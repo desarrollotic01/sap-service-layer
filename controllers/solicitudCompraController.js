@@ -1,83 +1,72 @@
 const { SolicitudCompra, SolicitudCompraLinea } = require("../db_connection");
 const sapService = require("../services/sap.services");
 
-// Crear solicitud (DRAFT)
 const createSolicitudCompra = async (usuarioId, data) => {
-  try {
-    const solicitud = await SolicitudCompra.create({
-      usuario_id: usuarioId,
-  requiredDate: data.requiredDate,
-  department: data.department,
-  comments: data.comments,
-  docCurrency: data.docCurrency,
-  docRate: data.docRate,
-  estado: "DRAFT",
+  const solicitud = await SolicitudCompra.create({
+    usuario_id: usuarioId,
+    requiredDate: data.requiredDate,
+    department: data.department,
+    emailSolicitante: data.email,
+    comments: data.comments,
+    docCurrency: data.docCurrency,
+    docRate: data.docRate,
+    bplId: data.bplId,
+    estado: "DRAFT",
+  });
+
+  for (const l of data.lineas) {
+    await SolicitudCompraLinea.create({
+      solicitud_compra_id: solicitud.id,
+      itemCode: l.itemCode,
+      quantity: l.quantity,
+      warehouseCode: l.warehouseCode,
+      costingCode: l.costingCode || null,
+      projectCode: l.projectCode || null,
     });
-
-    for (const linea of data.lineas) {
-      await SolicitudCompraLinea.create({
-        solicitud_compra_id: solicitud.id,
-        itemCode: linea.itemCode,
-        quantity: linea.quantity,
-        warehouseCode: linea.warehouseCode,
-      });
-    }
-
-    return solicitud;
-  } catch (error) {
-    console.error("Error createSolicitudCompra:", error);
-    return false;
   }
+
+  return solicitud;
 };
 
-// Obtener solicitudes del usuario
-const getSolicitudesByUsuario = async (usuarioId) => {
-  try {
-    return await SolicitudCompra.findAll({
-      where: { usuario_id: usuarioId },
-      include: ["lineas"],
-      order: [["createdAt", "DESC"]],
-    });
-  } catch (error) {
-    console.error("Error getSolicitudesByUsuario:", error);
-    return false;
-  }
-};
-
-// Sincronizar con SAP
 const syncSolicitudCompra = async (solicitudId) => {
-  try {
-    const solicitud = await SolicitudCompra.findByPk(solicitudId, {
-      include: ["lineas"],
-    });
+  const solicitud = await SolicitudCompra.findByPk(solicitudId, {
+    include: ["lineas"],
+  });
 
-    if (!solicitud || solicitud.estado !== "DRAFT") return null;
+  if (!solicitud || solicitud.estado !== "DRAFT") return null;
 
-    // Payload SAP
-    const payload = {
-      RequiredDate: solicitud.requiredDate,
-      DocumentLines: solicitud.lineas.map((l) => ({
-        ItemCode: l.itemCode,
-        Quantity: l.quantity,
-        WarehouseCode: l.warehouseCode,
-      })),
-    };
+  const payloadSAP = {
+    DocDate: solicitud.requiredDate,
+    RequiredDate: solicitud.requiredDate,
+    DocDueDate: solicitud.requiredDate,
 
-    const sapResponse = await sapService.createPurchaseRequest(payload);
+    Department: solicitud.department,
+    Comments: solicitud.comments,
+    DocCurrency: solicitud.docCurrency,
+    DocRate: solicitud.docRate,
 
-    solicitud.estado = "SENT";
-    solicitud.sapDocNum = sapResponse.DocNum;
-    await solicitud.save();
+    BPL_IDAssignedToInvoice: solicitud.bplId,
+    U_EmailSolicitante: solicitud.emailSolicitante,
 
-    return solicitud;
-  } catch (error) {
-    console.error("Error syncSolicitudCompra:", error);
-    return false;
-  }
+    DocumentLines: solicitud.lineas.map((l) => ({
+      ItemCode: l.itemCode,
+      Quantity: l.quantity,
+      WarehouseCode: l.warehouseCode,
+      CostingCode: l.costingCode || undefined,
+      ProjectCode: l.projectCode || undefined,
+    })),
+  };
+
+  const response = await sapService.createPurchaseRequest(payloadSAP);
+
+  solicitud.estado = "SENT";
+  solicitud.sapDocNum = response.DocNum;
+  await solicitud.save();
+
+  return solicitud;
 };
 
 module.exports = {
   createSolicitudCompra,
-  getSolicitudesByUsuario,
   syncSolicitudCompra,
 };
