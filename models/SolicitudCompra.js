@@ -8,6 +8,11 @@ module.exports = (sequelize) => {
         type: DataTypes.UUID,
         primaryKey: true,
         defaultValue: DataTypes.UUIDV4,
+      },
+
+      // === CABECERA SAP ===
+      docDate: {
+        type: DataTypes.DATEONLY,
         allowNull: false,
       },
 
@@ -18,10 +23,10 @@ module.exports = (sequelize) => {
 
       department: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
 
-      emailSolicitante: {
+      requester: {
         type: DataTypes.STRING,
         allowNull: false,
       },
@@ -43,14 +48,14 @@ module.exports = (sequelize) => {
         defaultValue: 1,
       },
 
-      bplId: {
+      branchId: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true,
       },
 
+      // === CONTROL ===
       estado: {
-        type: DataTypes.STRING,
-        allowNull: false,
+        type: DataTypes.ENUM("DRAFT", "SENT", "ERROR"),
         defaultValue: "DRAFT",
       },
 
@@ -66,6 +71,11 @@ module.exports = (sequelize) => {
   );
 
   SolicitudCompra.associate = (db) => {
+    SolicitudCompra.belongsTo(db.Usuario, {
+      foreignKey: "usuario_id",
+      as: "usuario",
+    });
+
     SolicitudCompra.hasMany(db.SolicitudCompraLinea, {
       foreignKey: "solicitud_compra_id",
       as: "lineas",
