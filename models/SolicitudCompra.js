@@ -8,6 +8,11 @@ module.exports = (sequelize) => {
         type: DataTypes.UUID,
         primaryKey: true,
         defaultValue: DataTypes.UUIDV4,
+      },
+
+      // === CABECERA SAP ===
+      docDate: {
+        type: DataTypes.DATEONLY,
         allowNull: false,
       },
 
@@ -16,8 +21,41 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      estado: {
+      department: {
         type: DataTypes.STRING,
+        allowNull: true,
+      },
+
+      requester: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+
+      comments: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+
+      docCurrency: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "PEN",
+      },
+
+      docRate: {
+        type: DataTypes.DECIMAL(15, 6),
+        allowNull: false,
+        defaultValue: 1,
+      },
+
+      branchId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+
+      // === CONTROL ===
+      estado: {
+        type: DataTypes.ENUM("DRAFT", "SENT", "ERROR"),
         defaultValue: "DRAFT",
       },
 
@@ -25,27 +63,6 @@ module.exports = (sequelize) => {
         type: DataTypes.INTEGER,
         allowNull: true,
       },
-department: {
-  type: DataTypes.STRING,
-  allowNull: true,
-},
-
-comments: {
-  type: DataTypes.TEXT,
-  allowNull: true,
-},
-
-docCurrency: {
-  type: DataTypes.STRING,
-  allowNull: false,
-  defaultValue: "PEN",
-},
-
-docRate: {
-  type: DataTypes.DECIMAL(15,6),
-  allowNull: false,
-  defaultValue: 1,
-},
     },
     {
       tableName: "SolicitudesCompra",

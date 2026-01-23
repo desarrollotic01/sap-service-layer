@@ -8,12 +8,16 @@ module.exports = (sequelize) => {
         type: DataTypes.UUID,
         primaryKey: true,
         defaultValue: DataTypes.UUIDV4,
-        allowNull: false,
       },
 
       itemCode: {
         type: DataTypes.STRING,
         allowNull: false,
+      },
+
+      description: {
+        type: DataTypes.STRING,
+        allowNull: true,
       },
 
       quantity: {
@@ -24,6 +28,16 @@ module.exports = (sequelize) => {
       warehouseCode: {
         type: DataTypes.STRING,
         allowNull: false,
+      },
+
+      costingCode: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+
+      projectCode: {
+        type: DataTypes.STRING,
+        allowNull: true,
       },
     },
     {
