@@ -22,6 +22,12 @@ const loginHandler = async (req, res) => {
   res.status(200).json(result);
 };
 
+const meHandler = async (req, res) => {
+  // req.user viene del middleware auth
+  res.status(200).json(req.user);
+};
+
 module.exports = {
   loginHandler,
+  meHandler,
 };

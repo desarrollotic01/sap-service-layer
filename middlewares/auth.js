@@ -5,15 +5,21 @@ module.exports = (req, res, next) => {
 
   if (!authHeader) {
     return res.status(401).json({
-      errors: ["Token requerido"],
+      errors: ["No se envió el token"],
     });
   }
 
-  const token = authHeader.split(" ")[1];
+  const [type, token] = authHeader.split(" ");
+
+  if (type !== "Bearer" || !token) {
+    return res.status(401).json({
+      errors: ["Formato de token inválido"],
+    });
+  }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // 👈 AQUÍ QUEDA EL USUARIO
+    req.user = decoded;
     next();
   } catch (error) {
     return res.status(401).json({

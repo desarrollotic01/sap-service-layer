@@ -1,5 +1,7 @@
 const argon2 = require("argon2");
-const { Usuario } = require("../db_connection");
+const { Usuario , UserViewConfig} = require("../db_connection");
+const { DEFAULT_VIEW_CONFIGS } = require("../utils/defautlViewConfig");
+
 
 // Obtener todos los usuarios activos
 const getAllUsuarios = async (page = 1, limit = 20) => {
@@ -36,22 +38,45 @@ const getUsuario = async (id) => {
   }
 };
 
-// Crear usuario
 const createUsuario = async ({ nombreApellido, alias, password }) => {
+  const transaction = await Usuario.sequelize.transaction();
+
   try {
     const hashedPassword = await argon2.hash(password);
 
-    return await Usuario.create({
-      nombreApellido,
-      alias,
-      password: hashedPassword,
-      state: true,
-    });
+    // 1️⃣ Crear usuario
+    const usuario = await Usuario.create(
+      {
+        nombreApellido,
+        alias,
+        password: hashedPassword,
+        state: true,
+      },
+      { transaction }
+    );
+
+    // 2️⃣ Crear configuraciones default por vista
+    const configs = Object.entries(DEFAULT_VIEW_CONFIGS).map(
+      ([view, config]) => ({
+        userId: usuario.id,
+        view,
+        cardFields: config.cardFields,
+        columnOrder: config.columnOrder,
+        filters: config.filters,
+      })
+    );
+
+    await UserViewConfig.bulkCreate(configs, { transaction });
+
+    await transaction.commit();
+    return usuario;
   } catch (error) {
+    await transaction.rollback();
     console.error("Error createUsuario:", error);
     return false;
   }
 };
+
 
 // Verificar login
 const verifyUsuario = async (alias, password) => {
