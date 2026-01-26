@@ -63,6 +63,11 @@ module.exports = (sequelize) => {
         type: DataTypes.INTEGER,
         allowNull: true,
       },
+      tratamiento_id: {
+  type: DataTypes.UUID,
+  allowNull: false,
+},
+
     },
     {
       tableName: "SolicitudesCompra",
@@ -80,6 +85,12 @@ module.exports = (sequelize) => {
       foreignKey: "solicitud_compra_id",
       as: "lineas",
     });
+    
+    SolicitudCompra.belongsTo(db.Tratamiento, {
+    foreignKey: "tratamiento_id",
+    as: "tratamiento",
+  });
+
   };
 
   return SolicitudCompra;
