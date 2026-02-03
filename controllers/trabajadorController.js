@@ -1,5 +1,5 @@
 const { Trabajador } = require("../db_connection");
-const { validate: isUUID } = require("uuid");
+
 
 const crear = async (data) => {
   if (!data.nombre || !data.rol) {

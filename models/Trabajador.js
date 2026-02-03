@@ -11,22 +11,57 @@ module.exports = (sequelize) => {
         defaultValue: DataTypes.UUIDV4,
       },
 
+      // 🧍 DATOS PERSONALES
       nombre: {
         type: DataTypes.STRING,
         allowNull: false,
       },
 
-      rol: {
-        type: DataTypes.ENUM(
-          "electrico",
-          "mantenimiento",
-          "mecanico"
-        ),
+      apellido: {
+        type: DataTypes.STRING,
         allowNull: false,
       },
 
+      dni: {
+  type: DataTypes.STRING,
+  allowNull: false,
+  unique: true,
+  validate: {
+    notEmpty: true,
+    len: [7, 12],
+  },
+},
+
+      fechaNacimiento: {
+        type: DataTypes.DATEONLY,
+        allowNull: true,
+      },
+
+      // 📍 UBICACIÓN
+      zona: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+
+      direccion: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+
+      // 🧰 DATOS LABORALES
+      rol: {
+        type: DataTypes.ENUM(
+          "tecnico_electrico",
+          "operario_de_mantenimiento",
+          "tecnico_mecanico",
+          "supervisor"
+        ),
+        allowNull: false,
+      },
+      
       empresa: {
         type: DataTypes.STRING,
+        allowNull: true,
       },
 
       activo: {

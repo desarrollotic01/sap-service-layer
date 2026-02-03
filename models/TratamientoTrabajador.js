@@ -23,9 +23,10 @@ module.exports = (sequelize) => {
 
       rol: {
         type: DataTypes.ENUM(
-          "electrico",
-          "mantenimiento",
-          "mecanico"
+          "tecnico_electrico",
+    "operario_de_mantenimiento",
+    "tecnico_mecanico",
+    "supervisor"
         ),
         allowNull: false,
       },

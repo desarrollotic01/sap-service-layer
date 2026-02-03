@@ -139,9 +139,11 @@ module.exports = (sequelize) => {
       /* =====================
          GESTIÓN / FLUJO
       ===================== */
-      solicitante: {
-        type: DataTypes.STRING,
-      },
+      solicitanteId: {
+  type: DataTypes.UUID,
+  allowNull: false,
+},
+
 
       supervisorAsignado: {
         type: DataTypes.STRING,
@@ -164,10 +166,7 @@ module.exports = (sequelize) => {
          DATOS FLEXIBLES
          (VIENEN DEL MODAL)
       ===================== */
-      equipos: {
-        type: DataTypes.JSON,
-        defaultValue: [],
-      },
+      
 
       documentos: {
         type: DataTypes.JSON,
@@ -195,12 +194,32 @@ module.exports = (sequelize) => {
   /* =====================
      ASOCIACIONES
   ===================== */
-  Aviso.associate = (db) => {
-    Aviso.belongsTo(db.Usuario, {
-      foreignKey: "creadoPor",
-      as: "creador",
-    });
-  };
+ Aviso.associate = (db) => {
+  Aviso.belongsTo(db.Usuario, {
+    foreignKey: "creadoPor",
+    as: "creador",
+  });
+
+
+  Aviso.belongsTo(db.Usuario, {
+    foreignKey: "solicitanteId",
+    as: "solicitante",
+  });
+
+
+  Aviso.hasMany(db.AvisoEquipo, {
+    foreignKey: "avisoId",
+    as: "equiposRelacion",
+  });
+
+
+  Aviso.hasMany(db.Tratamiento, {
+    foreignKey: "aviso_id",
+    as: "tratamientos",
+  });
+};
+
+
 
   return Aviso;
 };

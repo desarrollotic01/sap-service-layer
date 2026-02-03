@@ -98,6 +98,8 @@ module.exports = (sequelize) => {
       foreignKey: "tratamiento_id",
       as: "trabajadores",
     });
+
+    
   };
 
   return Tratamiento;

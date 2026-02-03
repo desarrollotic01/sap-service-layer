@@ -179,14 +179,118 @@ async function seedBase() {
        TRABAJADORES (OPCIONAL)
     ========================= */
     const trabajadores = [
-      { nombre: "Juan Pérez", rol: "electrico", empresa: "Interno" },
-      { nombre: "Carlos Gómez", rol: "mecanico", empresa: "Interno" },
-      { nombre: "Luis Torres", rol: "mantenimiento", empresa: "Contratista SAC" },
-    ];
+  {
+    nombre: "Luis",
+    apellido: "Torres",
+    dni: "45678912",
+    rol: "tecnico_electrico",
+    empresa: "Interno",
+  },
+  {
+    nombre: "Mario",
+    apellido: "Ramírez",
+    dni: "45678913",
+    rol: "tecnico_electrico",
+    empresa: "Interno",
+  },
+  {
+    nombre: "Lucio",
+    apellido: "Fernández",
+    dni: "45678914",
+    rol: "tecnico_electrico",
+    empresa: "Interno",
+  },
+  {
+    nombre: "Victor",
+    apellido: "Santos",
+    dni: "45678915",
+    rol: "tecnico_electrico",
+    empresa: "Interno",
+  },
+  {
+    nombre: "Aldair",
+    apellido: "Mendoza",
+    dni: "45678916",
+    rol: "tecnico_electrico",
+    empresa: "Interno",
+  },
+
+  {
+    nombre: "Carlos",
+    apellido: "Gómez",
+    dni: "47891234",
+    rol: "tecnico_mecanico",
+    empresa: "Interno",
+  },
+  {
+    nombre: "Junior",
+    apellido: "Vargas",
+    dni: "47891235",
+    rol: "tecnico_mecanico",
+    empresa: "Interno",
+  },
+  {
+    nombre: "Eduardo",
+    apellido: "Silva",
+    dni: "47891236",
+    rol: "tecnico_mecanico",
+    empresa: "Interno",
+  },
+  {
+    nombre: "Miguel",
+    apellido: "Hernández",
+    dni: "47891237",
+    rol: "tecnico_mecanico",
+    empresa: "Interno",
+  },
+  {
+    nombre: "Oscar",
+    apellido: "Ramírez",
+    dni: "47891238",
+    rol: "tecnico_mecanico",
+    empresa: "Interno",
+  },
+
+  {
+    nombre: "Roy",
+    apellido: "García",
+    dni: "48912345",
+    rol: "operario_de_mantenimiento",
+    empresa: "Contratista SAC",
+  },
+  {
+    nombre: "Luis",
+    apellido: "Torres",
+    dni: "48912345",
+    rol: "operario_de_mantenimiento",
+    empresa: "Contratista SAC",
+  },
+  {
+    nombre: "Jean",
+    apellido: "Perez",
+    dni: "48912346",
+    rol: "operario_de_mantenimiento",
+    empresa: "Contratista SAC",
+  },
+  {
+    nombre: "Andres",
+    apellido: "Gonzalez",
+    dni: "48912347",
+    rol: "operario_de_mantenimiento",
+    empresa: "Contratista SAC",
+  },
+  {
+    nombre: "Sebastian",
+    apellido: "Nuñez",
+    dni: "48912348",
+    rol: "supervisor",
+    empresa: "Contratista SAC",
+  }
+];
 
     for (const t of trabajadores) {
       await Trabajador.findOrCreate({
-        where: { nombre: t.nombre },
+        where: { dni: t.dni }, 
         defaults: t,
       });
     }

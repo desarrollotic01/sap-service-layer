@@ -44,5 +44,14 @@ module.exports = (sequelize) => {
     }
   );
 
+
+ Equipo.associate = (db) => {
+    Equipo.hasMany(db.AvisoEquipo, {
+      foreignKey: "equipoId",
+      as: "avisosRelacion",
+    });
+  };
+
+
   return Equipo;
 };

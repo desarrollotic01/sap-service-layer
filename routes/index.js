@@ -11,18 +11,20 @@ const clienteRouter = require("./clienteRouter");
 const equipoRouter = require("./equipoRouter");
 const ubicacionTecnicaRouter = require("./ubicacionTecnicaRouter");
 const contactoRouter = require("./contactoRouter");
+const ordenTrabajoRouter = require("./ordenTrabajoRouter");
+const EquipoAvisoRouter = require("./EquipoAvisoRouter");
+
+
+
+router.use("/equipo-aviso", EquipoAvisoRouter);
 
 
 
 
 
-
-
-router.use("/trabajador", trabajadorRouter);
+router.use("/orden-trabajo", ordenTrabajoRouter);
+router.use("/trabajador", trabajadorRouter);    
 router.use("/tratamiento", tratamiento);
-
-
-
 router.use("/solicitudCompra", solicitudCompraRutas);
 router.use("/auth" , authRutas)
 router.use("/usuario",usuarioRutas)
@@ -32,4 +34,10 @@ router.use("/cliente", clienteRouter);
 router.use("/equipo", equipoRouter);
 router.use("/ubicacion-tecnica", ubicacionTecnicaRouter);  
 router.use("/contacto", contactoRouter); 
+
+
+
+
+
+
 module.exports = router;

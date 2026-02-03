@@ -1,23 +1,22 @@
 const avisosController = require("../controllers/avisosController");
+const { validarAviso } = require("../validators/avisoValidator");
+
+
 
 async function crearAvisoHandler(req, res) {
-  const errors = [];
-
   try {
+    const errors = [];
+
     if (!req.user?.id) {
       errors.push("Usuario no autenticado");
     }
 
-    if (!req.body.tipoAviso) {
-      errors.push("tipoAviso es obligatorio");
-    }
+    // validaciones tuyas actuales
+    errors.push(...validarAviso(req.body));
 
-    if (!req.body.numeroAviso) {
-      errors.push("numeroAviso es obligatorio");
-    }
-
-    if (!req.body.cliente) {
-      errors.push("cliente es obligatorio");
+    // 👉 validación simple de equipos
+    if (req.body.equipos && !Array.isArray(req.body.equipos)) {
+      errors.push("Equipos debe ser un arreglo");
     }
 
     if (errors.length > 0) {
@@ -29,18 +28,17 @@ async function crearAvisoHandler(req, res) {
       req.user.id
     );
 
-    res.status(201).json(aviso);
+    return res.status(201).json(aviso);
   } catch (error) {
     console.error("ERROR CREAR AVISO:", error);
 
-    errors.push("Error interno al crear el aviso");
-
-    res.status(500).json({
-      errors,
-      detalle: error.message,
+    return res.status(500).json({
+      errors: ["Error interno al crear el aviso"],
     });
   }
 }
+
+
 async function obtenerAvisosHandler(req, res) {
   try {
     const avisos = await avisosController.obtenerAvisos();
@@ -99,10 +97,24 @@ async function eliminarAvisoHandler(req, res) {
   }
 }
 
+async function actualizarEstadoAvisoHandler(req, res) {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body;
+
+    const aviso = await avisosController.actualizarEstadoAviso(id, estado);
+
+    res.json(aviso);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error al actualizar estado" });
+  }
+}
 module.exports = {
   crearAvisoHandler,
   obtenerAvisosHandler,
   obtenerAvisoPorIdHandler,
   actualizarAvisoHandler,
   eliminarAvisoHandler,
+  actualizarEstadoAvisoHandler,
 };
