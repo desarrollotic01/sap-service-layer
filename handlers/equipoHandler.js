@@ -3,23 +3,33 @@ const EquipoController = require("../controllers/equipoController");
 const crearEquipo = async (req, res) => {
   try {
     const result = await EquipoController.crear(req.body);
-    res.status(201).json(result);
+    return res.status(201).json(result);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    return res.status(400).json({ message: error.message });
   }
 };
 
 const listarEquipos = async (_req, res) => {
-  const result = await EquipoController.listar();
-  res.json(result);
+  try {
+    const result = await EquipoController.listar();
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
 };
 
 const obtenerEquipo = async (req, res) => {
-  const result = await EquipoController.obtener(req.params.id);
-  if (!result)
-    return res.status(404).json({ message: "Equipo no encontrado" });
+  try {
+    const result = await EquipoController.obtener(req.params.id);
 
-  res.json(result);
+    if (!result) {
+      return res.status(404).json({ message: "Equipo no encontrado" });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
 };
 
 const actualizarEquipo = async (req, res) => {
@@ -28,18 +38,18 @@ const actualizarEquipo = async (req, res) => {
       req.params.id,
       req.body
     );
-    res.json(result);
+    return res.json(result);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    return res.status(400).json({ message: error.message });
   }
 };
 
 const eliminarEquipo = async (req, res) => {
   try {
     await EquipoController.eliminar(req.params.id);
-    res.status(204).end();
+    return res.status(204).end();
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    return res.status(400).json({ message: error.message });
   }
 };
 

@@ -66,6 +66,11 @@ module.exports = (sequelize) => {
         defaultValue: "CREADO",
       },
 
+      plan_mantenimiento_id: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
+
       /* =====================
          AUDITORÍA
       ===================== */

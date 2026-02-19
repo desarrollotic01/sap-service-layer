@@ -66,7 +66,51 @@ const syncSolicitudCompra = async (solicitudId) => {
   return solicitud;
 };
 
+
+const updateSolicitudCompra = async (solicitudId, data) => {
+  const solicitud = await SolicitudCompra.findByPk(solicitudId, {
+    include: [{ association: "lineas" }],
+  });
+
+  if (!solicitud) return null;
+  if (solicitud.estado !== "DRAFT") return "NO_EDITABLE";
+
+  // 🔹 Actualizar cabecera
+  await solicitud.update({
+    requiredDate: data.requiredDate,
+    department: data.department,
+    requester: data.requester,
+    comments: data.comments,
+    docCurrency: data.docCurrency,
+    docRate: data.docRate,
+    branchId: data.branchId,
+  });
+
+  // 🔹 Reemplazar líneas (estrategia segura)
+  await SolicitudCompraLinea.destroy({
+    where: { solicitud_compra_id: solicitud.id },
+  });
+
+  for (const l of data.lineas) {
+    await SolicitudCompraLinea.create({
+      solicitud_compra_id: solicitud.id,
+      itemCode: l.itemCode,
+      description: l.description || null,
+      quantity: l.quantity,
+      warehouseCode: l.warehouseCode,
+      costingCode: l.costingCode || null,
+      projectCode: l.projectCode || null,
+    });
+  }
+
+  return await SolicitudCompra.findByPk(solicitud.id, {
+    include: [{ association: "lineas" }],
+  });
+};
+
 module.exports = {
   createSolicitudCompra,
   syncSolicitudCompra,
+    updateSolicitudCompra,
+
 };

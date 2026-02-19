@@ -16,7 +16,18 @@ module.exports = (sequelize) => {
     unique: true,
   },
 
-  descripcionGeneral: DataTypes.TEXT, // antes "descripcion"
+  tipoMantenimiento: {
+  type: DataTypes.ENUM(
+    "Preventivo",
+    "Correctivo",
+    "Mejora",
+    "Predictivo"
+  ),
+  allowNull: false,
+},
+
+
+  descripcionGeneral: DataTypes.TEXT,
 
   estado: {
     type: DataTypes.ENUM(
@@ -62,6 +73,11 @@ module.exports = (sequelize) => {
   OrdenTrabajo.hasMany(models.OrdenTrabajoEquipo, {
     foreignKey: "ordenTrabajoId",
     as: "equipos",
+  });
+
+   OrdenTrabajo.hasMany(models.Adjunto, {
+    foreignKey: "ordenTrabajoId",
+    as: "adjuntos",
   });
 };
 

@@ -7,10 +7,6 @@ async function crearOrdenTrabajoHandler(req, res) {
   try {
     const errors = [];
 
-    if (!req.body.numeroOT) {
-      errors.push("numeroOT es requerido");
-    }
-
     if (!req.body.avisoId) {
       errors.push("avisoId es requerido");
     }
@@ -118,6 +114,24 @@ async function eliminarOrdenTrabajoHandler(req, res) {
   }
 }
 
+const liberarOrdenTrabajo = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const ot = await ordenTrabajoController.liberarOrdenTrabajo(id);
+
+    res.json({
+      message: "Orden de Trabajo liberada correctamente",
+      data: ot
+    });
+
+  } catch (error) {
+    res.status(400).json({
+      message: error.message
+    });
+  }
+};
+
 /* =========================
    EXPORTS
 ========================= */
@@ -127,4 +141,5 @@ module.exports = {
   obtenerOrdenTrabajoPorIdHandler,
   actualizarOrdenTrabajoHandler,
   eliminarOrdenTrabajoHandler,
+  liberarOrdenTrabajo
 };

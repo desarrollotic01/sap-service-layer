@@ -58,17 +58,6 @@ function validarAviso(body) {
   }
 
   /* =====================
-     UBICACIÓN Y EQUIPOS
-  ===================== */
-  if (!body.ubicacionTecnica) {
-    errors.push("ubicacionTecnica es obligatoria");
-  }
-
-  if (!Array.isArray(body.equipos) || body.equipos.length === 0) {
-    errors.push("Debe seleccionar al menos un equipo");
-  }
-
-  /* =====================
      MANTENIMIENTO (CONDICIONAL)
   ===================== */
   if (body.tipoAviso === "mantenimiento") {

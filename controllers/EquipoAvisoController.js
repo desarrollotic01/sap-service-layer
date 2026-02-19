@@ -3,26 +3,25 @@ const { Op } = require("sequelize");
 
 const getEquiposDisponiblesPorAviso = async (avisoId) => {
   return await AvisoEquipo.findAll({
-    where: {
-      avisoId,
-      equipoId: {
-        [Op.notIn]: sequelize.literal(`
-          (
-            SELECT "equipoId"
-            FROM "orden_trabajo_equipos"
-            WHERE "estadoEquipo" IN ('PENDIENTE', 'EN_PROCESO')
-          )
-        `),
-      },
-    },
+    where: { avisoId },
     include: [
       {
         association: "equipo",
         required: true,
+        include: [
+          {
+            association: "ordenesTrabajoEquipos",
+            required: false,
+            where: {
+              estadoEquipo: { [Op.in]: ["PENDIENTE", "EN_PROCESO"] }
+            }
+          }
+        ]
       },
     ],
   });
 };
+
 
 module.exports = {
   getEquiposDisponiblesPorAviso,

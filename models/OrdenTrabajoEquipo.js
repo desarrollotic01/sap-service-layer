@@ -25,6 +25,11 @@ module.exports = (sequelize) => {
       type: DataTypes.TEXT,
     },
 
+    planMantenimientoId: {
+  type: DataTypes.UUID,
+  allowNull: true, // puede ser manual
+},
+
     // ⚠️ prioridad por equipo
     prioridad: {
       type: DataTypes.ENUM(
@@ -36,6 +41,7 @@ module.exports = (sequelize) => {
       defaultValue: "MEDIA",
     },
 
+
     // 🔧 actividad a realizar
     tipoActividad: {
       type: DataTypes.STRING,
@@ -46,6 +52,10 @@ module.exports = (sequelize) => {
     fechaFinProgramada: DataTypes.DATE,
     fechaInicioReal: DataTypes.DATE,
     fechaFinReal: DataTypes.DATE,
+
+    observacionesEquipo: {
+      type: DataTypes.TEXT,
+    },
 
     estadoEquipo: {
       type: DataTypes.ENUM(
@@ -82,6 +92,30 @@ module.exports = (sequelize) => {
       foreignKey: "equipoId",
       as: "equipo",
     });
+
+    OrdenTrabajoEquipo.belongsTo(models.PlanMantenimiento, {
+  foreignKey: "planMantenimientoId",
+  as: "planMantenimiento",
+});
+
+OrdenTrabajoEquipo.hasMany(models.Adjunto, {
+  foreignKey: "ordenTrabajoEquipoId",
+  as: "adjuntos",
+});
+
+
+
+  OrdenTrabajoEquipo.hasMany(models.OrdenTrabajoEquipoTrabajador, {
+  foreignKey: "ordenTrabajoEquipoId",
+  as: "trabajadores",
+});
+
+ OrdenTrabajoEquipo.hasMany(models.OrdenTrabajoEquipoActividad, {
+    foreignKey: "ordenTrabajoEquipoId",
+    as: "actividades",
+  });
+
+
   };
 
   return OrdenTrabajoEquipo;

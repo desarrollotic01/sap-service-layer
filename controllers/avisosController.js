@@ -1,4 +1,4 @@
-const { Aviso, Usuario, AvisoEquipo, sequelize, Equipo } = require("../db_connection");
+const { Aviso, Usuario, AvisoEquipo, sequelize, Equipo , UbicacionTecnica, AvisoUbicacion} = require("../db_connection");
 
 /* =========================
    CREAR AVISO
@@ -7,7 +7,7 @@ async function crearAviso(data, userId) {
   const t = await sequelize.transaction();
 
   try {
-    const { equipos, ...avisoData } = data;
+    const { equipos = [], ubicaciones = [], ...avisoData } = data;
 
     const aviso = await Aviso.create(
       {
@@ -19,13 +19,28 @@ async function crearAviso(data, userId) {
       { transaction: t }
     );
 
-    if (equipos && equipos.length > 0) {
-      const relaciones = equipos.map((equipoId) => ({
+    // 🔹 Crear relaciones con equipos
+    if (equipos.length > 0) {
+      const relacionesEquipos = equipos.map((equipoId) => ({
         avisoId: aviso.id,
         equipoId,
       }));
 
-      await AvisoEquipo.bulkCreate(relaciones, { transaction: t });
+      await AvisoEquipo.bulkCreate(relacionesEquipos, {
+        transaction: t,
+      });
+    }
+
+    // 🔹 Crear relaciones con ubicaciones
+    if (ubicaciones.length > 0) {
+      const relacionesUbicaciones = ubicaciones.map((ubicacionId) => ({
+        avisoId: aviso.id,
+        ubicacionId,
+      }));
+
+      await AvisoUbicacion.bulkCreate(relacionesUbicaciones, {
+        transaction: t,
+      });
     }
 
     await t.commit();
@@ -54,19 +69,36 @@ async function obtenerAvisos() {
       },
       {
         association: "equiposRelacion",
-        attributes: ["id", "equipoId"], 
+        attributes: ["id", "equipoId"],
         include: [
           {
             model: Equipo,
             as: "equipo",
-            attributes: ["id", "nombre", "codigo", "tipo"],
+            attributes: ["id", "nombre", "codigo", "tipoEquipo"], 
+          },
+        ],
+      },
+      {
+        association: "ubicacionesRelacion",
+        attributes: ["id", "ubicacionId"],
+        include: [
+          {
+            model: UbicacionTecnica,
+            as: "ubicacion",
+            attributes: ["id", "nombre", "codigo", "nivel"],
           },
         ],
       },
       {
         association: "tratamientos",
-        attributes: ["id"]
+        attributes: ["id"],
       },
+
+      
+       {
+         association: "pais",
+      attributes: ["id", "codigo", "nombre"],
+       },
     ],
     order: [["createdAt", "DESC"]],
   });

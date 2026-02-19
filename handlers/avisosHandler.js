@@ -11,12 +11,34 @@ async function crearAvisoHandler(req, res) {
       errors.push("Usuario no autenticado");
     }
 
-    // validaciones tuyas actuales
     errors.push(...validarAviso(req.body));
 
-    // 👉 validación simple de equipos
-    if (req.body.equipos && !Array.isArray(req.body.equipos)) {
+    const { equipos = [], ubicaciones = [] } = req.body;
+
+    // Validar tipo arreglo
+    if (equipos && !Array.isArray(equipos)) {
       errors.push("Equipos debe ser un arreglo");
+    }
+
+    if (ubicaciones && !Array.isArray(ubicaciones)) {
+      errors.push("Ubicaciones debe ser un arreglo");
+    }
+
+    const tieneEquipos = Array.isArray(equipos) && equipos.length > 0;
+    const tieneUbicaciones =
+      Array.isArray(ubicaciones) && ubicaciones.length > 0;
+
+    // 🔥 VALIDACIÓN EXCLUSIVA (XOR)
+    if (!tieneEquipos && !tieneUbicaciones) {
+      errors.push(
+        "Debe enviar equipos o ubicaciones técnicas"
+      );
+    }
+
+    if (tieneEquipos && tieneUbicaciones) {
+      errors.push(
+        "El aviso no puede tener equipos y ubicaciones al mismo tiempo"
+      );
     }
 
     if (errors.length > 0) {
@@ -37,6 +59,8 @@ async function crearAvisoHandler(req, res) {
     });
   }
 }
+
+  
 
 
 async function obtenerAvisosHandler(req, res) {

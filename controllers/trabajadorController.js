@@ -2,15 +2,20 @@ const { Trabajador } = require("../db_connection");
 
 
 const crear = async (data) => {
-  if (!data.nombre || !data.rol) {
-    throw new Error("Nombre y rol son obligatorios");
+  if (!data.nombre || !data.apellido || !data.dni || !data.rol) {
+    throw new Error("Nombre, apellido, DNI y rol son obligatorios");
   }
 
   return Trabajador.create({
     nombre: data.nombre,
+    apellido: data.apellido,
+    dni: data.dni,
+    fechaNacimiento: data.fechaNacimiento || null,
+    zona: data.zona || null,
+    direccion: data.direccion || null,
     rol: data.rol,
-    empresa: data.empresa,
-    activo: true,
+    empresa: data.empresa || null,
+    activo: data.activo ?? true,
   });
 };
 

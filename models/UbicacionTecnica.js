@@ -40,5 +40,13 @@ module.exports = (sequelize) => {
     }
   );
 
+  UbicacionTecnica.associate = (db) =>{ 
+
+  UbicacionTecnica.hasMany(db.AvisoUbicacion, {
+  foreignKey: "ubicacionId",
+  as: "avisosRelacion",
+});
+}
+
   return UbicacionTecnica;
 };

@@ -125,13 +125,6 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
       },
 
-      /* =====================
-         UBICACIÓN
-      ===================== */
-      ubicacionTecnica: {
-        type: DataTypes.STRING,
-      },
-
       direccionAtencion: {
         type: DataTypes.STRING,
       },
@@ -177,6 +170,12 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
       },
 
+
+      paisId: {
+  type: DataTypes.UUID,
+  allowNull: false,
+},
+
       /* =====================
          AUDITORÍA
       ===================== */
@@ -217,6 +216,19 @@ module.exports = (sequelize) => {
     foreignKey: "aviso_id",
     as: "tratamientos",
   });
+
+
+  Aviso.hasMany(db.AvisoUbicacion, {
+  foreignKey: "avisoId",
+  as: "ubicacionesRelacion",
+});
+
+Aviso.belongsTo(db.Pais, {
+  foreignKey: "paisId",
+  as: "pais",
+});
+
+
 };
 
 
