@@ -94,7 +94,7 @@ const obtener = async (id) => {
       {
         model: Cliente,
         as: "cliente",
-        attributes: ["id", "nombre"],
+        attributes: ["id", "razonSocial"],
       },
       {
         model: Familia,
@@ -106,17 +106,17 @@ const obtener = async (id) => {
         as: "pais",
         attributes: ["id", "codigo", "nombre"],
       },
-
-      {
-  model: PlanMantenimiento,
-  as: "planesMantenimiento",
-  attributes: ["id", "codigoPlan", "nombre", "tipo"],
-},
-
       {
         model: Adjunto,
         as: "adjuntos",
       },
+
+      {
+  model:PlanMantenimiento,
+  as: "planesMantenimiento",
+  attributes: ["id", "codigoPlan", "nombre", "tipo"],
+},
+
     ],
   });
 };

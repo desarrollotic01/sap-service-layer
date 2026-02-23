@@ -94,10 +94,10 @@ module.exports = (sequelize) => {
       as: "aviso",
     });
 
-    Tratamiento.hasOne(db.SolicitudCompra, {
-      foreignKey: "tratamiento_id",
-      as: "solicitudCompra",
-    });
+    Tratamiento.hasMany(db.SolicitudCompra, {
+  foreignKey: "tratamiento_id",
+  as: "solicitudesCompra",
+});
 
     Tratamiento.hasMany(db.TratamientoTrabajador, {
       foreignKey: "tratamiento_id",

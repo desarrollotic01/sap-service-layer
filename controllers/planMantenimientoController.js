@@ -244,6 +244,11 @@ const obtenerPlanes = async () => {
           { association: "adjuntos" },
         ],
       },
+      {
+        association: "equipos", 
+        attributes: ["id", "nombre", "codigo"],
+        through: { attributes: [] },
+      },
     ],
     order: [["createdAt", "DESC"]],
   });

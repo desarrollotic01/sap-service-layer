@@ -68,6 +68,22 @@ module.exports = (sequelize) => {
   allowNull: false,
 },
 
+
+equipo_id: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
+
+ubicacion_tecnica_id: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
+
+esGeneral: {
+  type: DataTypes.BOOLEAN,
+  defaultValue: false,
+},
+
     },
     {
       tableName: "SolicitudesCompra",
