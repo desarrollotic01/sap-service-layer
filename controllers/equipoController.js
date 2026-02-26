@@ -5,7 +5,9 @@ const {
   Adjunto,
   Pais,
   sequelize,
-  PlanMantenimiento
+  PlanMantenimiento,
+    PlanMantenimientoActividad,
+
 } = require("../db_connection");
 
 const crear = async (data) => {
@@ -47,6 +49,19 @@ const crear = async (data) => {
         { model: Pais, as: "pais", attributes: ["id", "codigo", "nombre"] },
         { model: Adjunto, as: "adjuntos" },
         { model: sequelize.models.PlanMantenimiento, as: "planesMantenimiento" },
+        {
+          model: PlanMantenimiento,
+          as: "planesMantenimiento",
+          attributes: ["id", "codigoPlan", "nombre", "tipo", "activo", "esEspecifico", "equipoObjetivoId"],
+          through: { attributes: [] },
+          include: [
+            {
+              model: PlanMantenimientoActividad,
+              as: "actividades",
+            },
+          ],
+        },
+        
       ],
       transaction: t,
     });
@@ -57,32 +72,22 @@ const crear = async (data) => {
 const listar = async () => {
   return Equipo.findAll({
     include: [
+      { model: Cliente, as: "cliente", attributes: ["id", "razonSocial"] },
+      { model: Familia, as: "familia", attributes: ["id", "nombre"] },
+      { model: Pais, as: "pais", attributes: ["id", "codigo", "nombre"] },
+      { model: Adjunto, as: "adjuntos" },
       {
-        model: Cliente,
-        as: "cliente",
-        attributes: ["id", "razonSocial"],
+        model: PlanMantenimiento,
+        as: "planesMantenimiento",
+        attributes: ["id", "codigoPlan", "nombre", "tipo", "activo", "esEspecifico", "equipoObjetivoId"],
+        through: { attributes: [] },
+        include: [
+          {
+            model: PlanMantenimientoActividad,
+            as: "actividades",
+          },
+        ],
       },
-      {
-        model: Familia,
-        as: "familia",
-        attributes: ["id", "nombre"],
-      },
-      {
-        model: Pais,
-        as: "pais",
-        attributes: ["id", "codigo", "nombre"],
-      },
-      {
-        model: Adjunto,
-        as: "adjuntos",
-      },
-
-      {
-  model:PlanMantenimiento,
-  as: "planesMantenimiento",
-  attributes: ["id", "codigoPlan", "nombre", "tipo"],
-},
-
     ],
     order: [["createdAt", "DESC"]],
   });
@@ -91,32 +96,22 @@ const listar = async () => {
 const obtener = async (id) => {
   return Equipo.findByPk(id, {
     include: [
+      { model: Cliente, as: "cliente", attributes: ["id", "razonSocial"] },
+      { model: Familia, as: "familia", attributes: ["id", "nombre"] },
+      { model: Pais, as: "pais", attributes: ["id", "codigo", "nombre"] },
+      { model: Adjunto, as: "adjuntos" },
       {
-        model: Cliente,
-        as: "cliente",
-        attributes: ["id", "razonSocial"],
+        model: PlanMantenimiento,
+        as: "planesMantenimiento",
+        attributes: ["id", "codigoPlan", "nombre", "tipo", "activo", "esEspecifico", "equipoObjetivoId"],
+        through: { attributes: [] },
+        include: [
+          {
+            model: PlanMantenimientoActividad,
+            as: "actividades",
+          },
+        ],
       },
-      {
-        model: Familia,
-        as: "familia",
-        attributes: ["id", "nombre"],
-      },
-      {
-        model: Pais,
-        as: "pais",
-        attributes: ["id", "codigo", "nombre"],
-      },
-      {
-        model: Adjunto,
-        as: "adjuntos",
-      },
-
-      {
-  model:PlanMantenimiento,
-  as: "planesMantenimiento",
-  attributes: ["id", "codigoPlan", "nombre", "tipo"],
-},
-
     ],
   });
 };
@@ -152,10 +147,39 @@ const eliminar = async (id) => {
   });
 };
 
+const obtenerPlanesMantenimientoPorEquipo = async (equipoId) => {
+  if (!equipoId) throw new Error("El id del equipo es obligatorio");
+
+  const equipo = await Equipo.findByPk(equipoId, {
+    include: [
+      {
+        model: PlanMantenimiento,
+        as: "planesMantenimiento",
+        attributes: ["id", "codigoPlan", "nombre", "tipo", "activo", "esEspecifico", "equipoObjetivoId"],
+        where: { activo: true },
+        required: false,
+        through: { attributes: [] },
+        include: [
+          {
+            model: PlanMantenimientoActividad,
+            as: "actividades",
+          },
+        ],
+      },
+    ],
+  });
+
+  if (!equipo) throw new Error("Equipo no encontrado");
+
+  return equipo.planesMantenimiento || [];
+};
+
 module.exports = {
   crear,
   listar,
   obtener,
   actualizar,
   eliminar,
+  obtenerPlanesMantenimientoPorEquipo,
+
 };

@@ -7,5 +7,6 @@ router.get("/:id",auth, h.obtenerEquipo);
 router.post("/", auth, h.crearEquipo);
 router.put("/:id", auth, h.actualizarEquipo);
 router.delete("/:id", auth, h.eliminarEquipo);
+router.get("/:id/planes-mantenimiento", auth, h.obtenerPlanesMantenimientoEquipo);
 
 module.exports = router;

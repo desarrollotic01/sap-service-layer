@@ -3,7 +3,9 @@ const {
   obtenerPlanes,
   obtenerPlanPorId,
   obtenerPlanesPorEquipo,
-  obtenerMejorPlanPorEquipo
+  obtenerMejorPlanPorEquipo,
+  actualizarPlanesDeEquipo,
+
 } = require("../controllers/planMantenimientoController");
 
 const crearPlanHandler = async (req, res) => {
@@ -52,11 +54,29 @@ const obtenerMejorPlanPorEquipoHandler = async (req, res) => {
   }
 };
 
+const actualizarPlanesMantenimientoEquipo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { planesMantenimientoIds } = req.body;
+
+    const result = await EquipoController.actualizarPlanesDeEquipo(
+      id,
+      planesMantenimientoIds
+    );
+
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+};
+
+
 
 module.exports = {
   crearPlanHandler,
   obtenerPlanesHandler,
   obtenerPlanPorIdHandler,
   obtenerPlanesPorEquipoHandler,
-  obtenerMejorPlanPorEquipoHandler
+  obtenerMejorPlanPorEquipoHandler,
+  actualizarPlanesMantenimientoEquipo,
 };

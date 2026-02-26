@@ -94,6 +94,16 @@ module.exports = (sequelize) => {
       foreignKey: "tratamientoEquipoId",
       as: "actividades",
     });
+
+    TratamientoEquipo.hasMany(models.TratamientoEquipoRequerimiento, {
+  foreignKey: "tratamientoEquipoId",
+  as: "requerimientos",
+});
+
+TratamientoEquipo.hasMany(models.TratamientoEquipoTrabajador, {
+  foreignKey: "tratamientoEquipoId",
+  as: "tecnicosAsignados",
+});
   };
 
   return TratamientoEquipo;

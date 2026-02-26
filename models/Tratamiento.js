@@ -37,7 +37,7 @@ module.exports = (sequelize) => {
        */
       requerimientos: {
         type: DataTypes.JSON,
-        allowNull: false,
+        allowNull: true,
         /*
           [
             {
@@ -103,6 +103,11 @@ module.exports = (sequelize) => {
       foreignKey: "tratamiento_id",
       as: "trabajadores",
     });
+
+    Tratamiento.hasMany(db.TratamientoEquipo, {
+  foreignKey: "tratamientoId",
+  as: "equipos",
+});
 
     
   };

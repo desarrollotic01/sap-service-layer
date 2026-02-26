@@ -1,3 +1,4 @@
+// models/OrdenTrabajoEquipoActividad.js
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
@@ -20,10 +21,15 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
+      sistema: DataTypes.STRING,
+      subsistema: DataTypes.STRING,
       componente: DataTypes.STRING,
-      tarea: DataTypes.STRING,
 
-      // ✅ SINCRONIZADO con PlanMantenimientoActividad + valores extra
+      tarea: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+
       tipoTrabajo: {
         type: DataTypes.ENUM(
           "TORQUEO_REGULACION",
@@ -32,20 +38,51 @@ module.exports = (sequelize) => {
           "INSPECCION",
           "CAMBIO",
           "LIMPIEZA",
-          "AJUSTE",        // ← era solo de OT, lo mantenemos
-          "LUBRICACION"    // ← era solo de OT, lo mantenemos
+          "AJUSTE",
+          "LUBRICACION"
         ),
+        allowNull: true,
       },
 
-      duracionEstimadaMin: DataTypes.INTEGER,
-      duracionRealMin: DataTypes.INTEGER,
+      // ✅ NUEVO: duración estimada con unidad
+      duracionEstimadaValor: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+
+      unidadDuracion: {
+        type: DataTypes.ENUM("min", "h"),
+        allowNull: false,
+        defaultValue: "min",
+      },
+
+      duracionEstimadaMin: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+
+      // ✅ NUEVO: duración real con unidad (solo OT)
+      duracionRealValor: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+
+      unidadDuracionReal: {
+        type: DataTypes.ENUM("min", "h"),
+        allowNull: false,
+        defaultValue: "min",
+      },
+
+      duracionRealMin: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
 
       estado: {
         type: DataTypes.ENUM("PENDIENTE", "EN_PROCESO", "COMPLETADA", "OMITIDA"),
         defaultValue: "PENDIENTE",
       },
 
-      // ✅ NUEVO: distinguir origen
       origen: {
         type: DataTypes.ENUM("PLAN", "MANUAL"),
         allowNull: false,

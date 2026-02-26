@@ -1,3 +1,4 @@
+// models/SolicitudCompraLinea.js
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
@@ -34,8 +35,19 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: true,
       },
-      
+
       projectCode: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+
+
+      rubro: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+
+      paqueteTrabajo: {
         type: DataTypes.STRING,
         allowNull: true,
       },

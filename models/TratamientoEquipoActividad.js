@@ -1,3 +1,4 @@
+// models/TratamientoEquipoActividad.js
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
@@ -39,27 +40,47 @@ module.exports = (sequelize) => {
           "CAMBIO",
           "LIMPIEZA",
           "AJUSTE",
-          "LUBRICACION"
+          "LUBRICACION",
+          "REPARACION" 
+
         ),
+        allowNull: true,
       },
 
-      duracionEstimadaMin: DataTypes.INTEGER,
+      // ✅ NUEVO: el valor tal cual lo elige el usuario (ej: 2, 30, 1.5)
+      duracionEstimadaValor: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+
+      // ✅ NUEVO: unidad de la duración estimada
+      unidadDuracion: {
+        type: DataTypes.ENUM("min", "h"),
+        allowNull: false,
+        defaultValue: "min",
+      },
+
+      // ✅ Estándar del sistema (minutos) para cálculos/reportes
+      duracionEstimadaMin: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
 
       estado: {
-        type: DataTypes.ENUM(
-          "PENDIENTE",
-          "LISTA",
-          "OMITIDA"
-        ),
+        type: DataTypes.ENUM("PENDIENTE", "LISTA", "OMITIDA"),
         defaultValue: "PENDIENTE",
       },
 
-      // 🔥 CLAVE PARA TU CASO
       origen: {
         type: DataTypes.ENUM("PLAN", "MANUAL"),
         allowNull: false,
         defaultValue: "PLAN",
       },
+
+      descripcion: {
+  type: DataTypes.TEXT,
+  allowNull: true,
+},
 
       observaciones: DataTypes.TEXT,
     },
@@ -75,13 +96,10 @@ module.exports = (sequelize) => {
       as: "tratamientoEquipo",
     });
 
-    TratamientoEquipoActividad.belongsTo(
-      models.PlanMantenimientoActividad,
-      {
-        foreignKey: "planMantenimientoActividadId",
-        as: "actividadPlan",
-      }
-    );
+    TratamientoEquipoActividad.belongsTo(models.PlanMantenimientoActividad, {
+      foreignKey: "planMantenimientoActividadId",
+      as: "actividadPlan",
+    });
   };
 
   return TratamientoEquipoActividad;

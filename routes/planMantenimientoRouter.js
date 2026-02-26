@@ -4,14 +4,17 @@ const {
   obtenerPlanesHandler,
   obtenerPlanPorIdHandler,
   obtenerPlanesPorEquipoHandler,
-  obtenerMejorPlanPorEquipoHandler
+  obtenerMejorPlanPorEquipoHandler,
+  actualizarPlanesMantenimientoEquipo,
 } = require("../handlers/planMantenimientoHandler");
 
+const auth = require("../middlewares/auth");
 const router = Router();
 
-router.post("/", crearPlanHandler);
-router.get("/", obtenerPlanesHandler);
-router.get("/equipo/:equipoId/mejor", obtenerMejorPlanPorEquipoHandler);
-router.get("/equipo/:equipoId", obtenerPlanesPorEquipoHandler);
-router.get("/:id", obtenerPlanPorIdHandler);
+router.post("/", auth,crearPlanHandler);
+router.get("/", auth, obtenerPlanesHandler);
+router.get("/equipo/:equipoId/mejor", auth, obtenerMejorPlanPorEquipoHandler);
+router.get("/equipo/:equipoId", auth, obtenerPlanesPorEquipoHandler);
+router.put("/:id/planes-mantenimiento", auth, actualizarPlanesMantenimientoEquipo);
+router.get("/:id", auth, obtenerPlanPorIdHandler);
 module.exports = router;

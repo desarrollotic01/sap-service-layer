@@ -84,6 +84,11 @@ esGeneral: {
   defaultValue: false,
 },
 
+ordenTrabajoId: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
+
     },
     {
       tableName: "SolicitudesCompra",
@@ -106,6 +111,9 @@ esGeneral: {
     foreignKey: "tratamiento_id",
     as: "tratamiento",
   });
+
+  SolicitudCompra.belongsTo(db.OrdenTrabajo,
+     { foreignKey: "ordenTrabajoId", as: "ordenTrabajo" });
 
   };
 

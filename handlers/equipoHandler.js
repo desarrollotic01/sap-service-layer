@@ -53,10 +53,30 @@ const eliminarEquipo = async (req, res) => {
   }
 };
 
+const obtenerPlanesMantenimientoEquipo = async (req, res) => {
+  try {
+    const { id } = req.params; 
+
+    const planes = await EquipoController.obtenerPlanesMantenimientoPorEquipo(id);
+
+    return res.json({
+      equipoId: id,
+      total: planes.length,
+      planes,
+    });
+  } catch (error) {
+    const msg = error.message || "Error";
+    const status = msg.toLowerCase().includes("no encontrado") ? 404 : 400;
+    return res.status(status).json({ message: msg });
+  }
+};
+
 module.exports = {
   crearEquipo,
   listarEquipos,
   obtenerEquipo,
   actualizarEquipo,
   eliminarEquipo,
+  obtenerPlanesMantenimientoEquipo,
+
 };

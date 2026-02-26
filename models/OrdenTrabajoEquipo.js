@@ -42,11 +42,6 @@ module.exports = (sequelize) => {
     },
 
 
-    // 🔧 actividad a realizar
-    tipoActividad: {
-      type: DataTypes.STRING,
-    },
-
     // 📅 fechas y horas propias
     fechaInicioProgramada: DataTypes.DATE,
     fechaFinProgramada: DataTypes.DATE,
