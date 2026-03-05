@@ -21,18 +21,79 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
+      id_cliente: {
+        type: DataTypes.STRING,
+      },
+
+      clienteId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },  
+
+      tipoEquipoPropiedad: {
+        type: DataTypes.ENUM("Vendido", "Propio", "Atendido"),
+        allowNull: false,
+      },
+
+      paisId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      },
+
+      sede: {
+        type: DataTypes.STRING,
+      },
+
+      almacen: {
+        type: DataTypes.STRING,
+      },
+
+      operadorLogistico: {
+        type: DataTypes.STRING,
+      },
+
+       idPlaca: {
+        type: DataTypes.STRING,
+      },
+
+      numeroOV: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+
+      fechaOV: {
+        type: DataTypes.DATEONLY,
+      },
+
+      numeroOrdenCliente: {
+        type: DataTypes.STRING,
+      },
+
+      fechaOrdenCliente: {
+        type: DataTypes.DATEONLY,
+      },
+
       descripcion: {
         type: DataTypes.STRING,
       },
 
-      nivel: {
-        type: DataTypes.STRING,
+      fechaEntregaPrevista: {
+        type: DataTypes.DATEONLY,
       },
 
-      ubicacionPadre: {
-        type: DataTypes.UUID,
-        allowNull: true,
+      fechaEntregaReal: {
+        type: DataTypes.DATEONLY,
       },
+
+      finGarantia: {
+        type: DataTypes.DATEONLY,
+      },
+
+      especialidad: {
+          type: DataTypes.STRING,
+      }
+
+
     },
     {
       tableName: "UbicacionesTecnicas",
@@ -46,7 +107,19 @@ module.exports = (sequelize) => {
   foreignKey: "ubicacionId",
   as: "avisosRelacion",
 });
+
+UbicacionTecnica.belongsTo(db.Pais, {
+  foreignKey: "paisId",
+  as: "pais",
+}); 
+
+UbicacionTecnica.belongsTo(db.Cliente, {
+  foreignKey: "ClienteId",
+  as: "cliente",
+});
+
 }
+
 
   return UbicacionTecnica;
 };

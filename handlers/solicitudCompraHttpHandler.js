@@ -48,8 +48,33 @@ const syncSolicitudHandler = async (req, res) => {
   });
 };
 
+
+const enviarSolicitudGeneralHandler = async (req, res) => {
+  try {
+    const { avisoId, otId } = req.body;
+
+    if (!avisoId) {
+      return res.status(400).json({ errors: ["avisoId es obligatorio"] });
+    }
+    if (!otId) {
+      return res.status(400).json({ errors: ["otId es obligatorio"] });
+    }
+
+    const result = await controller.enviarSolicitudGeneral({ avisoId, otId });
+
+    return res.json({
+      message: "Solicitud general enviada (bloqueada) y asignada a OT",
+      solicitud: result,
+    });
+  } catch (error) {
+    return res.status(400).json({ errors: [error.message] });
+  }
+};
+
+
 module.exports = {
   createSolicitudHandler,
   getSolicitudesHandler,
   syncSolicitudHandler,
+  enviarSolicitudGeneralHandler
 };

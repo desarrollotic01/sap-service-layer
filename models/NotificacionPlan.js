@@ -35,6 +35,11 @@ module.exports = (sequelize) => {
         type: DataTypes.UUID,
         allowNull: true,
       },
+
+      trabajadorId: {
+  type: DataTypes.UUID,
+  allowNull: true,
+}
     },
     {
       tableName: "notificacion_planes",

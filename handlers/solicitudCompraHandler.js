@@ -85,6 +85,9 @@ const updateSolicitudHandler = async (req, res) => {
 };
 
 
+
+
+
 module.exports = {
   validarCreateSolicitud,
   validarUpdateSolicitud,

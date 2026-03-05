@@ -88,6 +88,37 @@ module.exports = (sequelize) => {
         allowNull: false,
         defaultValue: "PLAN",
       },
+      tipoTrabajo: {
+  type: DataTypes.ENUM(
+    "TORQUEO_REGULACION",
+    "APLICACION",
+    "REVISION",
+    "INSPECCION",
+    "CAMBIO",
+    "LIMPIEZA",
+    "AJUSTE",
+    "LUBRICACION",
+    "REPARACION" // ✅ agregar
+  ),
+  allowNull: true,
+},
+
+origen: {
+  type: DataTypes.ENUM("PLAN", "MANUAL", "TRATAMIENTO"), // ✅ agregar
+  allowNull: false,
+  defaultValue: "PLAN",
+},
+
+descripcion: { // ✅ agregar
+  type: DataTypes.TEXT,
+  allowNull: true,
+},
+
+// (opcional recomendado)
+tratamientoEquipoActividadId: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
 
       observaciones: DataTypes.TEXT,
     },

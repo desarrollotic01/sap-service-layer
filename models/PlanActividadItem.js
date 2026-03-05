@@ -15,34 +15,26 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      // 🔹 Tipo de recurso
       recurso: {
-        type: DataTypes.ENUM(
-          "MATERIAL",
-          "MANO_OBRA",
-          "SERVICIO"
-        ),
+        type: DataTypes.ENUM("MATERIAL", "MANO_OBRA", "SERVICIO"),
         allowNull: false,
       },
 
-      // 🔹 Item / descripción del recurso
       item: {
         type: DataTypes.STRING,
         allowNull: false,
       },
 
-       itemCode: {
+      itemCode: {
         type: DataTypes.STRING,
         allowNull: false,
       },
 
-      // 🔹 Unidad de medida (kg, hrs, unid, etc.)
       unidad: {
         type: DataTypes.STRING,
         allowNull: false,
       },
 
-      // 🔹 Cantidad requerida
       cantidad: {
         type: DataTypes.FLOAT,
         allowNull: false,

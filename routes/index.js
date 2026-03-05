@@ -18,9 +18,12 @@ const adjuntosRouter = require("../routes/adjuntoRouter");
 const  notificacionRouter = require("./notificacionRouter");
 const familiaRouter = require ("./familiaRouter")
 const paisRouter = require("./paisRouter")
+const guiaMantenimientoRouter = require("./guiaMantenimientoRouter")
 
 
 
+
+router.use("/guia-mantenimiento", guiaMantenimientoRouter);
 router.use("/pais",paisRouter)
 router.use("/familia",familiaRouter)
 router.use("/notificaciones", notificacionRouter);

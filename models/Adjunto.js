@@ -63,6 +63,11 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
+      planMantenimientoId: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
+
       equipoId: {
   type: DataTypes.UUID,
   allowNull: true,
@@ -100,6 +105,11 @@ module.exports = (sequelize) => {
     Adjunto.belongsTo(models.Equipo, {
   foreignKey: "equipoId",
   as: "equipo",
+});
+
+Adjunto.belongsTo(models.PlanMantenimiento, {
+  foreignKey: "planMantenimientoId",
+  as: "plan",
 });
 
 

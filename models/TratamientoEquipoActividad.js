@@ -22,9 +22,15 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
-      sistema: DataTypes.STRING,
-      subsistema: DataTypes.STRING,
-      componente: DataTypes.STRING,
+      // ✅ Igual que PlanMantenimientoActividad
+      codigoActividad: {
+        type: DataTypes.STRING,
+        allowNull: true, // en MANUAL puede ser null
+      },
+
+      sistema: { type: DataTypes.STRING, allowNull: true },
+      subsistema: { type: DataTypes.STRING, allowNull: true },
+      componente: { type: DataTypes.STRING, allowNull: true },
 
       tarea: {
         type: DataTypes.STRING,
@@ -41,26 +47,43 @@ module.exports = (sequelize) => {
           "LIMPIEZA",
           "AJUSTE",
           "LUBRICACION",
-          "REPARACION" 
-
+          "REPARACION"
         ),
-        allowNull: true,
+        allowNull: true, // preventivo lo trae el plan; correctivo lo define usuario
       },
 
-      // ✅ NUEVO: el valor tal cual lo elige el usuario (ej: 2, 30, 1.5)
+      // ✅ NUEVO (para igualarlo al plan)
+      rolTecnico: {
+        type: DataTypes.ENUM(
+          "tecnico_electrico",
+          "operario_de_mantenimiento",
+          "tecnico_mecanico",
+          "supervisor"
+        ),
+        allowNull: true, // PLAN lo trae; MANUAL lo define usuario
+      },
+
+      // ✅ NUEVO (editable)
+      cantidadTecnicos: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        validate: { min: 1 },
+      },
+
+      // ✅ Editable (valor tal cual lo pone el usuario)
       duracionEstimadaValor: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: true,
       },
 
-      // ✅ NUEVO: unidad de la duración estimada
+      // ✅ Editable
       unidadDuracion: {
         type: DataTypes.ENUM("min", "h"),
         allowNull: false,
         defaultValue: "min",
       },
 
-      // ✅ Estándar del sistema (minutos) para cálculos/reportes
+      // ✅ estándar en minutos (para reportes)
       duracionEstimadaMin: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -78,11 +101,14 @@ module.exports = (sequelize) => {
       },
 
       descripcion: {
-  type: DataTypes.TEXT,
-  allowNull: true,
-},
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
 
-      observaciones: DataTypes.TEXT,
+      observaciones: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
     },
     {
       tableName: "tratamiento_equipo_actividades",

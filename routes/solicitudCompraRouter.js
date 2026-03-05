@@ -6,7 +6,10 @@ const auth = require("../middlewares/auth");
 
 router.post("/", auth, handler.createSolicitudHandler);
 router.get("/", auth, handler.getSolicitudesHandler);
+router.post("/general/enviar", auth, handler.enviarSolicitudGeneralHandler);
+
 router.post("/:id/sync", auth, handler.syncSolicitudHandler);
 router.put("/:id", auth, update.updateSolicitudHandler);
+
 
 module.exports = router;

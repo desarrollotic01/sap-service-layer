@@ -37,26 +37,44 @@ module.exports = (sequelize) => {
       },
 
       tipo: {
+        type: DataTypes.ENUM("PREVENTIVO", "CORRECTIVO", "MEJORA", "INSPECCION"),
+        allowNull: false,
+      },
+
+      esEspecifico: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
+
+      equipoObjetivoId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
+
+      // ✅ FRECUENCIA GENERAL DEL PLAN
+      frecuencia: {
         type: DataTypes.ENUM(
-          "PREVENTIVO",
-          "CORRECTIVO",
-          "MEJORA",
-          "INSPECCION"
+          "POR_HORA",
+          "DIARIA",
+          "SEMANAL",
+          "QUINCENAL",
+          "MENSUAL",
+          "TRIMESTRAL",
+          "SEMESTRAL",
+          "ANUAL",
+          "BIENAL",
+          "QUINQUENAL"
         ),
         allowNull: false,
       },
-      
-      esEspecifico: {
-  type: DataTypes.BOOLEAN,
-  defaultValue: false,
-},
 
-equipoObjetivoId: {
-  type: DataTypes.UUID,
-  allowNull: true,
-},
+      // ✅ Solo si frecuencia = POR_HORA
+      frecuenciaHoras: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
 
-
+      // ✅ activar/desactivar plan
       activo: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
@@ -77,14 +95,30 @@ equipoObjetivoId: {
     PlanMantenimiento.hasMany(models.PlanMantenimientoActividad, {
       foreignKey: "planMantenimientoId",
       as: "actividades",
+      onDelete: "CASCADE",
+      hooks: true,
     });
 
-    // ✅ relación correcta
     PlanMantenimiento.belongsToMany(models.Equipo, {
       through: models.EquipoPlanMantenimiento,
       foreignKey: "planMantenimientoId",
       otherKey: "equipoId",
       as: "equipos",
+    });
+
+    // ✅ Items generales del plan (tipo solicitud)
+    PlanMantenimiento.hasMany(models.PlanMantenimientoItem, {
+      foreignKey: "planMantenimientoId",
+      as: "items",
+      onDelete: "CASCADE",
+      hooks: true,
+    });
+
+    // ✅ Adjuntos generales del plan
+    PlanMantenimiento.hasMany(models.Adjunto, {
+      foreignKey: "planMantenimientoId",
+      as: "adjuntos",
+      onDelete: "SET NULL",
     });
   };
 

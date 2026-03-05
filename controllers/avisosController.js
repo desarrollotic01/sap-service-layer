@@ -85,7 +85,7 @@ async function obtenerAvisos() {
           {
             model: UbicacionTecnica,
             as: "ubicacion",
-            attributes: ["id", "nombre", "codigo", "nivel"],
+            attributes: ["id", "nombre", "codigo"],
           },
         ],
       },
@@ -110,18 +110,17 @@ async function obtenerAvisos() {
 async function obtenerAvisoPorId(id) {
   return await Aviso.findByPk(id, {
     include: [
-      {
-        model: Usuario,
-        as: "creador",
-        attributes: ["id", "alias", "nombreApellido"],
-      },
-      {
-        model: Usuario,
-        as: "solicitante",
-        attributes: ["id", "alias", "nombreApellido"],
-      },
+      { model: Usuario, as: "creador", attributes: ["id", "alias", "nombreApellido"] },
+      { model: Usuario, as: "solicitante", attributes: ["id", "alias", "nombreApellido"] },
       {
         association: "equiposRelacion",
+        attributes: ["id", "equipoId"],
+        include: [{ model: Equipo, as: "equipo", attributes: ["id","nombre","codigo","tipoEquipo"] }],
+      },
+      {
+        association: "ubicacionesRelacion",
+        attributes: ["id", "ubicacionId"],
+        include: [{ model: UbicacionTecnica, as: "ubicacion", attributes: ["id","nombre","codigo","nivel"] }],
       },
     ],
   });

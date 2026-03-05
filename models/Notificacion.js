@@ -27,9 +27,6 @@ module.exports = (sequelize) => {
         type: DataTypes.DATE,
       },
 
-      // ===============================
-      // DATOS OPERATIVOS
-      // ===============================
       horometro: {
         type: DataTypes.FLOAT,
       },
@@ -101,6 +98,11 @@ module.exports = (sequelize) => {
         type: DataTypes.UUID,
         allowNull: false,
       },
+
+      ordenTrabajoEquipoId: {
+  type: DataTypes.UUID,
+  allowNull: false,
+},
     },
     {
       tableName: "notificaciones",
@@ -134,6 +136,17 @@ module.exports = (sequelize) => {
       foreignKey: "notificacionId",
       as: "adjuntos",
     });
+
+    Notificacion.belongsTo(models.OrdenTrabajoEquipo, {
+  foreignKey: "ordenTrabajoEquipoId",
+  as: "equipoOT",
+});
+
+// opcional
+models.OrdenTrabajoEquipo.hasOne(models.Notificacion, {
+  foreignKey: "ordenTrabajoEquipoId",
+  as: "notificacion",
+});
   };
 
   return Notificacion;

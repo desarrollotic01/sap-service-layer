@@ -34,9 +34,6 @@ module.exports = (sequelize) => {
     {
       tableName: "tratamiento_equipo_trabajadores",
       timestamps: true,
-      indexes: [
-        { unique: true, fields: ["tratamientoEquipoId", "trabajadorId"] },
-      ],
     }
   );
 

@@ -15,4 +15,9 @@ router.get(
   TratamientoHandler.obtenerTratamiento
 );
 
+router.patch(
+ "/:tratamientoId/guardar",auth,
+  TratamientoHandler.guardarCambiosTratamientoHandler
+);
+
 module.exports = router;

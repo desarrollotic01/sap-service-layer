@@ -131,6 +131,14 @@ module.exports = (sequelize) => {
         ),
       },
 
+      creticidad: {
+        type: DataTypes.ENUM(
+          "A",
+          "B",
+          "C",
+        ),
+      },
+
       lineaOtroTexto: {
         type: DataTypes.STRING,
       },
@@ -167,20 +175,20 @@ module.exports = (sequelize) => {
     });
 
     Equipo.belongsTo(models.Pais, {
-  foreignKey: "paisId",
-  as: "pais",
-});
+    foreignKey: "paisId",
+    as: "pais",
+    });
 
-Equipo.hasMany(models.OrdenTrabajoEquipo, {
-  foreignKey: "equipoId",
-  as: "ordenesTrabajoEquipos",
-});
+    Equipo.hasMany(models.OrdenTrabajoEquipo, {
+    foreignKey: "equipoId",
+    as: "ordenesTrabajoEquipos",
+    });
 
-Equipo.belongsToMany(models.PlanMantenimiento, {
-  through: models.EquipoPlanMantenimiento,
-  foreignKey: "equipoId",
-  otherKey: "planMantenimientoId",
-  as: "planesMantenimiento",
+    Equipo.belongsToMany(models.PlanMantenimiento, {
+    through: models.EquipoPlanMantenimiento,
+    foreignKey: "equipoId",
+    otherKey: "planMantenimientoId",
+    as: "planesMantenimiento",
 });
 
 

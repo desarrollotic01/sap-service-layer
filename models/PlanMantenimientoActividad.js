@@ -1,7 +1,6 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
-
   const PlanMantenimientoActividad = sequelize.define(
     "PlanMantenimientoActividad",
     {
@@ -16,7 +15,6 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      // ✅ CÓDIGO FUNCIONAL
       codigoActividad: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -31,7 +29,6 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      // 🔧 Tipo de trabajo REAL
       tipoTrabajo: {
         type: DataTypes.ENUM(
           "TORQUEO_REGULACION",
@@ -44,46 +41,37 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      // 👷 Rol requerido
       rolTecnico: {
         type: DataTypes.ENUM(
           "tecnico_electrico",
+          "operario_de_mantenimiento",
           "tecnico_mecanico",
-          "supervisor",
-          "externo"
+          "supervisor"
         ),
         allowNull: false,
       },
 
-      frecuencia: {
-        type: DataTypes.ENUM(
-          "POR_HORA",
-          "DIARIA",
-          "SEMANAL",
-          "QUINCENAL",
-          "MENSUAL",
-          "TRIMESTRAL",
-          "SEMESTRAL",
-          "ANUAL",
-          "BIENAL",
-          "QUINQUENAL"
-        ),
-        allowNull: false,
-      },
-
-      frecuenciaHoras: {
+      // ✅ guardar solo minutos reales
+      duracionMinutos: {
         type: DataTypes.INTEGER,
         allowNull: true,
       },
 
-      duracionMinutos: DataTypes.INTEGER,
-
+      // ✅ UI
       unidadDuracion: {
         type: DataTypes.ENUM("min", "h"),
         defaultValue: "min",
       },
 
-      cantidadTecnicos: DataTypes.INTEGER,
+      cantidadTecnicos: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+
+      orden: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
     },
     {
       tableName: "plan_mantenimiento_actividades",
@@ -92,21 +80,21 @@ module.exports = (sequelize) => {
   );
 
   PlanMantenimientoActividad.associate = (models) => {
-
     PlanMantenimientoActividad.belongsTo(models.PlanMantenimiento, {
       foreignKey: "planMantenimientoId",
       as: "plan",
     });
 
-    PlanMantenimientoActividad.hasMany(models.PlanActividadItem, {
-      foreignKey: "actividadId",
-      as: "items",
-    });
-
     PlanMantenimientoActividad.hasMany(models.Adjunto, {
       foreignKey: "planMantenimientoActividadId",
       as: "adjuntos",
+      onDelete: "SET NULL",
     });
+
+    PlanMantenimientoActividad.hasMany(models.PlanActividadItem, {
+  foreignKey: "actividadId",
+  as: "items",
+  });
   };
 
   return PlanMantenimientoActividad;

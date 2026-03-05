@@ -22,19 +22,7 @@ module.exports = (sequelize) => {
         type: DataTypes.UUID,
         allowNull: false,
       },
-
-      /* =====================
-         DEFINICIÓN DEL TRABAJO
-      ===================== */
-      contratista: {
-        type: DataTypes.STRING,
-        allowNull: true,
-      },
-
-      /**
-       * Viene DIRECTO del frontend
-       * NO se transforma
-       */
+      
       requerimientos: {
         type: DataTypes.JSON,
         allowNull: true,
