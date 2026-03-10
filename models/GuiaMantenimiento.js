@@ -29,7 +29,6 @@ module.exports = (sequelize) => {
         defaultValue: "creado",
       },
 
-      // ✅ Selección: Equipo O Ubicación Técnica (uno obligatorio)
       equipoId: {
         type: DataTypes.UUID,
         allowNull: true,
@@ -105,12 +104,22 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      // ✅ Producto (automático por equipo) - snapshot
-      producto: {
-        type: DataTypes.STRING,
-        allowNull: false,
+     producto: {
+        type: DataTypes.ENUM(
+          "Racks",
+          "Vehiculo",
+          "Autosat",
+          "Techo y Cerramiento",
+          "Equipos Propios",
+          "Sanitarias",
+          "HVAC",
+          "DACI",
+          "ACI",
+          "Datos y Comunicaciones",
+          "Eléctrico",
+          "Pisos y Estructuras"
+        ),
       },
-
       descripcion: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -126,6 +135,23 @@ module.exports = (sequelize) => {
         allowNull: false,
         defaultValue: true,
       },
+
+      alertaActiva: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false, 
+    },
+
+    tipoAnticipacionAlerta: {
+  type: DataTypes.ENUM("MINUTOS", "HORAS", "DIAS", "SEMANAS"),
+  allowNull: true,
+},
+
+valorAnticipacionAlerta: {
+  type: DataTypes.INTEGER,
+  allowNull: true,
+},
+
+
     },
     {
       tableName: "guias_mantenimiento",
@@ -169,6 +195,11 @@ module.exports = (sequelize) => {
     GuiaMantenimiento.hasMany(models.GuiaMantenimientoProgramacion, {
   foreignKey: "guiaMantenimientoId",
   as: "programaciones",
+});
+
+GuiaMantenimiento.hasMany(models.Aviso, {
+  foreignKey: "guiaMantenimientoId",
+  as: "avisosGenerados",
 });
   };
 

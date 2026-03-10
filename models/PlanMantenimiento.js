@@ -36,6 +36,11 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
+       contextoObjetivo: {
+        type: DataTypes.ENUM("EQUIPO", "UBICACION_TECNICA"),
+        allowNull: false,
+      },
+
       tipo: {
         type: DataTypes.ENUM("PREVENTIVO", "CORRECTIVO", "MEJORA", "INSPECCION"),
         allowNull: false,
@@ -51,7 +56,11 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
-      // ✅ FRECUENCIA GENERAL DEL PLAN
+      ubicacionTecnicaObjetivoId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
+
       frecuencia: {
         type: DataTypes.ENUM(
           "POR_HORA",
@@ -68,13 +77,11 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      // ✅ Solo si frecuencia = POR_HORA
       frecuenciaHoras: {
         type: DataTypes.INTEGER,
         allowNull: true,
       },
 
-      // ✅ activar/desactivar plan
       activo: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
@@ -92,6 +99,16 @@ module.exports = (sequelize) => {
       as: "familia",
     });
 
+    PlanMantenimiento.belongsTo(models.Equipo, {
+      foreignKey: "equipoObjetivoId",
+      as: "equipoObjetivo",
+    });
+
+    PlanMantenimiento.belongsTo(models.UbicacionTecnica, {
+      foreignKey: "ubicacionTecnicaObjetivoId",
+      as: "ubicacionTecnicaObjetivo",
+    });
+
     PlanMantenimiento.hasMany(models.PlanMantenimientoActividad, {
       foreignKey: "planMantenimientoId",
       as: "actividades",
@@ -106,7 +123,13 @@ module.exports = (sequelize) => {
       as: "equipos",
     });
 
-    // ✅ Items generales del plan (tipo solicitud)
+    PlanMantenimiento.belongsToMany(models.UbicacionTecnica, {
+      through: models.UbicacionTecnicaPlanMantenimiento,
+      foreignKey: "planMantenimientoId",
+      otherKey: "ubicacionTecnicaId",
+      as: "ubicacionesTecnicas",
+    });
+
     PlanMantenimiento.hasMany(models.PlanMantenimientoItem, {
       foreignKey: "planMantenimientoId",
       as: "items",
@@ -114,7 +137,6 @@ module.exports = (sequelize) => {
       hooks: true,
     });
 
-    // ✅ Adjuntos generales del plan
     PlanMantenimiento.hasMany(models.Adjunto, {
       foreignKey: "planMantenimientoId",
       as: "adjuntos",

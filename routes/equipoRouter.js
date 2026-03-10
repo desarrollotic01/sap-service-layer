@@ -1,12 +1,21 @@
-const router = require("express").Router();
-const h = require("../handlers/equipoHandler");
-const auth = require("../middlewares/auth");
+const { Router } = require("express");
+const {
+  crearEquipo,
+  listarEquipos,
+  obtenerEquipo,
+  actualizarEquipo,
+  eliminarEquipo,
+  obtenerPlanesMantenimientoEquipo,
+} = require("../handlers/equipoHandler");
+const uploadEquipoAdjuntos = require("../middlewares/uploadEquipoAdjuntos");
 
-router.get("/", auth,h.listarEquipos);
-router.get("/:id",auth, h.obtenerEquipo);
-router.post("/", auth, h.crearEquipo);
-router.put("/:id", auth, h.actualizarEquipo);
-router.delete("/:id", auth, h.eliminarEquipo);
-router.get("/:id/planes-mantenimiento", auth, h.obtenerPlanesMantenimientoEquipo);
+const router = Router();
+
+router.post("/", uploadEquipoAdjuntos.array("adjuntos"), crearEquipo);
+router.get("/", listarEquipos);
+router.get("/:id", obtenerEquipo);
+router.put("/:id", uploadEquipoAdjuntos.array("adjuntos"), actualizarEquipo);
+router.delete("/:id", eliminarEquipo);
+router.get("/:id/planes-mantenimiento", obtenerPlanesMantenimientoEquipo);
 
 module.exports = router;

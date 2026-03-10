@@ -46,6 +46,22 @@ module.exports = (sequelize) => {
         allowNull: false,
         defaultValue: true,
       },
+
+      fechaAlertaCalculada: {
+  type: DataTypes.DATE,
+  allowNull: true,
+},
+
+alertaDisparada: {
+  type: DataTypes.BOOLEAN,
+  allowNull: false,
+  defaultValue: false,
+},
+
+avisoId: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
     },
     {
       tableName: "guias_mantenimiento_programaciones",
@@ -59,11 +75,21 @@ module.exports = (sequelize) => {
       as: "guia",
     });
 
-    // opcional (si quieres guardar el usuario que ejecuta/cancela)
     GuiaMantenimientoProgramacion.belongsTo(models.Usuario, {
       foreignKey: "usuarioIdAccion",
       as: "usuarioAccion",
     });
+
+
+    GuiaMantenimientoProgramacion.belongsTo(models.Aviso, {
+  foreignKey: "avisoId",
+  as: "aviso",
+});
+
+GuiaMantenimientoProgramacion.hasMany(models.Aviso, {
+  foreignKey: "guiaMantenimientoProgramacionId",
+  as: "avisosGenerados",
+});
   };
 
   return GuiaMantenimientoProgramacion;

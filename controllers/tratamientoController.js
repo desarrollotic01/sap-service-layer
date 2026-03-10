@@ -9,8 +9,8 @@ const {
   PlanMantenimiento,
   PlanMantenimientoActividad,
   Equipo,
+  UbicacionTecnica,
 } = require("../db_connection");
-const { Op } = require("sequelize");
 
 const toMinutes = (valor, unidad) => {
   if (valor === null || valor === undefined) return null;
@@ -28,12 +28,7 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     /* ===============================
        VALIDACIONES BASE
     =============================== */
-
     if (!tratamiento) throw new Error("Datos de tratamiento requeridos");
-
-    // ✅ YA NO EXISTE contratista (según lo que dijiste)
-    // si aún lo tienes en el modelo, déjalo; si ya lo borraste, elimina esta validación.
-    // if (!tratamiento.contratista) throw new Error("El contratista es obligatorio");
 
     if (!solicitudGeneral) throw new Error("Debe enviar la solicitud general");
     if (!Array.isArray(solicitudGeneral.lineas) || solicitudGeneral.lineas.length === 0) {
@@ -43,7 +38,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     /* ===============================
        VALIDAR QUE NO EXISTA
     =============================== */
-
     const existe = await Tratamiento.findOne({
       where: { aviso_id: avisoId },
       transaction: t,
@@ -54,7 +48,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     /* ===============================
        OBTENER AVISO + TARGETS
     =============================== */
-
     const aviso = await Aviso.findByPk(avisoId, {
       include: [
         { association: "equiposRelacion" },
@@ -72,36 +65,39 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       })),
       ...(aviso.ubicacionesRelacion || []).map((rel) => ({
         equipoId: null,
-        ubicacionId: rel.ubicacionTecnicaId,
+        ubicacionId: rel.ubicacionId,
       })),
-    ];
+    ].filter((x) => x.equipoId || x.ubicacionId);
 
     if (!targets.length) {
       throw new Error("El aviso no tiene equipos ni ubicaciones técnicas asociadas");
     }
 
+    for (const target of targets) {
+      if (!target.equipoId && !target.ubicacionId) {
+        throw new Error("Se encontró un target inválido sin equipoId ni ubicacionId");
+      }
+    }
+
     /* ===============================
        1️⃣ CREAR TRATAMIENTO (cabecera)
     =============================== */
-
     const nuevoTratamiento = await Tratamiento.create(
       {
         aviso_id: avisoId,
-        // contratista: tratamiento.contratista, // ✅ quitar si ya borraste el campo
         creado_por: usuarioId,
         estado: "CON_SOLICITUD",
-        // plan_mantenimiento_id: tratamiento.plan_mantenimiento_id || null, // opcional si lo usas
       },
       { transaction: t }
     );
 
     /* ===============================
        2️⃣ CREAR TRATAMIENTO_EQUIPOS + ACTIVIDADES
-       ✅ YA NO SE CREAN TRABAJADORES NI REQUERIMIENTOS AQUÍ
+       SOPORTA EQUIPO Y UBICACION TECNICA
     =============================== */
-
     for (const target of targets) {
-      // ✅ crear TratamientoEquipo
+      const targetKey = String(target.equipoId || target.ubicacionId);
+
       const te = await TratamientoEquipo.create(
         {
           tratamientoId: nuevoTratamiento.id,
@@ -113,18 +109,20 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
 
       /* =====================================
          🔵 PREVENTIVO → PLAN SELECCIONADO
-         - Copia TODAS las actividades del plan
-         - El usuario SOLO editará: duracion + unidad + cantidadTecnicos
+         EQUIPO o UBICACION TECNICA
       ===================================== */
       if (
         aviso.tipoAviso === "mantenimiento" &&
-        aviso.tipoMantenimiento === "Preventivo" &&
-        target.equipoId
+        aviso.tipoMantenimiento === "Preventivo"
       ) {
-        const planIdSeleccionado = tratamiento.planesSeleccionados?.[target.equipoId];
+        const planIdSeleccionado = tratamiento.planesSeleccionados?.[targetKey];
 
         if (!planIdSeleccionado) {
-          throw new Error(`Debe seleccionar un plan para el equipo ${target.equipoId}`);
+          throw new Error(
+            `Debe seleccionar un plan para ${
+              target.equipoId ? "el equipo" : "la ubicación técnica"
+            } ${targetKey}`
+          );
         }
 
         const plan = await PlanMantenimiento.findByPk(planIdSeleccionado, {
@@ -133,17 +131,30 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
         });
 
         if (!plan) {
-          throw new Error(`Plan no válido para el equipo ${target.equipoId}`);
+          throw new Error(
+            `Plan no válido para ${
+              target.equipoId ? "el equipo" : "la ubicación técnica"
+            } ${targetKey}`
+          );
+        }
+
+        if (target.equipoId && plan.contextoObjetivo !== "EQUIPO") {
+          throw new Error(
+            `El plan seleccionado no corresponde al contexto EQUIPO (${targetKey})`
+          );
+        }
+
+        if (target.ubicacionId && plan.contextoObjetivo !== "UBICACION_TECNICA") {
+          throw new Error(
+            `El plan seleccionado no corresponde al contexto UBICACION_TECNICA (${targetKey})`
+          );
         }
 
         await te.update({ planMantenimientoId: plan.id }, { transaction: t });
 
         for (const act of plan.actividades || []) {
-          // Convertimos duración del plan a tu estructura editable:
           const unidad = act.unidadDuracion || "min";
           const min = act.duracionMinutos ?? null;
-
-          // valor visible editable:
           const valor =
             min == null ? null : unidad === "h" ? Number(min) / 60 : Number(min);
 
@@ -152,17 +163,15 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
               tratamientoEquipoId: te.id,
               planMantenimientoActividadId: act.id,
 
-              // igual que plan:
               codigoActividad: act.codigoActividad || null,
               sistema: act.sistema,
               subsistema: act.subsistema,
               componente: act.componente,
               tarea: act.tarea,
               tipoTrabajo: act.tipoTrabajo,
-              rolTecnico: act.rolTecnico,                // ✅ NUEVO
-              cantidadTecnicos: act.cantidadTecnicos ?? 1, // ✅ NUEVO
+              rolTecnico: act.rolTecnico,
+              cantidadTecnicos: act.cantidadTecnicos ?? 1,
 
-              // editable:
               duracionEstimadaValor: valor,
               unidadDuracion: unidad,
               duracionEstimadaMin: min,
@@ -177,46 +186,66 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
 
       /* =====================================
          🔴 CORRECTIVO → ACTIVIDADES MANUALES
-         - Aquí el usuario llena TODO desde cero
-         - ✅ obliga: tarea + rolTecnico + cantidadTecnicos
+         EQUIPO o UBICACION TECNICA
       ===================================== */
       if (
         aviso.tipoAviso === "mantenimiento" &&
-        aviso.tipoMantenimiento === "Correctivo" &&
-        target.equipoId
+        aviso.tipoMantenimiento === "Correctivo"
       ) {
-        const manuales = tratamiento.actividadesManuales?.[target.equipoId] || [];
+        const manuales = tratamiento.actividadesManuales?.[targetKey] || [];
 
         if (!Array.isArray(manuales)) {
-          throw new Error(`Actividades manuales inválidas para equipo ${target.equipoId}`);
+          throw new Error(
+            `Actividades manuales inválidas para ${
+              target.equipoId ? "equipo" : "ubicación técnica"
+            } ${targetKey}`
+          );
         }
 
         if (manuales.length === 0) {
-          throw new Error(`Debe agregar actividades manuales para equipo ${target.equipoId}`);
+          throw new Error(
+            `Debe agregar actividades manuales para ${
+              target.equipoId ? "equipo" : "ubicación técnica"
+            } ${targetKey}`
+          );
         }
 
         for (const act of manuales) {
           if (!act.tarea || !act.tarea.trim()) {
-            throw new Error(`Actividad manual sin tarea para equipo ${target.equipoId}`);
-          }
-
-          // ✅ Si quieres mantener el "estricto", déjalo:
-          if (act.tipoTrabajo && !["REPARACION", "CAMBIO"].includes(act.tipoTrabajo)) {
             throw new Error(
-              `TipoTrabajo inválido (solo REPARACION o CAMBIO) para equipo ${target.equipoId}`
+              `Actividad manual sin tarea para ${
+                target.equipoId ? "equipo" : "ubicación técnica"
+              } ${targetKey}`
             );
           }
 
-          // ✅ NUEVO: ahora el rol y cantidad viven en la actividad
-          if (!act.rolTecnico) {
-            throw new Error(`rolTecnico es obligatorio en actividad manual (equipo ${target.equipoId})`);
+          if (act.tipoTrabajo && !["REPARACION", "CAMBIO"].includes(act.tipoTrabajo)) {
+            throw new Error(
+              `TipoTrabajo inválido (solo REPARACION o CAMBIO) para ${
+                target.equipoId ? "equipo" : "ubicación técnica"
+              } ${targetKey}`
+            );
           }
+
+          if (!act.rolTecnico) {
+            throw new Error(
+              `rolTecnico es obligatorio en actividad manual (${
+                target.equipoId ? "equipo" : "ubicación técnica"
+              } ${targetKey})`
+            );
+          }
+
           if (!act.cantidadTecnicos || act.cantidadTecnicos <= 0) {
-            throw new Error(`cantidadTecnicos debe ser > 0 en actividad manual (equipo ${target.equipoId})`);
+            throw new Error(
+              `cantidadTecnicos debe ser > 0 en actividad manual (${
+                target.equipoId ? "equipo" : "ubicación técnica"
+              } ${targetKey})`
+            );
           }
 
           const unidad = act.unidadDuracion || "min";
-          const min = act.duracionEstimadaMin ?? toMinutes(act.duracionEstimadaValor, unidad);
+          const min =
+            act.duracionEstimadaMin ?? toMinutes(act.duracionEstimadaValor, unidad);
 
           await TratamientoEquipoActividad.create(
             {
@@ -234,8 +263,8 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
 
               tipoTrabajo: act.tipoTrabajo || "REPARACION",
 
-              rolTecnico: act.rolTecnico, // ✅ NUEVO
-              cantidadTecnicos: act.cantidadTecnicos, // ✅ NUEVO
+              rolTecnico: act.rolTecnico,
+              cantidadTecnicos: act.cantidadTecnicos,
 
               duracionEstimadaValor: act.duracionEstimadaValor ?? null,
               unidadDuracion: unidad,
@@ -254,7 +283,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     /* ===============================
        3️⃣ SOLICITUD GENERAL
     =============================== */
-
     const solicitudGen = await SolicitudCompra.create(
       {
         tratamiento_id: nuevoTratamiento.id,
@@ -288,9 +316,8 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     /* ===============================
        4️⃣ SOLICITUDES POR TARGET
     =============================== */
-
     for (const target of targets) {
-      const key = target.equipoId || target.ubicacionId;
+      const key = String(target.equipoId || target.ubicacionId);
       const dataSolicitud = solicitudesPorEquipo[key];
       if (!dataSolicitud) continue;
 
@@ -330,14 +357,38 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     /* ===============================
        5️⃣ ACTUALIZAR AVISO
     =============================== */
-
     await Aviso.update(
       { estadoAviso: "tratado" },
       { where: { id: avisoId }, transaction: t }
     );
 
+    const tratamientoCompleto = await Tratamiento.findByPk(nuevoTratamiento.id, {
+      include: [
+        {
+          model: SolicitudCompra,
+          as: "solicitudesCompra",
+          include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+        },
+        {
+          model: TratamientoEquipo,
+          as: "equipos",
+          include: [
+            { model: Equipo, as: "equipo" },
+            { model: UbicacionTecnica, as: "ubicacionTecnica" },
+            {
+              model: TratamientoEquipoActividad,
+              as: "actividades",
+              include: [{ model: PlanMantenimientoActividad, as: "actividadPlan" }],
+            },
+            { model: PlanMantenimiento, as: "planMantenimiento" },
+          ],
+        },
+      ],
+      transaction: t,
+    });
+
     await t.commit();
-    return nuevoTratamiento;
+    return tratamientoCompleto;
   } catch (error) {
     await t.rollback();
     throw error;
@@ -358,6 +409,7 @@ const obtenerTratamientoPorAviso = async (avisoId) => {
         as: "equipos",
         include: [
           { model: Equipo, as: "equipo" },
+          { model: UbicacionTecnica, as: "ubicacionTecnica" },
           {
             model: TratamientoEquipoActividad,
             as: "actividades",
@@ -375,11 +427,10 @@ const upsertSolicitud = async ({
   esGeneral,
   equipoId,
   ubicacionId,
-  data, 
+  data,
   usuarioId,
   t,
 }) => {
-  // Buscar existente
   const where = {
     tratamiento_id: tratamientoId,
     esGeneral: !!esGeneral,
@@ -396,7 +447,7 @@ const upsertSolicitud = async ({
     requester: data.email,
     comments: data.comments,
     usuario_id: usuarioId,
-    estado: "DRAFT", // sigue siendo pendiente
+    estado: "DRAFT",
     tratamiento_id: tratamientoId,
     esGeneral: !!esGeneral,
     equipo_id: equipoId || null,
@@ -408,14 +459,12 @@ const upsertSolicitud = async ({
   } else {
     await solicitud.update(header, { transaction: t });
 
-    // 👇 reemplazar líneas (lo más estable)
     await SolicitudCompraLinea.destroy({
       where: { solicitud_compra_id: solicitud.id },
       transaction: t,
     });
   }
 
-  // Crear líneas nuevas (incluye rubro/paqueteTrabajo/etc.)
   await SolicitudCompraLinea.bulkCreate(
     (data.lineas || []).map((l) => ({
       solicitud_compra_id: solicitud.id,
@@ -425,8 +474,6 @@ const upsertSolicitud = async ({
       costingCode: l.costCenter || null,
       projectCode: l.projectCode || null,
       warehouseCode: l.warehouseCode || "01",
-
-      // ✅ campos extra
       rubro: l.rubro || null,
       paqueteTrabajo: l.paqueteTrabajo || null,
     })),
@@ -438,13 +485,13 @@ const upsertSolicitud = async ({
 
 const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => {
   const t = await sequelize.transaction();
+
   try {
     const { actividades = [], solicitudGeneral, solicitudesPorEquipo = {} } = body || {};
 
     const tratamiento = await Tratamiento.findByPk(tratamientoId, { transaction: t });
     if (!tratamiento) throw new Error("Tratamiento no encontrado");
 
-    // 1) ✅ Actualizar actividades (si vinieron)
     if (Array.isArray(actividades) && actividades.length > 0) {
       for (const a of actividades) {
         const act = await TratamientoEquipoActividad.findByPk(a.id, {
@@ -465,7 +512,9 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
 
         const unidad = a.unidadDuracion || act.unidadDuracion || "min";
         const valor =
-          a.duracionEstimadaValor !== undefined ? a.duracionEstimadaValor : act.duracionEstimadaValor;
+          a.duracionEstimadaValor !== undefined
+            ? a.duracionEstimadaValor
+            : act.duracionEstimadaValor;
 
         const min = toMinutes(valor, unidad);
 
@@ -474,7 +523,9 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
             duracionEstimadaValor: valor ?? null,
             unidadDuracion: unidad,
             duracionEstimadaMin: min,
-            ...(a.cantidadTecnicos !== undefined ? { cantidadTecnicos: Number(a.cantidadTecnicos) } : {}),
+            ...(a.cantidadTecnicos !== undefined
+              ? { cantidadTecnicos: Number(a.cantidadTecnicos) }
+              : {}),
             ...(a.rolTecnico !== undefined ? { rolTecnico: a.rolTecnico } : {}),
             ...(a.estado ? { estado: a.estado } : {}),
           },
@@ -483,7 +534,6 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
       }
     }
 
-    // 2) ✅ Upsert Solicitud General (reemplaza líneas)
     await upsertSolicitud({
       tratamientoId,
       esGeneral: true,
@@ -494,8 +544,6 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
       t,
     });
 
-    // 3) ✅ Upsert Solicitudes por target (equipo/ubicación)
-    // Para saber si key es equipo o ubicacion, usamos TratamientoEquipo del tratamiento:
     const tes = await TratamientoEquipo.findAll({
       where: { tratamientoId },
       attributes: ["equipoId", "ubicacionTecnicaId"],
@@ -503,9 +551,21 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
     });
 
     const mapTargets = new Map();
+
     for (const te of tes) {
-      if (te.equipoId) mapTargets.set(String(te.equipoId), { equipoId: te.equipoId, ubicacionId: null });
-      if (te.ubicacionTecnicaId) mapTargets.set(String(te.ubicacionTecnicaId), { equipoId: null, ubicacionId: te.ubicacionTecnicaId });
+      if (te.equipoId) {
+        mapTargets.set(String(te.equipoId), {
+          equipoId: te.equipoId,
+          ubicacionId: null,
+        });
+      }
+
+      if (te.ubicacionTecnicaId) {
+        mapTargets.set(String(te.ubicacionTecnicaId), {
+          equipoId: null,
+          ubicacionId: te.ubicacionTecnicaId,
+        });
+      }
     }
 
     for (const [key, dataSol] of Object.entries(solicitudesPorEquipo || {})) {
@@ -526,11 +586,6 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
         t,
       });
     }
-
-    // 4) ✅ Estado “pendiente”
-    // Si quieres marcarlo como “pendiente”, usa CREADO o agrega enum PENDIENTE.
-    // Ejemplo usando CREADO como borrador:
-    // await tratamiento.update({ estado: "CREADO" }, { transaction: t });
 
     await t.commit();
     return { ok: true, message: "Cambios guardados", tratamientoId };

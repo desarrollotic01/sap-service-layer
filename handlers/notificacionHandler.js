@@ -1,5 +1,8 @@
 const { sequelize } = require("../db_connection");
-
+const { saveUploadedFile } = require("../middlewares/fileStorage");
+const {
+  actualizarOTACierreTecnicoSiCompleta,
+} = require("../controllers/ordenTrabajoController");
 const {
   createNotificacionDB,
   setTecnicosDB,
@@ -9,21 +12,69 @@ const {
   getAllNotificacionesDB,
   getActaAdjuntaDB,
   updateEstadoNotificacionDB,
-
-  // nuevos
   getEquipoOTDB,
   getNotificacionByEquipoOTDB,
   precargarPlanesPorEquipoOTDB,
   getOTConEquiposDB,
   getNotificacionForPdfDB,
-  getNotificacionesByOTDB // ✅ si vas a generar por OT
+  getNotificacionesByOTDB,
 } = require("../controllers/notificacionController");
 
 const { renderNotificacionPdfBuffer } = require("../services/notificacionPdfService");
 
+const parseJsonField = (value, fallback) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+};
+
+const isValidDate = (value) => {
+  if (!value) return false;
+  const d = new Date(value);
+  return !Number.isNaN(d.getTime());
+};
+
+const mapCategoriaByField = (fieldname = "") => {
+  const name = String(fieldname).toLowerCase();
+
+  if (name.includes("antes")) return "ANTES";
+  if (name.includes("despues")) return "DESPUES";
+  if (name.includes("correctivo")) return "CORRECTIVO";
+  if (name.includes("acta")) return "ACTA_CONFORMIDAD";
+  if (name.includes("informe")) return "INFORME";
+  if (name.includes("checklist")) return "CHECKLIST";
+
+  return "OTRO";
+};
+
+const createAdjuntoRecordFromStored = (stored, extra = {}) => ({
+  nombre: stored.nombre,
+  url: stored.url,
+  extension: stored.extension,
+  categoria: extra.categoria || "OTRO",
+  notificacionId: extra.notificacionId || null,
+  notificacionPlanId: extra.notificacionPlanId || null,
+  ordenTrabajoId: extra.ordenTrabajoId || null,
+  ordenTrabajoEquipoId: extra.ordenTrabajoEquipoId || null,
+  planMantenimientoActividadId: extra.planMantenimientoActividadId || null,
+  planMantenimientoId: extra.planMantenimientoId || null,
+  equipoId: extra.equipoId || null,
+});
+
+const groupFilesByField = (files = []) => {
+  return files.reduce((acc, file) => {
+    if (!acc[file.fieldname]) acc[file.fieldname] = [];
+    acc[file.fieldname].push(file);
+    return acc;
+  }, {});
+};
 
 /* =====================================
-   CREAR NOTIFICACION (1 por equipo OT)
+   CREAR NOTIFICACION
 ===================================== */
 const crearNotificacion = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -35,57 +86,72 @@ const crearNotificacion = async (req, res) => {
       estadoGeneralEquipo,
       ordenTrabajoId,
       ordenTrabajoEquipoId,
-      tecnicos,
-      planes,
-      adjuntos,
-      precargarPlanes = true,
-      ...resto
+      fechaUltimoMantenimientoPreventivo,
+      horometro,
+      numeroMisiones,
+      numeroEquipo,
+      codigoRepuesto,
+      descripcionMantenimiento,
+      resumenCorrectivos,
+      descripcionGeneral,
+      observaciones,
+      recomendaciones,
+      estado,
+      precargarPlanes = "true",
     } = req.body;
+
+    const tecnicos = parseJsonField(req.body.tecnicos, []);
+    const planes = parseJsonField(req.body.planes, []);
+    const usePrecargarPlanes = String(precargarPlanes) === "true";
 
     if (!fechaInicio || !fechaFin) {
       await transaction.rollback();
       return res.status(400).json({ message: "Fechas obligatorias" });
     }
+
     if (!estadoGeneralEquipo) {
       await transaction.rollback();
       return res.status(400).json({ message: "Estado general requerido" });
     }
+
     if (!ordenTrabajoId) {
       await transaction.rollback();
       return res.status(400).json({ message: "Orden de trabajo requerida" });
     }
+
     if (!ordenTrabajoEquipoId) {
       await transaction.rollback();
       return res.status(400).json({
-        message: "ordenTrabajoEquipoId es requerido (1 notificación por equipo)",
+        message: "ordenTrabajoEquipoId es requerido",
       });
     }
 
-    // validar equipo pertenece a OT
     const equipoOT = await getEquipoOTDB({
       ordenTrabajoId,
       ordenTrabajoEquipoId,
       transaction,
     });
+
     if (!equipoOT) {
       await transaction.rollback();
-      return res.status(400).json({ message: "El equipo no pertenece a la OT" });
+      return res.status(400).json({
+        message: "El registro de la OT no pertenece a la orden de trabajo",
+      });
     }
 
-    // evitar duplicado
     const existe = await getNotificacionByEquipoOTDB(
       ordenTrabajoEquipoId,
       transaction
     );
+
     if (existe) {
       await transaction.rollback();
       return res.status(409).json({
-        message: "Ya existe notificación para este equipo de la OT",
+        message: "Ya existe notificación para este registro de la OT",
         notificacionId: existe.id,
       });
     }
 
-    // 1) crear notificación
     const notificacion = await createNotificacionDB(
       {
         fechaInicio,
@@ -93,53 +159,136 @@ const crearNotificacion = async (req, res) => {
         estadoGeneralEquipo,
         ordenTrabajoId,
         ordenTrabajoEquipoId,
-        ...resto,
+        fechaUltimoMantenimientoPreventivo: isValidDate(fechaUltimoMantenimientoPreventivo)
+          ? new Date(fechaUltimoMantenimientoPreventivo)
+          : null,
+        horometro: horometro ?? null,
+        numeroMisiones: numeroMisiones ?? null,
+        numeroEquipo: numeroEquipo ?? null,
+        codigoRepuesto: codigoRepuesto ?? null,
+        descripcionMantenimiento: descripcionMantenimiento ?? null,
+        resumenCorrectivos: resumenCorrectivos ?? null,
+        descripcionGeneral: descripcionGeneral ?? null,
+        observaciones: observaciones ?? null,
+        recomendaciones: recomendaciones ?? null,
+        estado: estado || undefined,
       },
       transaction
     );
 
-    // 2) técnicos
-    if (tecnicos?.length) {
+    if (Array.isArray(tecnicos) && tecnicos.length > 0) {
       await setTecnicosDB(notificacion, tecnicos, transaction);
     }
 
-    // 3) planes
-    if (planes?.length) {
-  const planesValidos = planes.filter((p) => p.ordenTrabajoActividadId && p.estado);
+    const filesByField = groupFilesByField(req.files || []);
 
-  if (planesValidos.length > 0) {
-    const planesData = planesValidos.map((p) => ({
-      notificacionId: notificacion.id,
-      ordenTrabajoActividadId: p.ordenTrabajoActividadId,
-      planMantenimientoId: null, // ✅ NO GUARDES lo que venga del front (evita FK)
-      estado: p.estado,
-      comentario: p.comentario ?? null,
-      trabajadorId: p.trabajadorId ?? null, 
-    }));
+    let planesCreados = [];
 
-    await bulkCreatePlanesDB(planesData, transaction);
-  }
-} else if (precargarPlanes) {
-  await precargarPlanesPorEquipoOTDB({
-    notificacionId: notificacion.id,
-    ordenTrabajoEquipoId,
-    transaction,
-  });
-}
-    // 4) adjuntos
-    if (adjuntos?.length) {
-      const adjuntosData = adjuntos.map((a) => ({
-        ...a,
+    if (Array.isArray(planes) && planes.length > 0) {
+      const planesValidos = planes.filter(
+        (p) => p?.ordenTrabajoActividadId && p?.estado
+      );
+
+      if (planesValidos.length > 0) {
+        const planesData = planesValidos.map((p) => ({
+          notificacionId: notificacion.id,
+          ordenTrabajoActividadId: p.ordenTrabajoActividadId,
+          planMantenimientoId: p.planMantenimientoId ?? null,
+          estado: p.estado,
+          comentario: p.comentario ?? null,
+          trabajadorId: p.trabajadorId ?? null,
+          duracionPlan:
+            p.duracionPlan !== undefined && p.duracionPlan !== null
+              ? Number(p.duracionPlan)
+              : null,
+          unidadDuracionPlan: p.unidadDuracionPlan ?? null,
+          fechaInicioPlan: isValidDate(p.fechaInicioPlan)
+            ? new Date(p.fechaInicioPlan)
+            : null,
+          fechaFinPlan: isValidDate(p.fechaFinPlan)
+            ? new Date(p.fechaFinPlan)
+            : null,
+          observaciones: p.observaciones ?? null,
+        }));
+
+        planesCreados = await bulkCreatePlanesDB(planesData, transaction);
+
+        const adjuntosPlanes = [];
+
+        for (let i = 0; i < planesValidos.length; i++) {
+          const planInput = planesValidos[i];
+          const planCreado = planesCreados[i];
+          const fieldName = `planAdjuntos_${i}`;
+          const filesPlan = filesByField[fieldName] || [];
+
+          for (const file of filesPlan) {
+            const stored = saveUploadedFile({
+              file,
+              folder: "notificaciones/planes",
+            });
+
+            adjuntosPlanes.push(
+              createAdjuntoRecordFromStored(stored, {
+                categoria: mapCategoriaByField(file.fieldname),
+                notificacionId: notificacion.id,
+                notificacionPlanId: planCreado.id,
+                ordenTrabajoId,
+                ordenTrabajoEquipoId,
+                planMantenimientoActividadId: planInput.planMantenimientoActividadId || null,
+                planMantenimientoId: planInput.planMantenimientoId || null,
+                equipoId: equipoOT.equipoId || null,
+              })
+            );
+          }
+        }
+
+        if (adjuntosPlanes.length > 0) {
+          await bulkCreateAdjuntosDB(adjuntosPlanes, transaction);
+        }
+      }
+    } else if (usePrecargarPlanes) {
+      planesCreados = await precargarPlanesPorEquipoOTDB({
         notificacionId: notificacion.id,
-      }));
-      await bulkCreateAdjuntosDB(adjuntosData, transaction);
+        ordenTrabajoEquipoId,
+        transaction,
+      });
     }
+
+    const adjuntosGeneralesFiles = [
+      ...(filesByField.adjuntosGenerales || []),
+      ...(filesByField.actas || []),
+      ...(filesByField.informes || []),
+      ...(filesByField.checklists || []),
+    ];
+
+    if (adjuntosGeneralesFiles.length > 0) {
+      const adjuntosGenerales = adjuntosGeneralesFiles.map((file) => {
+        const stored = saveUploadedFile({
+          file,
+          folder: "notificaciones/generales",
+        });
+
+        return createAdjuntoRecordFromStored(stored, {
+          categoria: mapCategoriaByField(file.fieldname),
+          notificacionId: notificacion.id,
+          ordenTrabajoId,
+          ordenTrabajoEquipoId,
+          equipoId: equipoOT.equipoId || null,
+        });
+      });
+
+      await bulkCreateAdjuntosDB(adjuntosGenerales, transaction);
+    }
+
+    await actualizarOTACierreTecnicoSiCompleta(ordenTrabajoId, transaction);
 
     await transaction.commit();
 
+    const notificacionCompleta = await getNotificacionByIdDB(notificacion.id);
+
     return res.status(201).json({
-      message: "Notificación creada correctamente (por equipo)",
-      data: notificacion,
+      message: "Notificación creada correctamente",
+      data: notificacionCompleta || notificacion,
     });
   } catch (error) {
     await transaction.rollback();
@@ -156,8 +305,8 @@ const crearNotificacion = async (req, res) => {
 const obtenerNotificacion = async (req, res) => {
   try {
     const { id } = req.params;
-
     const notificacion = await getNotificacionByIdDB(id);
+
     if (!notificacion) {
       return res.status(404).json({ message: "No encontrada" });
     }
@@ -181,7 +330,7 @@ const listarNotificaciones = async (req, res) => {
 };
 
 /* =====================================
-   FINALIZAR (requiere Acta)
+   FINALIZAR
 ===================================== */
 const finalizarNotificacion = async (req, res) => {
   try {
@@ -195,7 +344,6 @@ const finalizarNotificacion = async (req, res) => {
     }
 
     await updateEstadoNotificacionDB(id, "FINALIZADO");
-
     return res.json({ message: "Notificación finalizada" });
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -203,20 +351,20 @@ const finalizarNotificacion = async (req, res) => {
 };
 
 /* =====================================
-   (OPCIONAL) GENERAR POR OT (1 por equipo)
-   POST /notificaciones/ots/:ordenTrabajoId/generar
+   GENERAR POR OT
 ===================================== */
 const generarNotificacionesPorOT = async (req, res) => {
   const transaction = await sequelize.transaction();
+
   try {
     const { ordenTrabajoId } = req.params;
-
     const { fechaInicio, fechaFin, estadoGeneralEquipo, precargarPlanes = true, ...resto } = req.body || {};
 
     if (!fechaInicio || !fechaFin) {
       await transaction.rollback();
       return res.status(400).json({ message: "Fechas obligatorias" });
     }
+
     if (!estadoGeneralEquipo) {
       await transaction.rollback();
       return res.status(400).json({ message: "Estado general requerido" });
@@ -231,7 +379,7 @@ const generarNotificacionesPorOT = async (req, res) => {
     const equiposOT = ot.equipos || [];
     if (equiposOT.length === 0) {
       await transaction.rollback();
-      return res.status(400).json({ message: "La OT no tiene equipos" });
+      return res.status(400).json({ message: "La OT no tiene registros" });
     }
 
     const creadas = [];
@@ -267,17 +415,27 @@ const generarNotificacionesPorOT = async (req, res) => {
       creadas.push(n);
     }
 
+    await actualizarOTACierreTecnicoSiCompleta(ordenTrabajoId, transaction);
+
+
     await transaction.commit();
 
     return res.status(201).json({
-      message: "Notificaciones generadas (1 por equipo)",
-      resumen: { totalEquipos: equiposOT.length, creadas: creadas.length, existentes: existentes.length },
+      message: "Notificaciones generadas correctamente",
+      resumen: {
+        totalRegistrosOT: equiposOT.length,
+        creadas: creadas.length,
+        existentes: existentes.length,
+      },
       creadas,
       existentes,
     });
   } catch (error) {
     await transaction.rollback();
-    return res.status(500).json({ message: "Error al generar notificaciones", error: error.message });
+    return res.status(500).json({
+      message: "Error al generar notificaciones",
+      error: error.message,
+    });
   }
 };
 
@@ -299,7 +457,6 @@ const generarPdfNotificacion = async (req, res) => {
   }
 };
 
-
 const listarNotificacionesPorOT = async (req, res) => {
   try {
     const { ordenTrabajoId } = req.params;
@@ -309,12 +466,13 @@ const listarNotificacionesPorOT = async (req, res) => {
     return res.status(500).json({ message: "Error al listar por OT", error: error.message });
   }
 };
+
 module.exports = {
   crearNotificacion,
   obtenerNotificacion,
   listarNotificaciones,
   finalizarNotificacion,
-  generarNotificacionesPorOT, 
+  generarNotificacionesPorOT,
   generarPdfNotificacion,
-  listarNotificacionesPorOT, 
+  listarNotificacionesPorOT,
 };

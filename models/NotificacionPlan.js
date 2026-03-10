@@ -10,6 +10,21 @@ module.exports = (sequelize) => {
         defaultValue: DataTypes.UUIDV4,
       },
 
+      notificacionId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
+
+      ordenTrabajoActividadId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
+
+      planMantenimientoId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
+
       estado: {
         type: DataTypes.ENUM("OK", "NO_OK", "NO_APLICA"),
         allowNull: false,
@@ -17,29 +32,40 @@ module.exports = (sequelize) => {
 
       comentario: {
         type: DataTypes.TEXT,
-      },
-
-      notificacionId: {
-        type: DataTypes.UUID,
-        allowNull: false,
-      },
-
-      // ← referencia a OrdenTrabajoEquipoActividad
-      ordenTrabajoActividadId: {
-        type: DataTypes.UUID,
-        allowNull: false,
-      },
-
-      // ← nullable, solo si la actividad viene de un plan
-      planMantenimientoId: {
-        type: DataTypes.UUID,
         allowNull: true,
       },
 
       trabajadorId: {
-  type: DataTypes.UUID,
-  allowNull: true,
-}
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
+
+      // ✅ duración real ejecutada de la actividad
+      duracionPlan: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+
+      unidadDuracionPlan: {
+        type: DataTypes.ENUM("min", "h"),
+        allowNull: true,
+      },
+
+      // ✅ inicio/fin real de la actividad
+      fechaInicioPlan: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+
+      fechaFinPlan: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+
+      observaciones: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
     },
     {
       tableName: "notificacion_planes",
@@ -50,6 +76,7 @@ module.exports = (sequelize) => {
   NotificacionPlan.associate = (models) => {
     NotificacionPlan.belongsTo(models.Notificacion, {
       foreignKey: "notificacionId",
+      as: "notificacion",
     });
 
     NotificacionPlan.belongsTo(models.OrdenTrabajoEquipoActividad, {
@@ -60,6 +87,16 @@ module.exports = (sequelize) => {
     NotificacionPlan.belongsTo(models.PlanMantenimiento, {
       foreignKey: "planMantenimientoId",
       as: "plan",
+    });
+
+    NotificacionPlan.belongsTo(models.Trabajador, {
+      foreignKey: "trabajadorId",
+      as: "trabajador",
+    });
+
+    NotificacionPlan.hasMany(models.Adjunto, {
+      foreignKey: "notificacionPlanId",
+      as: "adjuntos",
     });
   };
 

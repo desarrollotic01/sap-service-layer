@@ -1,7 +1,6 @@
 const {
   OrdenTrabajo,
   OrdenTrabajoEquipo,
-  AvisoEquipo,
   Aviso,
   sequelize,
   Adjunto,
@@ -10,33 +9,63 @@ const {
   SolicitudCompra,
   Tratamiento,
   TratamientoEquipo,
+  Notificacion,
 } = require("../db_connection");
 
 const { Op } = require("sequelize");
 
 /* =========================================================
-   1) Asignar Solicitudes a UNA OT (solo EQUIPOS)
-   - individuales: por equipoId IN equipos OT
-   - general: opcional, SOLO si está libre (sin ordenTrabajoId)
+   HELPERS
+========================================================= */
+const getTargetKey = (target) => {
+  if (target?.equipoId) return `E:${String(target.equipoId)}`;
+  if (target?.ubicacionTecnicaId) return `U:${String(target.ubicacionTecnicaId)}`;
+  return null;
+};
+
+const getTargetLabel = (target) => {
+  if (target?.equipoId) return `equipo ${target.equipoId}`;
+  if (target?.ubicacionTecnicaId) return `ubicación técnica ${target.ubicacionTecnicaId}`;
+  return "target inválido";
+};
+
+const ensureValidTarget = (target) => {
+  const tieneEquipo = !!target?.equipoId;
+  const tieneUbicacion = !!target?.ubicacionTecnicaId;
+
+  if ((tieneEquipo && tieneUbicacion) || (!tieneEquipo && !tieneUbicacion)) {
+    throw new Error(
+      "Cada target debe tener solo equipoId o solo ubicacionTecnicaId"
+    );
+  }
+};
+
+/* =========================================================
+   1) Asignar Solicitudes a UNA OT
 ========================================================= */
 async function asignarSolicitudesDeTratamientoAOT({
   avisoId,
   otId,
-  equipoIdsOT = [],
+  targetsOT = [],
   asignarGeneral = false,
   t,
 }) {
   if (!avisoId) throw new Error("avisoId es obligatorio");
   if (!otId) throw new Error("otId es obligatorio");
-  if (!Array.isArray(equipoIdsOT)) throw new Error("equipoIdsOT debe ser un arreglo");
+  if (!Array.isArray(targetsOT)) {
+    throw new Error("targetsOT debe ser un arreglo");
+  }
 
   const tratamiento = await Tratamiento.findOne({
     where: { aviso_id: avisoId },
     transaction: t,
   });
+
   if (!tratamiento) throw new Error("No existe tratamiento para este aviso");
 
-  // 1) Individuales por equipos presentes en esta OT
+  const equipoIdsOT = targetsOT.map((x) => x.equipoId).filter(Boolean);
+  const ubicacionIdsOT = targetsOT.map((x) => x.ubicacionTecnicaId).filter(Boolean);
+
   if (equipoIdsOT.length) {
     await SolicitudCompra.update(
       { ordenTrabajoId: otId },
@@ -51,10 +80,26 @@ async function asignarSolicitudesDeTratamientoAOT({
     );
   }
 
-  // 2) General (solo si tú decides y está libre)
+  if (ubicacionIdsOT.length) {
+    await SolicitudCompra.update(
+      { ordenTrabajoId: otId },
+      {
+        where: {
+          tratamiento_id: tratamiento.id,
+          esGeneral: false,
+          ubicacion_tecnica_id: { [Op.in]: ubicacionIdsOT },
+        },
+        transaction: t,
+      }
+    );
+  }
+
   if (asignarGeneral) {
     const general = await SolicitudCompra.findOne({
-      where: { tratamiento_id: tratamiento.id, esGeneral: true },
+      where: {
+        tratamiento_id: tratamiento.id,
+        esGeneral: true,
+      },
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
@@ -69,68 +114,75 @@ async function asignarSolicitudesDeTratamientoAOT({
 
 /* =========================================================
    2) Copiar actividades SIEMPRE desde TRATAMIENTO
-   - preventivo y correctivo
-   - respeta duraciones/roles/cantidadTecnicos editadas en tratamiento
 ========================================================= */
-async function copiarActividadesDesdeTratamiento({ avisoId, equiposOT, t }) {
-  if (!Array.isArray(equiposOT) || equiposOT.length === 0) return;
+async function copiarActividadesDesdeTratamiento({ avisoId, targetsOT, t }) {
+  if (!Array.isArray(targetsOT) || targetsOT.length === 0) return;
 
   const tratamiento = await Tratamiento.findOne({
     where: { aviso_id: avisoId },
     transaction: t,
   });
+
   if (!tratamiento) throw new Error("No existe tratamiento para este aviso");
 
-  // Traer TE + actividades para esos equipos
+  const equipoIds = targetsOT.map((x) => x.equipoId).filter(Boolean);
+  const ubicacionIds = targetsOT.map((x) => x.ubicacionTecnicaId).filter(Boolean);
+
+  const where = {
+    tratamientoId: tratamiento.id,
+    [Op.or]: [],
+  };
+
+  if (equipoIds.length) {
+    where[Op.or].push({
+      equipoId: { [Op.in]: equipoIds },
+    });
+  }
+
+  if (ubicacionIds.length) {
+    where[Op.or].push({
+      ubicacionTecnicaId: { [Op.in]: ubicacionIds },
+    });
+  }
+
+  if (!where[Op.or].length) return;
+
   const tes = await TratamientoEquipo.findAll({
-    where: {
-      tratamientoId: tratamiento.id,
-      equipoId: { [Op.in]: equiposOT.map((e) => e.equipoId) },
-    },
-    include: [{ association: "actividades" }], // alias debe existir
+    where,
+    include: [{ association: "actividades" }],
     transaction: t,
   });
 
-  const actsByEquipoId = new Map();
+  const actsByTargetKey = new Map();
+
   for (const te of tes) {
-    actsByEquipoId.set(te.equipoId, te.actividades || []);
+    const key = getTargetKey(te);
+    actsByTargetKey.set(key, te.actividades || []);
   }
 
   const actividadesCrear = [];
 
-  for (const equipoOT of equiposOT) {
-    const acts = actsByEquipoId.get(equipoOT.equipoId) || [];
-
-    // si quieres estricto: OT no debe crearse sin actividades en tratamiento
-    // if (acts.length === 0) throw new Error(`El equipo ${equipoOT.equipoId} no tiene actividades en tratamiento`);
+  for (const targetOT of targetsOT) {
+    const key = getTargetKey(targetOT);
+    const acts = actsByTargetKey.get(key) || [];
 
     for (const act of acts) {
       actividadesCrear.push({
-        ordenTrabajoEquipoId: equipoOT.id,
-
-        // trazabilidad (opcional si tienes columna):
-        // tratamientoEquipoActividadId: act.id,
-
+        ordenTrabajoEquipoId: targetOT.id,
         planMantenimientoActividadId: act.planMantenimientoActividadId || null,
-
         codigoActividad: act.codigoActividad || null,
         sistema: act.sistema || null,
         subsistema: act.subsistema || null,
         componente: act.componente || null,
         tarea: act.tarea || null,
-
         descripcion: act.descripcion || null,
         tipoTrabajo: act.tipoTrabajo || null,
-
         rolTecnico: act.rolTecnico || null,
         cantidadTecnicos: act.cantidadTecnicos ?? null,
-
         duracionEstimadaValor: act.duracionEstimadaValor ?? null,
         unidadDuracion: act.unidadDuracion || "min",
         duracionEstimadaMin: act.duracionEstimadaMin ?? null,
-
         observaciones: act.observaciones || null,
-
         estado: "PENDIENTE",
         origen: "TRATAMIENTO",
       });
@@ -138,32 +190,64 @@ async function copiarActividadesDesdeTratamiento({ avisoId, equiposOT, t }) {
   }
 
   if (actividadesCrear.length) {
-    await OrdenTrabajoEquipoActividad.bulkCreate(actividadesCrear, { transaction: t });
+    await OrdenTrabajoEquipoActividad.bulkCreate(actividadesCrear, {
+      transaction: t,
+    });
   }
 }
 
 /* =========================================================
-   helper: validar equipos pertenezcan al aviso
+   3) Validar targets pertenezcan al aviso
 ========================================================= */
-async function validarEquiposDelAviso(avisoId, equipos, t) {
-  const equiposAviso = await AvisoEquipo.findAll({
-    where: {
-      avisoId,
-      equipoId: equipos.map((e) => e.equipoId),
-    },
+async function validarTargetsDelAviso(avisoId, targets, t) {
+  if (!Array.isArray(targets) || targets.length === 0) {
+    throw new Error("Debe enviar al menos un target");
+  }
+
+  const aviso = await Aviso.findByPk(avisoId, {
+    include: [
+      { association: "equiposRelacion" },
+      { association: "ubicacionesRelacion" },
+    ],
     transaction: t,
   });
 
-  if (equiposAviso.length !== equipos.length) {
-    throw new Error("Uno o más equipos no pertenecen al aviso");
+  if (!aviso) throw new Error("Aviso no encontrado");
+
+  const equipoIdsAviso = new Set(
+    (aviso.equiposRelacion || []).map((x) => String(x.equipoId))
+  );
+
+  const ubicacionIdsAviso = new Set(
+    (aviso.ubicacionesRelacion || []).map((x) => String(x.ubicacionId))
+  );
+
+  for (const target of targets) {
+    ensureValidTarget(target);
+
+    if (target.equipoId) {
+      if (!equipoIdsAviso.has(String(target.equipoId))) {
+        throw new Error(`El equipo ${target.equipoId} no pertenece al aviso`);
+      }
+    }
+
+    if (target.ubicacionTecnicaId) {
+      if (!ubicacionIdsAviso.has(String(target.ubicacionTecnicaId))) {
+        throw new Error(
+          `La ubicación técnica ${target.ubicacionTecnicaId} no pertenece al aviso`
+        );
+      }
+    }
   }
 }
 
 /* =========================================================
-   OT interna (crea 1 OT con sus equipos, solicitudes, actividades, trabajadores, adjuntos)
-   - parametro: asignarSolicitudGeneral (true/false) decide si esta OT recibe la general
+   4) Crear una OT interna
 ========================================================= */
-async function crearOTInterna({ aviso, otDataBase, equipos, adjuntos, asignarSolicitudGeneral }, t) {
+async function crearOTInterna(
+  { aviso, otDataBase, targets, adjuntos, asignarSolicitudGeneral },
+  t
+) {
   const countOT = await OrdenTrabajo.count({
     where: { avisoId: aviso.id },
     transaction: t,
@@ -177,67 +261,61 @@ async function crearOTInterna({ aviso, otDataBase, equipos, adjuntos, asignarSol
     numeroOT: `${aviso.numeroAviso}-OT${correlativo}`,
   };
 
-  // 1) crear OT
   const ot = await OrdenTrabajo.create(otData, { transaction: t });
 
-  // 2) crear equipos OT
-  const equiposOT = await OrdenTrabajoEquipo.bulkCreate(
-    equipos.map((e) => {
-      // En tu nuevo flujo, el plan solo es referencia/visual.
-      // Las actividades se copiarán SIEMPRE del tratamiento.
-      // Igual puedes guardar planMantenimientoId si viene (para reportes).
-      let planId = e.planMantenimientoId || null;
+  const targetsOT = await OrdenTrabajoEquipo.bulkCreate(
+    targets.map((x) => {
+      ensureValidTarget(x);
 
-      // Correctivo: puede venir null
-      // Preventivo: puede venir planId, pero no lo usaremos para generar actividades
       return {
         ordenTrabajoId: ot.id,
-        equipoId: e.equipoId,
-        descripcionEquipo: e.descripcionEquipo || null,
-        prioridad: e.prioridad || "MEDIA",
-        planMantenimientoId: planId,
-        fechaInicioProgramada: e.fechaInicioProgramada || null,
-        fechaFinProgramada: e.fechaFinProgramada || null,
-        observacionesEquipo: e.observacionesEquipo || null,
+        equipoId: x.equipoId || null,
+        ubicacionTecnicaId: x.ubicacionTecnicaId || null,
+        descripcionEquipo: x.descripcionEquipo || x.descripcionUbicacion || null,
+        prioridad: x.prioridad || "MEDIA",
+        planMantenimientoId: x.planMantenimientoId || null,
+        fechaInicioProgramada: x.fechaInicioProgramada || null,
+        fechaFinProgramada: x.fechaFinProgramada || null,
+        observacionesEquipo: x.observacionesEquipo || null,
       };
     }),
     { transaction: t, returning: true }
   );
 
-  // 3) asignar solicitudes (individuales siempre, general según estrategia)
   await asignarSolicitudesDeTratamientoAOT({
     avisoId: aviso.id,
     otId: ot.id,
-    equipoIdsOT: equiposOT.map((x) => x.equipoId),
+    targetsOT,
     asignarGeneral: !!asignarSolicitudGeneral,
     t,
   });
 
-  // 4) copiar actividades SIEMPRE desde TRATAMIENTO
   await copiarActividadesDesdeTratamiento({
     avisoId: aviso.id,
-    equiposOT,
+    targetsOT,
     t,
   });
 
-  // 5) trabajadores por equipo
-  const trabajadoresEquipo = [];
-  equiposOT.forEach((equipoCreado, index) => {
-    const trabajadores = equipos[index].trabajadores || [];
+  const trabajadoresTarget = [];
+
+  targetsOT.forEach((targetCreado, index) => {
+    const trabajadores = targets[index].trabajadores || [];
+
     trabajadores.forEach((trab) => {
-      trabajadoresEquipo.push({
-        ordenTrabajoEquipoId: equipoCreado.id,
+      trabajadoresTarget.push({
+        ordenTrabajoEquipoId: targetCreado.id,
         trabajadorId: trab.trabajadorId,
         esEncargado: trab.esEncargado || false,
       });
     });
   });
 
-  if (trabajadoresEquipo.length) {
-    await OrdenTrabajoEquipoTrabajador.bulkCreate(trabajadoresEquipo, { transaction: t });
+  if (trabajadoresTarget.length) {
+    await OrdenTrabajoEquipoTrabajador.bulkCreate(trabajadoresTarget, {
+      transaction: t,
+    });
   }
 
-  // 6) adjuntos OT
   if (adjuntos && adjuntos.length) {
     await Adjunto.bulkCreate(
       adjuntos.map((a) => ({
@@ -254,51 +332,48 @@ async function crearOTInterna({ aviso, otDataBase, equipos, adjuntos, asignarSol
 }
 
 /* =========================================================
-   ✅ FUNCIÓN PRINCIPAL: crearOrdenTrabajo
-   - soporta GRUPAL / INDIVIDUAL / MIXTO
-   - estrategia para solicitud GENERAL:
-       "NINGUNA" | "OT_GRUPAL" | "PRIMERA_OT" | "OT_ESPECIFICA"
-     otKeyGeneral: (solo si OT_ESPECIFICA) "GRUPAL" o "E:<equipoId>"
+   5) FUNCIÓN PRINCIPAL: crearOrdenTrabajo
 ========================================================= */
 async function crearOrdenTrabajo(data) {
   const t = await sequelize.transaction();
 
   try {
     const {
-      equipos,
+      targets,
       adjuntos = [],
-      modo = "GRUPAL", // GRUPAL | INDIVIDUAL | MIXTO
-
-      // MIXTO
-      grupalEquipoIds = [],
-      individualEquipoIds = [],
-
-      // 🔥 NUEVO: estrategia para asignar solicitud GENERAL
+      modo = "GRUPAL",
+      grupalTargetKeys = [],
+      individualTargetKeys = [],
       solicitudGeneralStrategy = "OT_GRUPAL",
       otKeyGeneral = null,
-
       ...otData
     } = data;
 
     if (!otData.avisoId) throw new Error("avisoId es obligatorio");
-    if (!Array.isArray(equipos) || equipos.length === 0) throw new Error("Debe enviar al menos un equipo");
+    if (!Array.isArray(targets) || targets.length === 0) {
+      throw new Error("Debe enviar al menos un target");
+    }
 
-    // 1) obtener aviso
+    for (const target of targets) {
+      ensureValidTarget(target);
+    }
+
     const aviso = await Aviso.findByPk(otData.avisoId, { transaction: t });
     if (!aviso) throw new Error("Aviso no encontrado");
 
-    // 2) heredar tipo mantenimiento
     if (aviso.tipoAviso === "mantenimiento") {
-      if (!aviso.tipoMantenimiento) throw new Error("El aviso de mantenimiento no tiene tipo de mantenimiento");
+      if (!aviso.tipoMantenimiento) {
+        throw new Error(
+          "El aviso de mantenimiento no tiene tipo de mantenimiento"
+        );
+      }
       otData.tipoMantenimiento = aviso.tipoMantenimiento;
     } else {
       otData.tipoMantenimiento = null;
     }
 
-    // 3) validar equipos del aviso
-    await validarEquiposDelAviso(aviso.id, equipos, t);
+    await validarTargetsDelAviso(aviso.id, targets, t);
 
-    // helper para decidir si esta OT recibe la general
     const shouldAssignGeneral = (key) => {
       if (solicitudGeneralStrategy === "NINGUNA") return false;
       if (solicitudGeneralStrategy === "OT_GRUPAL") return key === "GRUPAL";
@@ -313,120 +388,124 @@ async function crearOrdenTrabajo(data) {
       throw new Error("modo inválido. Use GRUPAL | INDIVIDUAL | MIXTO");
     }
 
-    // =========================
-    // GRUPAL
-    // =========================
     if (modo === "GRUPAL") {
-      const ot = await crearOTInterna({
-        aviso,
-        otDataBase: otData,
-        equipos,
-        adjuntos,
-        asignarSolicitudGeneral: shouldAssignGeneral("GRUPAL") || shouldAssignGeneral("PRIMERA"),
-      }, t);
+      const ot = await crearOTInterna(
+        {
+          aviso,
+          otDataBase: otData,
+          targets,
+          adjuntos,
+          asignarSolicitudGeneral:
+            shouldAssignGeneral("GRUPAL") || shouldAssignGeneral("PRIMERA"),
+        },
+        t
+      );
 
       otsCreadas.push(ot);
     }
 
-    // =========================
-    // INDIVIDUAL
-    // =========================
     if (modo === "INDIVIDUAL") {
       let primera = true;
 
-      for (const e of equipos) {
-        const key = `E:${e.equipoId}`;
+      for (const target of targets) {
+        const key = getTargetKey(target);
 
-        const ot = await crearOTInterna({
-          aviso,
-          otDataBase: otData,
-          equipos: [e],
-          adjuntos,
-          asignarSolicitudGeneral:
-            shouldAssignGeneral("PRIMERA") && primera
-              ? true
-              : shouldAssignGeneral(key),
-        }, t);
+        const ot = await crearOTInterna(
+          {
+            aviso,
+            otDataBase: otData,
+            targets: [target],
+            adjuntos,
+            asignarSolicitudGeneral:
+              (shouldAssignGeneral("PRIMERA") && primera)
+                ? true
+                : shouldAssignGeneral(key),
+          },
+          t
+        );
 
         otsCreadas.push(ot);
         primera = false;
       }
     }
 
-    // =========================
-    // MIXTO
-    // =========================
     if (modo === "MIXTO") {
-      if (!Array.isArray(grupalEquipoIds) || grupalEquipoIds.length === 0) {
-        throw new Error("En MIXTO debe enviar grupalEquipoIds");
-      }
-      if (!Array.isArray(individualEquipoIds) || individualEquipoIds.length === 0) {
-        throw new Error("En MIXTO debe enviar individualEquipoIds");
+      if (!Array.isArray(grupalTargetKeys) || grupalTargetKeys.length === 0) {
+        throw new Error("En MIXTO debe enviar grupalTargetKeys");
       }
 
-      // sin duplicados
-      const set = new Set([...grupalEquipoIds, ...individualEquipoIds]);
-      if (set.size !== grupalEquipoIds.length + individualEquipoIds.length) {
-        throw new Error("Un equipo no puede estar en grupal e individual a la vez");
+      if (!Array.isArray(individualTargetKeys) || individualTargetKeys.length === 0) {
+        throw new Error("En MIXTO debe enviar individualTargetKeys");
       }
 
-      // validar que existan en payload
-      const idsPayload = new Set(equipos.map((x) => x.equipoId));
-      for (const id of [...grupalEquipoIds, ...individualEquipoIds]) {
-        if (!idsPayload.has(id)) throw new Error(`El equipo ${id} no fue enviado en el payload`);
+      const set = new Set([...grupalTargetKeys, ...individualTargetKeys]);
+      if (set.size !== grupalTargetKeys.length + individualTargetKeys.length) {
+        throw new Error("Un target no puede estar en grupal e individual a la vez");
       }
 
-      const equiposGrupal = equipos.filter((e) => grupalEquipoIds.includes(e.equipoId));
-      const equiposIndividual = equipos.filter((e) => individualEquipoIds.includes(e.equipoId));
+      const targetsMap = new Map(targets.map((x) => [getTargetKey(x), x]));
 
-      // 1 OT grupal
-      const otGrupal = await crearOTInterna({
-        aviso,
-        otDataBase: otData,
-        equipos: equiposGrupal,
-        adjuntos,
-        asignarSolicitudGeneral: shouldAssignGeneral("GRUPAL") || shouldAssignGeneral("PRIMERA"),
-      }, t);
+      for (const key of [...grupalTargetKeys, ...individualTargetKeys]) {
+        if (!targetsMap.has(key)) {
+          throw new Error(`El target ${key} no fue enviado en el payload`);
+        }
+      }
+
+      const targetsGrupal = grupalTargetKeys.map((key) => targetsMap.get(key));
+      const targetsIndividual = individualTargetKeys.map((key) => targetsMap.get(key));
+
+      const otGrupal = await crearOTInterna(
+        {
+          aviso,
+          otDataBase: otData,
+          targets: targetsGrupal,
+          adjuntos,
+          asignarSolicitudGeneral:
+            shouldAssignGeneral("GRUPAL") || shouldAssignGeneral("PRIMERA"),
+        },
+        t
+      );
 
       otsCreadas.push(otGrupal);
 
-      // individuales
-      let primera = false; // ya existe una OT (grupal) => PRIMERA ya consumida
-      for (const e of equiposIndividual) {
-        const key = `E:${e.equipoId}`;
+      for (const target of targetsIndividual) {
+        const key = getTargetKey(target);
 
-        const ot = await crearOTInterna({
-          aviso,
-          otDataBase: otData,
-          equipos: [e],
-          adjuntos,
-          asignarSolicitudGeneral:
-            (shouldAssignGeneral("PRIMERA") && primera) ? true : shouldAssignGeneral(key),
-        }, t);
+        const ot = await crearOTInterna(
+          {
+            aviso,
+            otDataBase: otData,
+            targets: [target],
+            adjuntos,
+            asignarSolicitudGeneral: shouldAssignGeneral(key),
+          },
+          t
+        );
 
         otsCreadas.push(ot);
-        primera = false;
       }
     }
 
-    // 5) estado aviso
     await aviso.update({ estadoAviso: "con OT" }, { transaction: t });
 
     await t.commit();
 
     return await OrdenTrabajo.findAll({
-      where: { id: { [Op.in]: otsCreadas.map((x) => x.id) } },
+      where: {
+        id: { [Op.in]: otsCreadas.map((x) => x.id) },
+      },
       include: [
         {
           association: "equipos",
           include: [
             { association: "equipo" },
+            { association: "ubicacionTecnica" },
             { association: "planMantenimiento" },
             { association: "actividades" },
             { association: "trabajadores", include: ["trabajador"] },
           ],
         },
-        { association: "solicitudesCompra" }, // ahora aquí verás individuales + (general si se asignó)
+        { association: "solicitudesCompra" },
         { association: "adjuntos" },
       ],
       order: [["createdAt", "DESC"]],
@@ -444,6 +523,7 @@ async function obtenerOrdenesTrabajo() {
         association: "equipos",
         include: [
           { association: "equipo" },
+          { association: "ubicacionTecnica" },
           { association: "adjuntos" },
           { association: "trabajadores", include: ["trabajador"] },
           { association: "actividades" },
@@ -461,12 +541,14 @@ async function obtenerOrdenTrabajoPorId(id) {
         association: "equipos",
         include: [
           { association: "equipo" },
+          { association: "ubicacionTecnica" },
           { association: "planMantenimiento" },
           { association: "actividades" },
           { association: "trabajadores", include: ["trabajador"] },
         ],
       },
       { association: "adjuntos" },
+      { association: "solicitudesCompra" },
     ],
   });
 }
@@ -474,6 +556,7 @@ async function obtenerOrdenTrabajoPorId(id) {
 async function actualizarOrdenTrabajo(id, data) {
   const ot = await OrdenTrabajo.findByPk(id);
   if (!ot) return null;
+
   await ot.update(data);
   return ot;
 }
@@ -501,6 +584,70 @@ async function liberarOrdenTrabajo(id) {
   return ot;
 }
 
+/* =========================================================
+   6) CAMBIAR A CIERRE_TECNICO SI TODAS TIENEN NOTIFICACION
+========================================================= */
+async function actualizarOTACierreTecnicoSiCompleta(ordenTrabajoId, transaction) {
+  if (!ordenTrabajoId) {
+    throw new Error("ordenTrabajoId es obligatorio");
+  }
+
+  const totalRegistrosOT = await OrdenTrabajoEquipo.count({
+    where: { ordenTrabajoId },
+    transaction,
+  });
+
+  if (!totalRegistrosOT) {
+    return {
+      ok: false,
+      changed: false,
+      totalRegistrosOT: 0,
+      totalNotificaciones: 0,
+      reason: "La OT no tiene registros asociados",
+    };
+  }
+
+  const registrosOT = await OrdenTrabajoEquipo.findAll({
+    where: { ordenTrabajoId },
+    attributes: ["id"],
+    transaction,
+  });
+
+  const idsRegistrosOT = registrosOT.map((r) => r.id);
+
+  const totalNotificaciones = await Notificacion.count({
+    where: {
+      ordenTrabajoId,
+      ordenTrabajoEquipoId: { [Op.in]: idsRegistrosOT },
+    },
+    transaction,
+  });
+
+  if (totalNotificaciones === totalRegistrosOT) {
+    await OrdenTrabajo.update(
+      { estado: "CIERRE_TECNICO" },
+      {
+        where: { id: ordenTrabajoId },
+        transaction,
+      }
+    );
+
+    return {
+      ok: true,
+      changed: true,
+      totalRegistrosOT,
+      totalNotificaciones,
+    };
+  }
+
+  return {
+    ok: true,
+    changed: false,
+    totalRegistrosOT,
+    totalNotificaciones,
+  };
+}
+
 module.exports = {
   crearOrdenTrabajo,
   obtenerOrdenesTrabajo,
@@ -508,4 +655,5 @@ module.exports = {
   actualizarOrdenTrabajo,
   eliminarOrdenTrabajo,
   liberarOrdenTrabajo,
+  actualizarOTACierreTecnicoSiCompleta,
 };

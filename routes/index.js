@@ -19,10 +19,18 @@ const  notificacionRouter = require("./notificacionRouter");
 const familiaRouter = require ("./familiaRouter")
 const paisRouter = require("./paisRouter")
 const guiaMantenimientoRouter = require("./guiaMantenimientoRouter")
+const portalClienteRouter = require("./portalClienteRouter")
 
 
 
 
+
+
+
+
+
+
+router.use("/portal-cliente", portalClienteRouter);
 router.use("/guia-mantenimiento", guiaMantenimientoRouter);
 router.use("/pais",paisRouter)
 router.use("/familia",familiaRouter)

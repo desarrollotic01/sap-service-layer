@@ -10,9 +10,6 @@ module.exports = (sequelize) => {
         defaultValue: DataTypes.UUIDV4,
       },
 
-      // ===============================
-      // FECHAS
-      // ===============================
       fechaInicio: {
         type: DataTypes.DATE,
         allowNull: false,
@@ -25,50 +22,54 @@ module.exports = (sequelize) => {
 
       fechaUltimoMantenimientoPreventivo: {
         type: DataTypes.DATE,
+        allowNull: true,
       },
 
       horometro: {
         type: DataTypes.FLOAT,
+        allowNull: true,
       },
 
       numeroMisiones: {
         type: DataTypes.INTEGER,
+        allowNull: true,
       },
 
       numeroEquipo: {
         type: DataTypes.STRING,
+        allowNull: true,
       },
 
       codigoRepuesto: {
         type: DataTypes.STRING,
+        allowNull: true,
       },
 
-      // ===============================
-      // DESCRIPCIONES
-      // ===============================
       descripcionMantenimiento: {
         type: DataTypes.TEXT,
+        allowNull: true,
       },
 
       resumenCorrectivos: {
         type: DataTypes.TEXT,
+        allowNull: true,
       },
 
       descripcionGeneral: {
         type: DataTypes.TEXT,
+        allowNull: true,
       },
 
       observaciones: {
         type: DataTypes.TEXT,
+        allowNull: true,
       },
 
       recomendaciones: {
         type: DataTypes.TEXT,
+        allowNull: true,
       },
 
-      // ===============================
-      // ESTADO GENERAL DEL EQUIPO
-      // ===============================
       estadoGeneralEquipo: {
         type: DataTypes.ENUM(
           "OPERATIVO",
@@ -78,9 +79,6 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      // ===============================
-      // ESTADO INTERNO NOTIFICACIÓN
-      // ===============================
       estado: {
         type: DataTypes.ENUM(
           "BORRADOR",
@@ -91,18 +89,16 @@ module.exports = (sequelize) => {
         defaultValue: "BORRADOR",
       },
 
-      // ===============================
-      // RELACIONES
-      // ===============================
       ordenTrabajoId: {
         type: DataTypes.UUID,
         allowNull: false,
       },
 
       ordenTrabajoEquipoId: {
-  type: DataTypes.UUID,
-  allowNull: false,
-},
+        type: DataTypes.UUID,
+        allowNull: false,
+        unique: true,
+      },
     },
     {
       tableName: "notificaciones",
@@ -111,42 +107,37 @@ module.exports = (sequelize) => {
   );
 
   Notificacion.associate = (models) => {
-
-    // 🔹 Pertenece a una Orden de Trabajo
     Notificacion.belongsTo(models.OrdenTrabajo, {
       foreignKey: "ordenTrabajoId",
       as: "ordenTrabajo",
     });
 
-    // 🔹 Técnicos que ejecutaron (Muchos a Muchos)
+    Notificacion.belongsTo(models.OrdenTrabajoEquipo, {
+      foreignKey: "ordenTrabajoEquipoId",
+      as: "equipoOT",
+    });
+
     Notificacion.belongsToMany(models.Trabajador, {
       through: "NotificacionTrabajadores",
       foreignKey: "notificacionId",
+      otherKey: "trabajadorId",
       as: "tecnicos",
     });
 
-    // 🔹 Checklist de Planes de Mantenimiento
     Notificacion.hasMany(models.NotificacionPlan, {
       foreignKey: "notificacionId",
       as: "planes",
     });
 
-    // 🔹 Adjuntos (Fotos antes, después, correctivo, acta, informe, etc)
     Notificacion.hasMany(models.Adjunto, {
       foreignKey: "notificacionId",
       as: "adjuntos",
     });
 
-    Notificacion.belongsTo(models.OrdenTrabajoEquipo, {
-  foreignKey: "ordenTrabajoEquipoId",
-  as: "equipoOT",
-});
-
-// opcional
-models.OrdenTrabajoEquipo.hasOne(models.Notificacion, {
-  foreignKey: "ordenTrabajoEquipoId",
-  as: "notificacion",
-});
+    models.OrdenTrabajoEquipo.hasOne(models.Notificacion, {
+      foreignKey: "ordenTrabajoEquipoId",
+      as: "notificacion",
+    });
   };
 
   return Notificacion;

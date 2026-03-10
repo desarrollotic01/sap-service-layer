@@ -24,6 +24,12 @@ module.exports = (sequelize) => {
         ),
         allowNull: false,
       },
+
+      origenAviso: {
+  type: DataTypes.ENUM("manual", "guia"),
+  allowNull: false,
+  defaultValue: "manual",
+},
       /* =====================
          IDENTIFICACIÓN
       ===================== */
@@ -57,6 +63,9 @@ module.exports = (sequelize) => {
       prioridad: {
         type: DataTypes.ENUM("Baja", "Media", "Alta"),
       },
+
+
+      
 
       // 👉 SOLO APLICA SI tipoAviso === "mantenimiento"
       tipoMantenimiento: {
@@ -182,6 +191,16 @@ module.exports = (sequelize) => {
         type: DataTypes.UUID,
         allowNull: false,
       },
+
+      guiaMantenimientoId: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
+
+guiaMantenimientoProgramacionId: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
     },
     {
       tableName: "Avisos",
@@ -225,6 +244,16 @@ module.exports = (sequelize) => {
 Aviso.belongsTo(db.Pais, {
   foreignKey: "paisId",
   as: "pais",
+});
+
+Aviso.belongsTo(db.GuiaMantenimiento, {
+  foreignKey: "guiaMantenimientoId",
+  as: "guiaMantenimiento",
+});
+
+Aviso.belongsTo(db.GuiaMantenimientoProgramacion, {
+  foreignKey: "guiaMantenimientoProgramacionId",
+  as: "programacionGuia",
 });
 
 

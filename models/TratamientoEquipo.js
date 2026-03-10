@@ -99,6 +99,13 @@ TratamientoEquipo.hasMany(models.TratamientoEquipoTrabajador, {
   foreignKey: "tratamientoEquipoId",
   as: "tecnicosAsignados",
 });
+
+
+TratamientoEquipo.belongsTo(models.UbicacionTecnica, {
+  foreignKey: "ubicacionTecnicaId",
+  as: "ubicacionTecnica",
+});
+
   };
 
   return TratamientoEquipo;

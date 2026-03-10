@@ -2,7 +2,7 @@ const EquipoController = require("../controllers/equipoController");
 
 const crearEquipo = async (req, res) => {
   try {
-    const result = await EquipoController.crear(req.body);
+    const result = await EquipoController.crear(req.body, req.files || []);
     return res.status(201).json(result);
   } catch (error) {
     return res.status(400).json({ message: error.message });
@@ -36,7 +36,8 @@ const actualizarEquipo = async (req, res) => {
   try {
     const result = await EquipoController.actualizar(
       req.params.id,
-      req.body
+      req.body,
+      req.files || []
     );
     return res.json(result);
   } catch (error) {
@@ -55,7 +56,7 @@ const eliminarEquipo = async (req, res) => {
 
 const obtenerPlanesMantenimientoEquipo = async (req, res) => {
   try {
-    const { id } = req.params; 
+    const { id } = req.params;
 
     const planes = await EquipoController.obtenerPlanesMantenimientoPorEquipo(id);
 
@@ -78,5 +79,4 @@ module.exports = {
   actualizarEquipo,
   eliminarEquipo,
   obtenerPlanesMantenimientoEquipo,
-
 };

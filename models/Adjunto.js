@@ -1,7 +1,6 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
-
   const Adjunto = sequelize.define(
     "Adjunto",
     {
@@ -21,12 +20,11 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      // Tipo físico del archivo
       extension: {
-        type: DataTypes.STRING, // pdf, jpg, png, etc
+        type: DataTypes.STRING,
+        allowNull: true,
       },
 
-      // Tipo funcional del adjunto
       categoria: {
         type: DataTypes.ENUM(
           "ANTES",
@@ -37,11 +35,8 @@ module.exports = (sequelize) => {
           "CHECKLIST",
           "OTRO"
         ),
+        allowNull: true,
       },
-
-      // ===============================
-      // RELACIONES
-      // ===============================
 
       ordenTrabajoId: {
         type: DataTypes.UUID,
@@ -63,16 +58,20 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
+      notificacionPlanId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
+
       planMantenimientoId: {
-  type: DataTypes.UUID,
-  allowNull: true,
-},
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
 
       equipoId: {
-  type: DataTypes.UUID,
-  allowNull: true,
-},
-
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
     },
     {
       tableName: "adjuntos",
@@ -81,7 +80,6 @@ module.exports = (sequelize) => {
   );
 
   Adjunto.associate = (models) => {
-
     Adjunto.belongsTo(models.OrdenTrabajo, {
       foreignKey: "ordenTrabajoId",
       as: "ordenTrabajo",
@@ -102,17 +100,20 @@ module.exports = (sequelize) => {
       as: "notificacion",
     });
 
+    Adjunto.belongsTo(models.NotificacionPlan, {
+      foreignKey: "notificacionPlanId",
+      as: "notificacionPlan",
+    });
+
     Adjunto.belongsTo(models.Equipo, {
-  foreignKey: "equipoId",
-  as: "equipo",
-});
+      foreignKey: "equipoId",
+      as: "equipo",
+    });
 
-Adjunto.belongsTo(models.PlanMantenimiento, {
-  foreignKey: "planMantenimientoId",
-  as: "plan",
-});
-
-
+    Adjunto.belongsTo(models.PlanMantenimiento, {
+      foreignKey: "planMantenimientoId",
+      as: "plan",
+    });
   };
 
   return Adjunto;

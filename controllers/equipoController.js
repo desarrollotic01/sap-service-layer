@@ -6,71 +6,11 @@ const {
   Pais,
   sequelize,
   PlanMantenimiento,
-    PlanMantenimientoActividad,
-
+  PlanMantenimientoActividad,
 } = require("../db_connection");
 
-const crear = async (data) => {
-  if (!data.numeroOV) {
-    throw new Error("El número de OV es obligatorio");
-  }
-
-  if (!data.clienteId) {
-    throw new Error("El cliente es obligatorio");
-  }
-
-  if (!data.paisId) {
-    throw new Error("El país es obligatorio");
-  }
-
-  if (!data.tipoEquipoPropiedad) {
-    throw new Error("El tipo de equipo es obligatorio");
-  }
-
-  return await sequelize.transaction(async (t) => {
-    // ✅ separar planes
-    const { planesMantenimientoIds, ...equipoData } = data;
-
-    const equipo = await Equipo.create(equipoData, { transaction: t });
-
-    // ✅ vincular planes (si vienen)
- if (planesMantenimientoIds !== undefined) {
-  await equipo.setPlanesMantenimiento(planesMantenimientoIds, {
-    transaction: t,
-  });
-}
-
-
-    // ✅ devolver con planes
-    return await Equipo.findByPk(equipo.id, {
-      include: [
-        { model: Cliente, as: "cliente", attributes: ["id", "razonSocial"] },
-        { model: Familia, as: "familia", attributes: ["id", "nombre"] },
-        { model: Pais, as: "pais", attributes: ["id", "codigo", "nombre"] },
-        { model: Adjunto, as: "adjuntos" },
-        { model: sequelize.models.PlanMantenimiento, as: "planesMantenimiento" },
-        {
-          model: PlanMantenimiento,
-          as: "planesMantenimiento",
-          attributes: ["id", "codigoPlan", "nombre", "tipo", "activo", "esEspecifico", "equipoObjetivoId"],
-          through: { attributes: [] },
-          include: [
-            {
-              model: PlanMantenimientoActividad,
-              as: "actividades",
-            },
-          ],
-        },
-        
-      ],
-      transaction: t,
-    });
-  });
-};
-
-
-const listar = async () => {
-  return Equipo.findAll({
+const obtenerEquipoCompleto = async (id, transaction = null) => {
+  return await Equipo.findByPk(id, {
     include: [
       { model: Cliente, as: "cliente", attributes: ["id", "razonSocial"] },
       { model: Familia, as: "familia", attributes: ["id", "nombre"] },
@@ -79,7 +19,85 @@ const listar = async () => {
       {
         model: PlanMantenimiento,
         as: "planesMantenimiento",
-        attributes: ["id", "codigoPlan", "nombre", "tipo", "activo", "esEspecifico", "equipoObjetivoId"],
+        attributes: [
+          "id",
+          "codigoPlan",
+          "nombre",
+          "tipo",
+          "activo",
+          "esEspecifico",
+          "equipoObjetivoId",
+        ],
+        through: { attributes: [] },
+        include: [
+          {
+            model: PlanMantenimientoActividad,
+            as: "actividades",
+          },
+        ],
+      },
+    ],
+    transaction,
+  });
+};
+
+const crear = async (data, files = []) => {
+  return await sequelize.transaction(async (t) => {
+    const { planesMantenimientoIds, ...equipoData } = data;
+
+    const equipo = await Equipo.create(equipoData, { transaction: t });
+
+    if (planesMantenimientoIds !== undefined) {
+      let planes = planesMantenimientoIds;
+
+      if (typeof planesMantenimientoIds === "string") {
+        try {
+          planes = JSON.parse(planesMantenimientoIds);
+        } catch {
+          planes = [planesMantenimientoIds];
+        }
+      }
+
+      if (Array.isArray(planes)) {
+        await equipo.setPlanesMantenimiento(planes, { transaction: t });
+      }
+    }
+
+    if (files && files.length > 0) {
+      const adjuntosData = files.map((file) => ({
+        nombre: file.originalname,
+        url: `/uploads/equipos/${file.filename}`,
+        extension: file.mimetype,
+        categoria: "OTRO",
+        equipoId: equipo.id,
+      }));
+
+      await Adjunto.bulkCreate(adjuntosData, { transaction: t });
+    }
+
+    return await obtenerEquipoCompleto(equipo.id, t);
+  });
+};
+
+const listar = async () => {
+  return await Equipo.findAll({
+    include: [
+      { model: Cliente, as: "cliente", attributes: ["id", "razonSocial"] },
+      { model: Familia, as: "familia", attributes: ["id", "nombre"] },
+      { model: Pais, as: "pais", attributes: ["id", "codigo", "nombre"] },
+      { model: Adjunto, as: "adjuntos" },
+      {
+        model: PlanMantenimiento,
+        as: "planesMantenimiento",
+        attributes: [
+          "id",
+          "codigoPlan",
+          "nombre",
+          "tipo",
+          "activo",
+          "esEspecifico",
+          "equipoObjetivoId",
+        ],
         through: { attributes: [] },
         include: [
           {
@@ -94,47 +112,47 @@ const listar = async () => {
 };
 
 const obtener = async (id) => {
-  return Equipo.findByPk(id, {
-    include: [
-      { model: Cliente, as: "cliente", attributes: ["id", "razonSocial"] },
-      { model: Familia, as: "familia", attributes: ["id", "nombre"] },
-      { model: Pais, as: "pais", attributes: ["id", "codigo", "nombre"] },
-      { model: Adjunto, as: "adjuntos" },
-      {
-        model: PlanMantenimiento,
-        as: "planesMantenimiento",
-        attributes: ["id", "codigoPlan", "nombre", "tipo", "activo", "esEspecifico", "equipoObjetivoId"],
-        through: { attributes: [] },
-        include: [
-          {
-            model: PlanMantenimientoActividad,
-            as: "actividades",
-          },
-        ],
-      },
-    ],
-  });
+  return await obtenerEquipoCompleto(id);
 };
 
-const actualizar = async (id, data) => {
+const actualizar = async (id, data, files = []) => {
   const equipo = await Equipo.findByPk(id);
   if (!equipo) throw new Error("Equipo no encontrado");
 
   return await sequelize.transaction(async (t) => {
     const { planesMantenimientoIds, ...equipoData } = data;
 
-    // ✅ actualizar datos base
     await equipo.update(equipoData, { transaction: t });
 
-    // ✅ actualizar planes si vienen
-    if (planesMantenimientoIds) {
-      await equipo.setPlanesMantenimiento(planesMantenimientoIds, {
-        transaction: t,
-      });
+    if (planesMantenimientoIds !== undefined) {
+      let planes = planesMantenimientoIds;
+
+      if (typeof planesMantenimientoIds === "string") {
+        try {
+          planes = JSON.parse(planesMantenimientoIds);
+        } catch {
+          planes = [planesMantenimientoIds];
+        }
+      }
+
+      if (Array.isArray(planes)) {
+        await equipo.setPlanesMantenimiento(planes, { transaction: t });
+      }
     }
 
-    // ✅ devolver actualizado
-    return await obtener(id);
+    if (files && files.length > 0) {
+      const adjuntosData = files.map((file) => ({
+        nombre: file.originalname,
+        url: `/uploads/equipos/${file.filename}`,
+        extension: file.mimetype,
+        categoria: "OTRO",
+        equipoId: equipo.id,
+      }));
+
+      await Adjunto.bulkCreate(adjuntosData, { transaction: t });
+    }
+
+    return await obtenerEquipoCompleto(id, t);
   });
 };
 
@@ -155,7 +173,15 @@ const obtenerPlanesMantenimientoPorEquipo = async (equipoId) => {
       {
         model: PlanMantenimiento,
         as: "planesMantenimiento",
-        attributes: ["id", "codigoPlan", "nombre", "tipo", "activo", "esEspecifico", "equipoObjetivoId"],
+        attributes: [
+          "id",
+          "codigoPlan",
+          "nombre",
+          "tipo",
+          "activo",
+          "esEspecifico",
+          "equipoObjetivoId",
+        ],
         where: { activo: true },
         required: false,
         through: { attributes: [] },
@@ -181,5 +207,4 @@ module.exports = {
   actualizar,
   eliminar,
   obtenerPlanesMantenimientoPorEquipo,
-
 };

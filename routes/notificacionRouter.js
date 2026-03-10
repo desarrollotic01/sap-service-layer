@@ -1,4 +1,6 @@
-const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
+const uploadAdjuntosNotificacion = require("../middlewares/uploadAdjuntosNotificacion");
 const {
   crearNotificacion,
   obtenerNotificacion,
@@ -6,18 +8,20 @@ const {
   finalizarNotificacion,
   generarNotificacionesPorOT,
   generarPdfNotificacion,
-  listarNotificacionesPorOT
+  listarNotificacionesPorOT,
 } = require("../handlers/notificacionHandler");
 
-const auth = require("../middlewares/auth");
+router.post(
+  "/",
+  uploadAdjuntosNotificacion.any(),
+  crearNotificacion
+);
 
-
-router.post("/", auth, crearNotificacion);
-router.get("/", auth, listarNotificaciones);
-router.get("/:id", auth, obtenerNotificacion);
-router.patch("/:id/finalizar", auth, finalizarNotificacion);
-router.post("/ots/:ordenTrabajoId/generar", auth, generarNotificacionesPorOT);
-router.get("/:id/pdf", auth, generarPdfNotificacion);
-router.get("/ot/:ordenTrabajoId", auth, listarNotificacionesPorOT);
+router.get("/", listarNotificaciones);
+router.get("/:id", obtenerNotificacion);
+router.post("/:id/finalizar", finalizarNotificacion);
+router.post("/ots/:ordenTrabajoId/generar", generarNotificacionesPorOT);
+router.get("/:id/pdf", generarPdfNotificacion);
+router.get("/ots/:ordenTrabajoId/listar", listarNotificacionesPorOT);
 
 module.exports = router;

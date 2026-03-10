@@ -78,16 +78,13 @@ module.exports = (sequelize) => {
 
       serie: {
         type: DataTypes.STRING,
-        unique: true,
       },
 
-      // ✅ NUEVO: tipo de equipo (propiedad)
       tipoEquipoPropiedad: {
         type: DataTypes.ENUM("Vendido", "Propio", "Atendido"),
         allowNull: false,
       },
 
-      // ✅ NUEVO: país por código (escalable)
      paisId: {
   type: DataTypes.UUID,
   allowNull: false,
@@ -145,7 +142,6 @@ module.exports = (sequelize) => {
 
       codigo: {
         type: DataTypes.STRING,
-        unique: true,
       },
 
       creadoPor: {

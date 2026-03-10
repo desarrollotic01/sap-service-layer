@@ -4,20 +4,25 @@ const {
   obtenerPlanPorId,
   obtenerPlanesPorEquipo,
   obtenerMejorPlanPorEquipo,
+  obtenerPlanesPorUbicacionTecnica,
+  obtenerMejorPlanPorUbicacionTecnica,
   actualizarPlanesDeEquipo,
-    cambiarEstadoPlan,
+  actualizarPlanesDeUbicacionTecnica,
+  cambiarEstadoPlan,
 } = require("../controllers/planMantenimientoController");
+const deleteUploadedFiles = require("../middlewares/deleteUploadedFiles");
 
 /* =========================================================
    CREAR PLAN
 ========================================================= */
 const crearPlanHandler = async (req, res) => {
   try {
-    const plan = await crearPlan(req.body);
+    const plan = await crearPlan(req.body, req.files || []);
     return res.status(201).json(plan);
   } catch (error) {
+    deleteUploadedFiles(req.files || []);
     console.error(error);
-    return res.status(400).json({ error: error.message }); // ✅ 400 si es validación
+    return res.status(400).json({ error: error.message });
   }
 };
 
@@ -42,10 +47,10 @@ const obtenerPlanPorIdHandler = async (req, res) => {
     const plan = await obtenerPlanPorId(req.params.id);
     return res.json(plan);
   } catch (error) {
-    // si tu controller lanza "Plan no encontrado"
     if (error.message?.toLowerCase().includes("no encontrado")) {
       return res.status(404).json({ error: error.message });
     }
+
     console.error(error);
     return res.status(500).json({ error: error.message });
   }
@@ -70,7 +75,7 @@ const obtenerPlanesPorEquipoHandler = async (req, res) => {
 const obtenerMejorPlanPorEquipoHandler = async (req, res) => {
   try {
     const plan = await obtenerMejorPlanPorEquipo(req.params.equipoId);
-    return res.json(plan); // puede ser null y está ok
+    return res.json(plan);
   } catch (error) {
     console.error(error);
     return res.status(400).json({ error: error.message });
@@ -79,15 +84,13 @@ const obtenerMejorPlanPorEquipoHandler = async (req, res) => {
 
 /* =========================================================
    ACTUALIZAR PLANES DE UN EQUIPO
-   (setPlanesMantenimiento)
 ========================================================= */
 const actualizarPlanesMantenimientoEquipo = async (req, res) => {
   try {
-    const { id } = req.params; // id del equipo
+    const { id } = req.params;
     const { planesMantenimientoIds } = req.body;
 
-    const result = await actualizarPlanesDeEquipo(id, planesMantenimientoIds); // ✅ CORRECTO
-
+    const result = await actualizarPlanesDeEquipo(id, planesMantenimientoIds);
     return res.json(result);
   } catch (error) {
     console.error(error);
@@ -95,22 +98,72 @@ const actualizarPlanesMantenimientoEquipo = async (req, res) => {
   }
 };
 
+/* =========================================================
+   CAMBIAR ESTADO PLAN
+========================================================= */
 const cambiarEstadoPlanHandler = async (req, res) => {
   try {
     const { id } = req.params;
     const { activo } = req.body || {};
 
-    const plan = await cambiarEstadoPlan({ id, activo });
+    let activoNormalizado = activo;
+
+    if (activo === "true") activoNormalizado = true;
+    if (activo === "false") activoNormalizado = false;
+
+    const plan = await cambiarEstadoPlan({ id, activo: activoNormalizado });
 
     return res.json({
       message: `Plan ${plan.activo ? "activado" : "desactivado"} correctamente`,
       plan,
     });
   } catch (error) {
-    // 404 si no existe
     if (error.message?.toLowerCase().includes("no encontrado")) {
       return res.status(404).json({ error: error.message });
     }
+
+    return res.status(400).json({ error: error.message });
+  }
+};
+
+/* =========================================================
+   OBTENER PLANES POR UBICACION TECNICA
+========================================================= */
+const obtenerPlanesPorUbicacionTecnicaHandler = async (req, res) => {
+  try {
+    const planes = await obtenerPlanesPorUbicacionTecnica(req.params.ubicacionTecnicaId);
+    return res.json(planes);
+  } catch (error) {
+    console.error(error);
+    return res.status(400).json({ error: error.message });
+  }
+};
+
+/* =========================================================
+   OBTENER MEJOR PLAN POR UBICACION TECNICA
+========================================================= */
+const obtenerMejorPlanPorUbicacionTecnicaHandler = async (req, res) => {
+  try {
+    const plan = await obtenerMejorPlanPorUbicacionTecnica(req.params.ubicacionTecnicaId);
+    return res.json(plan);
+  } catch (error) {
+    console.error(error);
+    return res.status(400).json({ error: error.message });
+  }
+};
+
+/* =========================================================
+   ACTUALIZAR PLANES DE UNA UBICACION TECNICA
+========================================================= */
+const actualizarPlanesMantenimientoUbicacionTecnica = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { planesMantenimientoIds } = req.body;
+
+    const result = await actualizarPlanesDeUbicacionTecnica(id, planesMantenimientoIds);
+    return res.json(result);
+  } catch (error) {
+    console.error(error);
     return res.status(400).json({ error: error.message });
   }
 };
@@ -121,6 +174,9 @@ module.exports = {
   obtenerPlanPorIdHandler,
   obtenerPlanesPorEquipoHandler,
   obtenerMejorPlanPorEquipoHandler,
+  obtenerPlanesPorUbicacionTecnicaHandler,
+  obtenerMejorPlanPorUbicacionTecnicaHandler,
   actualizarPlanesMantenimientoEquipo,
+  actualizarPlanesMantenimientoUbicacionTecnica,
   cambiarEstadoPlanHandler,
 };

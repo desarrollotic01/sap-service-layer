@@ -1,12 +1,14 @@
 const {
     Notificacion,
+  OrdenTrabajo,
+  OrdenTrabajoEquipo,
+  OrdenTrabajoEquipoActividad,
+  OrdenTrabajoEquipoTrabajador,
   NotificacionPlan,
   Adjunto,
   Trabajador,
-  OrdenTrabajo,
-  OrdenTrabajoEquipo,
   Equipo,
-  OrdenTrabajoEquipoActividad,
+  UbicacionTecnica,
   PlanMantenimiento,
 } = require("../db_connection");
 
@@ -28,14 +30,20 @@ const setTecnicosDB = async (notificacion, tecnicos, transaction) => {
 // CREAR PLANES
 // ===============================
 const bulkCreatePlanesDB = async (planes, transaction) => {
-  return await NotificacionPlan.bulkCreate(planes, { transaction });
+  return await NotificacionPlan.bulkCreate(planes, {
+    transaction,
+    returning: true,
+  });
 };
 
 // ===============================
 // CREAR ADJUNTOS
 // ===============================
 const bulkCreateAdjuntosDB = async (adjuntos, transaction) => {
-  return await Adjunto.bulkCreate(adjuntos, { transaction });
+  return await Adjunto.bulkCreate(adjuntos, {
+    transaction,
+    returning: true,
+  });
 };
 
 // ===============================
@@ -145,26 +153,66 @@ const precargarPlanesPorEquipoOTDB = async ({ notificacionId, ordenTrabajoEquipo
 const getNotificacionForPdfDB = async (id) => {
   return await Notificacion.findByPk(id, {
     include: [
-      { model: OrdenTrabajo, as: "ordenTrabajo" },
-
-      // 👇 equipo de la OT (tu FK ordenTrabajoEquipoId)
+      {
+        model: OrdenTrabajo,
+        as: "ordenTrabajo",
+      },
       {
         model: OrdenTrabajoEquipo,
         as: "equipoOT",
-        include: [{ model: Equipo, as: "equipo" }],
+        include: [
+          { model: Equipo, as: "equipo" },
+          { model: UbicacionTecnica, as: "ubicacionTecnica" },
+          { model: PlanMantenimiento, as: "planMantenimiento" },
+          {
+            model: OrdenTrabajoEquipoTrabajador,
+            as: "trabajadores",
+            include: [
+              {
+                model: Trabajador,
+                as: "trabajador",
+              },
+            ],
+          },
+        ],
       },
-
-      { model: Trabajador, as: "tecnicos" },
-
-      // 👇 actividades/checklist (NotificacionPlan -> actividad OT)
+      {
+        model: Trabajador,
+        as: "tecnicos",
+        through: { attributes: [] },
+      },
       {
         model: NotificacionPlan,
         as: "planes",
-        include: [{ model: OrdenTrabajoEquipoActividad, as: "actividad" }],
+        include: [
+          {
+            model: OrdenTrabajoEquipoActividad,
+            as: "actividad",
+          },
+          {
+            model: Trabajador,
+            as: "trabajador",
+          },
+          {
+            model: Adjunto,
+            as: "adjuntos",
+          },
+        ],
       },
-
-      // 👇 adjuntos (pero en PDF filtramos para usar SOLO fotos)
-      { model: Adjunto, as: "adjuntos" },
+      {
+        model: Adjunto,
+        as: "adjuntos",
+      },
+    ],
+    order: [
+      [{ model: NotificacionPlan, as: "planes" }, "createdAt", "ASC"],
+      [
+        { model: NotificacionPlan, as: "planes" },
+        { model: Adjunto, as: "adjuntos" },
+        "createdAt",
+        "ASC",
+      ],
+      [{ model: Adjunto, as: "adjuntos" }, "createdAt", "ASC"],
     ],
   });
 };

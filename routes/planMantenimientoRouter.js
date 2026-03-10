@@ -5,18 +5,35 @@ const {
   obtenerPlanPorIdHandler,
   obtenerPlanesPorEquipoHandler,
   obtenerMejorPlanPorEquipoHandler,
+  obtenerPlanesPorUbicacionTecnicaHandler,
+  obtenerMejorPlanPorUbicacionTecnicaHandler,
   actualizarPlanesMantenimientoEquipo,
+  actualizarPlanesMantenimientoUbicacionTecnica,
   cambiarEstadoPlanHandler,
 } = require("../handlers/planMantenimientoHandler");
+const uploadPlanAdjuntos = require("../middlewares/uploadPlanAdjuntos");
 
-const auth = require("../middlewares/auth");
 const router = Router();
 
-router.post("/", auth,crearPlanHandler);
-router.get("/", auth, obtenerPlanesHandler);
-router.get("/equipo/:equipoId/mejor", auth, obtenerMejorPlanPorEquipoHandler);
-router.get("/equipo/:equipoId", auth, obtenerPlanesPorEquipoHandler);
-router.put("/:id/planes-mantenimiento", auth, actualizarPlanesMantenimientoEquipo);
-router.get("/:id", auth, obtenerPlanPorIdHandler);
-router.patch("/:id/estado", auth, cambiarEstadoPlanHandler);
+router.post("/", uploadPlanAdjuntos.any(), crearPlanHandler);
+
+router.get("/", obtenerPlanesHandler);
+
+router.get("/equipo/:equipoId", obtenerPlanesPorEquipoHandler);
+router.get("/equipo/:equipoId/mejor", obtenerMejorPlanPorEquipoHandler);
+router.put("/equipo/:id/planes", actualizarPlanesMantenimientoEquipo);
+
+router.get("/ubicacion-tecnica/:ubicacionTecnicaId", obtenerPlanesPorUbicacionTecnicaHandler);
+router.get(
+  "/ubicacion-tecnica/:ubicacionTecnicaId/mejor",
+  obtenerMejorPlanPorUbicacionTecnicaHandler
+);
+router.put(
+  "/ubicacion-tecnica/:id/planes",
+  actualizarPlanesMantenimientoUbicacionTecnica
+);
+
+router.patch("/:id/estado", cambiarEstadoPlanHandler);
+router.get("/:id", obtenerPlanPorIdHandler);
+
 module.exports = router;

@@ -10,6 +10,7 @@ const {
 } = require("../controllers/guiaMantenimientoProgramacionController");
 
 const { AddFrequency, AddPeriodoGuia } = require("../utils/guiaMantenimientoFechas");
+const { SubtractAnticipacion } = require("../utils/guiaMantenimientoAlertas");
 
 const isUUID = (v) =>
   typeof v === "string" &&
@@ -21,16 +22,35 @@ const toDate = (value) => {
   return d;
 };
 
-const CreateNextProgramacionIfAllowed = async ({ guia, plan, baseDate, usuarioIdAccion, t }) => {
+const CreateNextProgramacionIfAllowed = async ({
+  guia,
+  plan,
+  baseDate,
+  usuarioIdAccion,
+  t,
+}) => {
   const fechaFinGuia = AddPeriodoGuia(guia.fechaInicioAlerta, guia.periodo);
   const nextDate = AddFrequency(baseDate, plan.frecuencia, plan.frecuenciaHoras);
 
   if (nextDate > fechaFinGuia) return null;
 
+  const fechaAlertaCalculada =
+    guia.alertaActiva &&
+    guia.tipoAnticipacionAlerta &&
+    guia.valorAnticipacionAlerta
+      ? SubtractAnticipacion(
+          nextDate,
+          guia.tipoAnticipacionAlerta,
+          guia.valorAnticipacionAlerta
+        )
+      : null;
+
   const next = await CreateProgramacionGuiaMantenimientoDB(
     {
       guiaMantenimientoId: guia.id,
       fechaProgramada: nextDate,
+      fechaAlertaCalculada,
+      alertaDisparada: false,
       estado: "PENDIENTE",
       usuarioIdAccion: usuarioIdAccion || null,
       state: true,
@@ -41,12 +61,9 @@ const CreateNextProgramacionIfAllowed = async ({ guia, plan, baseDate, usuarioId
   return next;
 };
 
-// =======================
-// EJECUTAR
-// POST /programaciones/:id/ejecutar
-// body: { fechaEjecucionReal?, comentario?, usuarioIdAccion? }
-// Próximo = desde FECHA REAL ✅
-// =======================
+/* =======================
+   EJECUTAR
+======================= */
 const EjecutarProgramacionGuiaMantenimientoHandler = async (req, res) => {
   try {
     const { id } = req.params;
@@ -81,7 +98,7 @@ const EjecutarProgramacionGuiaMantenimientoHandler = async (req, res) => {
       const siguiente = await CreateNextProgramacionIfAllowed({
         guia,
         plan,
-        baseDate: real, // ✅ desde real
+        baseDate: real,
         usuarioIdAccion: usuarioIdAccion || null,
         t,
       });
@@ -95,12 +112,9 @@ const EjecutarProgramacionGuiaMantenimientoHandler = async (req, res) => {
   }
 };
 
-// =======================
-// CANCELAR
-// POST /programaciones/:id/cancelar
-// body: { comentario?, usuarioIdAccion? }
-// Próximo = desde FECHA PROGRAMADA ✅
-// =======================
+/* =======================
+   CANCELAR
+======================= */
 const CancelarProgramacionGuiaMantenimientoHandler = async (req, res) => {
   try {
     const { id } = req.params;
@@ -131,7 +145,7 @@ const CancelarProgramacionGuiaMantenimientoHandler = async (req, res) => {
       const siguiente = await CreateNextProgramacionIfAllowed({
         guia,
         plan,
-        baseDate: prog.fechaProgramada, // ✅ desde programada
+        baseDate: prog.fechaProgramada,
         usuarioIdAccion: usuarioIdAccion || null,
         t,
       });
@@ -145,10 +159,9 @@ const CancelarProgramacionGuiaMantenimientoHandler = async (req, res) => {
   }
 };
 
-// =======================
-// JOB: MARCAR VENCIDAS
-// POST /programaciones/jobs/marcar-vencidas
-// =======================
+/* =======================
+   JOB: MARCAR VENCIDAS
+======================= */
 const JobMarcarVencidasProgramacionesGuiaMantenimientoHandler = async (req, res) => {
   try {
     const now = new Date();
@@ -163,7 +176,10 @@ const JobMarcarVencidasProgramacionesGuiaMantenimientoHandler = async (req, res)
       }
     });
 
-    return res.status(200).json({ message: "Job ejecutado.", marcadasVencidas: marcadas });
+    return res.status(200).json({
+      message: "Job ejecutado.",
+      marcadasVencidas: marcadas,
+    });
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }

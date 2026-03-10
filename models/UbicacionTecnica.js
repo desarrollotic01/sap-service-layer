@@ -28,7 +28,7 @@ module.exports = (sequelize) => {
       clienteId: {
         type: DataTypes.UUID,
         allowNull: false,
-      },  
+      },
 
       tipoEquipoPropiedad: {
         type: DataTypes.ENUM("Vendido", "Propio", "Atendido"),
@@ -36,8 +36,8 @@ module.exports = (sequelize) => {
       },
 
       paisId: {
-      type: DataTypes.UUID,
-      allowNull: false,
+        type: DataTypes.UUID,
+        allowNull: false,
       },
 
       sede: {
@@ -52,7 +52,7 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
       },
 
-       idPlaca: {
+      idPlaca: {
         type: DataTypes.STRING,
       },
 
@@ -90,10 +90,8 @@ module.exports = (sequelize) => {
       },
 
       especialidad: {
-          type: DataTypes.STRING,
-      }
-
-
+        type: DataTypes.STRING,
+      },
     },
     {
       tableName: "UbicacionesTecnicas",
@@ -101,25 +99,34 @@ module.exports = (sequelize) => {
     }
   );
 
-  UbicacionTecnica.associate = (db) =>{ 
+  UbicacionTecnica.associate = (models) => {
+    UbicacionTecnica.hasMany(models.AvisoUbicacion, {
+      foreignKey: "ubicacionId",
+      as: "avisosRelacion",
+    });
 
-  UbicacionTecnica.hasMany(db.AvisoUbicacion, {
-  foreignKey: "ubicacionId",
-  as: "avisosRelacion",
-});
+    UbicacionTecnica.belongsTo(models.Pais, {
+      foreignKey: "paisId",
+      as: "pais",
+    });
 
-UbicacionTecnica.belongsTo(db.Pais, {
-  foreignKey: "paisId",
-  as: "pais",
-}); 
+    UbicacionTecnica.belongsTo(models.Cliente, {
+      foreignKey: "clienteId",
+      as: "cliente",
+    });
 
-UbicacionTecnica.belongsTo(db.Cliente, {
-  foreignKey: "ClienteId",
-  as: "cliente",
-});
+    UbicacionTecnica.belongsToMany(models.PlanMantenimiento, {
+      through: models.UbicacionTecnicaPlanMantenimiento,
+      foreignKey: "ubicacionTecnicaId",
+      otherKey: "planMantenimientoId",
+      as: "planesMantenimiento",
+    });
 
-}
-
+    UbicacionTecnica.hasMany(models.PlanMantenimiento, {
+      foreignKey: "ubicacionTecnicaObjetivoId",
+      as: "planesComoObjetivo",
+    });
+  };
 
   return UbicacionTecnica;
 };
