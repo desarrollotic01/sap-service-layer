@@ -10,6 +10,10 @@ module.exports = (sequelize) => {
         primaryKey: true,
       },
 
+      sapContactoId: {
+        type: DataTypes.INTEGER,
+      },
+
       clienteId: {
         type: DataTypes.UUID,
         allowNull: false,
@@ -22,7 +26,6 @@ module.exports = (sequelize) => {
 
       correo: {
         type: DataTypes.STRING,
-        allowNull: false,
       },
 
       telefono: {

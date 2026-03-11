@@ -1,8 +1,8 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
-  const Cliente = sequelize.define(
-    "Cliente",
+  const Item = sequelize.define(
+    "Item",
     {
       id: {
         type: DataTypes.UUID,
@@ -16,53 +16,46 @@ module.exports = (sequelize) => {
         unique: true,
       },
 
-      razonSocial: {
+      nombre: {
         type: DataTypes.STRING,
         allowNull: false,
       },
 
-      ruc: {
-        type: DataTypes.STRING,
+      rubroSapCode: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
       },
 
-      direccion: {
+      rubroNombre: {
         type: DataTypes.STRING,
+        allowNull: true,
       },
 
-      telefono: {
+      unidadCompra: {
         type: DataTypes.STRING,
+        allowNull: true,
       },
 
-      correo: {
+      unidadInventario: {
         type: DataTypes.STRING,
+        allowNull: true,
       },
 
-      tipoCliente: {
+      unidadVenta: {
         type: DataTypes.STRING,
+        allowNull: true,
       },
 
       activoSAP: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
       },
-
-      estado: {
-        type: DataTypes.ENUM("Activo", "Inactivo"),
-        defaultValue: "Activo",
-      },
     },
     {
-      tableName: "Clientes",
+      tableName: "Items",
       timestamps: true,
     }
   );
 
-  Cliente.associate = (db) => {
-    Cliente.hasMany(db.Contacto, {
-      foreignKey: "clienteId",
-      as: "contactos",
-    });
-  };
-
-  return Cliente;
+  return Item;
 };
