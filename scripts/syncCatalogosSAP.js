@@ -4,6 +4,7 @@ const { Cliente, Contacto, Item, Rubro } = require("../db_connection");
 const { getClientesSAP } = require("../sap/sapClientes");
 const { getItemsSAP } = require("../sap/sapItems");
 const { getRubrosSAP } = require("../sap/sapRubros");
+const { getContactosSAP } = require("../sap/sapContactos");
 
 async function syncRubros() {
   const rubrosSAP = await getRubrosSAP();
@@ -106,10 +107,49 @@ async function syncItems() {
   console.log(`✅ Items sincronizados: ${itemsSAP.length}`);
 }
 
+async function syncContactos() {
+  const contactosSAP = await getContactosSAP();
+
+  for (const c of contactosSAP) {
+    const cliente = await Cliente.findOne({
+      where: { sapCode: c.CardCode },
+    });
+
+    if (!cliente) continue;
+
+    let contacto = await Contacto.findOne({
+      where: {
+        clienteId: cliente.id,
+        nombre: c.Name,
+      },
+    });
+
+    if (!contacto) {
+      await Contacto.create({
+        clienteId: cliente.id,
+        nombre: c.Name,
+        correo: c.E_Mail || null,
+        telefono: c.Phone1 || null,
+        cargo: c.Position || null,
+        activo: true,
+      });
+    } else {
+      await contacto.update({
+        correo: c.E_Mail || null,
+        telefono: c.Phone1 || null,
+        cargo: c.Position || null,
+      });
+    }
+  }
+
+  console.log(`✅ Contactos sincronizados: ${contactosSAP.length}`);
+}
+
 async function main() {
   try {
     await syncRubros();
     await syncClientesYContactos();
+    await syncContactos();
     await syncItems();
     console.log("🎉 Sincronización SAP completada");
     process.exit(0);
