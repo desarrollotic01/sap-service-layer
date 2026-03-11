@@ -6,8 +6,6 @@
 require("dotenv").config();
 
 const {
-  Cliente,
-  Contacto,
   UbicacionTecnica,
   Equipo,
   Trabajador,
@@ -43,76 +41,6 @@ async function seedBase() {
     }
 
     console.log("🌎 Paises OK");
-
-    /* =========================
-       CLIENTES
-    ========================= */
-    const clientesData = [
-      {
-        razonSocial: "Arquitectos Unidos SAC",
-        ruc: "20123456789",
-        direccion: "Av. Primavera 123",
-        telefono: "999888777",
-        correo: "contacto@arquitectos.com",
-        tipoCliente: "Corporativo",
-      },
-      {
-        razonSocial: "Constructora Andina SRL",
-        ruc: "20456789123",
-        direccion: "Jr. Los Andes 456",
-        telefono: "988777666",
-        correo: "info@andina.com",
-        tipoCliente: "Corporativo",
-      },
-    ];
-
-    const clientes = [];
-
-    for (const c of clientesData) {
-      const [cliente] = await Cliente.findOrCreate({
-        where: { ruc: c.ruc },
-        defaults: c,
-      });
-      clientes.push(cliente);
-    }
-
-    console.log("🏢 Clientes OK");
-
-    /* =========================
-       CONTACTOS
-    ========================= */
-    const contactosData = [
-      {
-        nombre: "Juan Pérez",
-        correo: "juan@arquitectos.com",
-        telefono: "999111222",
-        clienteId: clientes[0].id,
-      },
-      {
-        nombre: "María López",
-        correo: "maria@arquitectos.com",
-        telefono: "999333444",
-        clienteId: clientes[0].id,
-      },
-      {
-        nombre: "Carlos Ruiz",
-        correo: "carlos@andina.com",
-        telefono: "988444555",
-        clienteId: clientes[1].id,
-      },
-    ];
-
-    for (const c of contactosData) {
-      await Contacto.findOrCreate({
-        where: {
-          correo: c.correo,
-          clienteId: c.clienteId,
-        },
-        defaults: c,
-      });
-    }
-
-    console.log("📇 Contactos OK");
 
     /* =========================
        FAMILIAS
