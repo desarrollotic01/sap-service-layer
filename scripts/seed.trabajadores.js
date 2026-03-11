@@ -118,8 +118,15 @@ async function seedBase() {
        FAMILIAS
     ========================= */
     const familiasData = [
-      { nombre: "Control de Acceso" },
-      { nombre: "GPS" },
+      { nombre: "Cortinas de Aire" },
+      { nombre: "Montacargas" },
+      { nombre: "Rampas" },
+      { nombre: "Puertas Seleccionales" },
+      { nombre: "Traspaletas" },
+      { nombre: "Apiladores" },
+      { nombre: "Puertas Peatonales" },
+      { nombre: "OTROS" },
+      { nombre: "Puertas" },
     ];
 
     const familias = [];

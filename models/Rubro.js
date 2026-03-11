@@ -32,5 +32,13 @@ module.exports = (sequelize) => {
     }
   );
 
+  Rubro.associate = (db) => {
+    Rubro.hasMany(db.Item, {
+      foreignKey: "rubroSapCode",
+      sourceKey: "sapCode",
+      as: "items",
+    });
+  };
+
   return Rubro;
 };

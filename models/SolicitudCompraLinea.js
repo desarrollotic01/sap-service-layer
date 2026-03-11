@@ -1,4 +1,3 @@
-// models/SolicitudCompraLinea.js
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
@@ -9,6 +8,11 @@ module.exports = (sequelize) => {
         type: DataTypes.UUID,
         primaryKey: true,
         defaultValue: DataTypes.UUIDV4,
+      },
+
+      itemId: {
+        type: DataTypes.UUID,
+        allowNull: true,
       },
 
       itemCode: {
@@ -41,9 +45,8 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
-
-      rubro: {
-        type: DataTypes.STRING,
+      rubroSapCode: {
+        type: DataTypes.INTEGER,
         allowNull: true,
       },
 
@@ -62,6 +65,17 @@ module.exports = (sequelize) => {
     SolicitudCompraLinea.belongsTo(db.SolicitudCompra, {
       foreignKey: "solicitud_compra_id",
       as: "solicitud",
+    });
+
+    SolicitudCompraLinea.belongsTo(db.Item, {
+      foreignKey: "itemId",
+      as: "item",
+    });
+
+    SolicitudCompraLinea.belongsTo(db.Rubro, {
+      foreignKey: "rubroSapCode",
+      targetKey: "sapCode",
+      as: "rubro",
     });
   };
 

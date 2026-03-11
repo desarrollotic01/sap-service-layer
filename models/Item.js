@@ -1,3 +1,4 @@
+// models/Item.js
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
@@ -56,6 +57,21 @@ module.exports = (sequelize) => {
       timestamps: true,
     }
   );
+
+  Item.associate = (db) => {
+    Item.hasMany(db.SolicitudCompraLinea, {
+      foreignKey: "itemId",
+      as: "solicitudLineas",
+    });
+
+    Item.belongsTo(db.Rubro, {
+  foreignKey: "rubroSapCode",
+  targetKey: "sapCode",
+  as: "rubro",
+});
+  };
+
+  
 
   return Item;
 };

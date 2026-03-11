@@ -84,28 +84,40 @@ async function syncContactos() {
 
     if (!cliente) continue;
 
-    let contacto = await Contacto.findOne({
-      where: {
-        clienteId: cliente.id,
-        sapContactoId: c.ContactCode || null,
-      },
-    });
+    let contacto = null;
+
+    if (c.ContactCode !== null && c.ContactCode !== undefined) {
+      contacto = await Contacto.findOne({
+        where: {
+          clienteId: cliente.id,
+          sapContactoId: c.ContactCode,
+        },
+      });
+    } else {
+      contacto = await Contacto.findOne({
+        where: {
+          clienteId: cliente.id,
+          nombre: c.Name || "",
+          correo: c.E_Mail || null,
+        },
+      });
+    }
 
     if (!contacto) {
       await Contacto.create({
         clienteId: cliente.id,
-        sapContactoId: c.ContactCode || null,
-        nombre: c.Name,
+        sapContactoId: c.ContactCode ?? null,
+        nombre: c.Name || "",
         correo: c.E_Mail || null,
-        telefono: c.Phone1 || null,
+        telefono: c.Phone1 || c.Cellular || null,
         cargo: c.Position || null,
         activo: true,
       });
     } else {
       await contacto.update({
-        nombre: c.Name,
+        nombre: c.Name || contacto.nombre,
         correo: c.E_Mail || null,
-        telefono: c.Phone1 || null,
+        telefono: c.Phone1 || c.Cellular || null,
         cargo: c.Position || null,
         activo: true,
       });
