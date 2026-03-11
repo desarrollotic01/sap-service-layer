@@ -122,39 +122,38 @@ function buildHtml(notificacion) {
   const planOT = equipoOT?.planMantenimiento || null;
 
   const esEquipo = !!equipo;
-  const esUbicacion = !!ubicacion;
 
   const trabajadoresOT = n?.equipoOT?.trabajadores || [];
 
-const encargadoOT =
-  trabajadoresOT.find((t) => t?.esEncargado)?.trabajador || null;
+  const encargadoOT =
+    trabajadoresOT.find((t) => t?.esEncargado)?.trabajador || null;
 
-const encargadoNombre = encargadoOT
-  ? (encargadoOT.nombreApellido ||
-     encargadoOT.nombreCompleto ||
-     encargadoOT.nombre ||
-     encargadoOT.alias ||
-     "—")
-  : "—";
-
+  const encargadoNombre = encargadoOT
+    ? (encargadoOT.nombreApellido ||
+       encargadoOT.nombreCompleto ||
+       encargadoOT.nombre ||
+       encargadoOT.alias ||
+       encargadoOT.usuario ||
+       "—")
+    : "—";
 
   const trabajadoresOTTexto =
-  trabajadoresOT.length > 0
-    ? trabajadoresOT
-        .map((tw) => {
-          const tr = tw?.trabajador;
-          const nombre =
-            tr?.nombreApellido ||
-            tr?.nombreCompleto ||
-            tr?.nombre ||
-            tr?.alias ||
-            tr?.usuario ||
-            "—";
+    trabajadoresOT.length > 0
+      ? trabajadoresOT
+          .map((tw) => {
+            const tr = tw?.trabajador;
+            const nombre =
+              tr?.nombreApellido ||
+              tr?.nombreCompleto ||
+              tr?.nombre ||
+              tr?.alias ||
+              tr?.usuario ||
+              "—";
 
-          return tw?.esEncargado ? `${nombre} (Encargado)` : nombre;
-        })
-        .join(", ")
-    : "—";
+            return tw?.esEncargado ? `${nombre} (Encargado)` : nombre;
+          })
+          .join(", ")
+      : "—";
 
   const tecnicosTexto =
     (n?.tecnicos || []).length > 0
@@ -193,6 +192,12 @@ const encargadoNombre = encargadoOT
             <div class="value">${esc(planOT?.nombre ?? planOT?.codigoPlan ?? "—")}</div>
           </div>
         </div>
+        <div class="row" style="margin-top:6px">
+          <div class="field">
+            <div class="label">Encargado OT</div>
+            <div class="value">${esc(encargadoNombre)}</div>
+          </div>
+        </div>
       </div>
     `
     : `
@@ -224,6 +229,12 @@ const encargadoNombre = encargadoOT
           <div class="field">
             <div class="label">Plan OT</div>
             <div class="value">${esc(planOT?.nombre ?? planOT?.codigoPlan ?? "—")}</div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <div class="field">
+            <div class="label">Encargado OT</div>
+            <div class="value">${esc(encargadoNombre)}</div>
           </div>
         </div>
       </div>
@@ -514,45 +525,45 @@ const encargadoNombre = encargadoOT
   </div>
 
   <div class="section grid2">
-  <div class="box">
-    <h3>Técnicos</h3>
+    <div class="box">
+      <h3>Técnicos</h3>
 
-    <div class="row">
-      <div class="field">
-        <div class="label">Encargado OT</div>
-        <div class="value">${esc(encargadoNombre)}</div>
+      <div class="row">
+        <div class="field">
+          <div class="label">Encargado OT</div>
+          <div class="value">${esc(encargadoNombre)}</div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:6px">
+        <div class="field">
+          <div class="label">Técnicos de la notificación</div>
+          <div class="value">${tecnicosTexto}</div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:6px">
+        <div class="field">
+          <div class="label">Trabajadores OT</div>
+          <div class="value">${esc(trabajadoresOTTexto)}</div>
+        </div>
       </div>
     </div>
 
-    <div class="row" style="margin-top:6px">
-      <div class="field">
-        <div class="label">Técnicos de la notificación</div>
-        <div class="value">${tecnicosTexto}</div>
-      </div>
-    </div>
-
-    <div class="row" style="margin-top:6px">
-      <div class="field">
-        <div class="label">Trabajadores OT</div>
-        <div class="value">${esc(trabajadoresOTTexto)}</div>
+    <div class="box">
+      <h3>Datos adicionales</h3>
+      <div class="row">
+        <div class="field">
+          <div class="label">Último preventivo</div>
+          <div class="value">${esc(fmtDate(n.fechaUltimoMantenimientoPreventivo))}</div>
+        </div>
+        <div class="field">
+          <div class="label">Código repuesto</div>
+          <div class="value">${esc(n.codigoRepuesto ?? "—")}</div>
+        </div>
       </div>
     </div>
   </div>
-
-  <div class="box">
-    <h3>Datos adicionales</h3>
-    <div class="row">
-      <div class="field">
-        <div class="label">Último preventivo</div>
-        <div class="value">${esc(fmtDate(n.fechaUltimoMantenimientoPreventivo))}</div>
-      </div>
-      <div class="field">
-        <div class="label">Código repuesto</div>
-        <div class="value">${esc(n.codigoRepuesto ?? "—")}</div>
-      </div>
-    </div>
-  </div>
-</div>
 
   <div class="section grid2">
     <div class="box">

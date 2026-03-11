@@ -11,17 +11,17 @@ const {
   listarNotificacionesPorOT,
 } = require("../handlers/notificacionHandler");
 
-router.post(
-  "/",
-  uploadAdjuntosNotificacion.any(),
-  crearNotificacion
-);
+router.post("/", uploadAdjuntosNotificacion.any(), crearNotificacion);
 
 router.get("/", listarNotificaciones);
-router.get("/:id", obtenerNotificacion);
-router.post("/:id/finalizar", finalizarNotificacion);
-router.post("/ots/:ordenTrabajoId/generar", generarNotificacionesPorOT);
+
+/* rutas por OT */
+router.get("/ot/:ordenTrabajoId", listarNotificacionesPorOT);
+router.post("/ot/:ordenTrabajoId/generar", generarNotificacionesPorOT);
+
+/* rutas por notificación */
 router.get("/:id/pdf", generarPdfNotificacion);
-router.get("/ots/:ordenTrabajoId/listar", listarNotificacionesPorOT);
+router.post("/:id/finalizar", finalizarNotificacion);
+router.get("/:id", obtenerNotificacion);
 
 module.exports = router;

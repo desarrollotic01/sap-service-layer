@@ -40,6 +40,37 @@ const ensureValidTarget = (target) => {
   }
 };
 
+const validarActividadesPayload = (targets = [], tipoMantenimiento = null) => {
+  for (const target of targets) {
+    const actividades = Array.isArray(target.actividades) ? target.actividades : [];
+
+    if (tipoMantenimiento === "Correctivo") {
+      if (!actividades.length) {
+        throw new Error(
+          `El target ${getTargetLabel(target)} debe tener al menos una actividad`
+        );
+      }
+
+      for (const act of actividades) {
+        if (!act.tarea || !String(act.tarea).trim()) {
+          throw new Error(
+            `Hay una actividad sin tarea en ${getTargetLabel(target)}`
+          );
+        }
+
+        if (
+          act.tipoTrabajo &&
+          !["REPARACION", "CAMBIO"].includes(act.tipoTrabajo)
+        ) {
+          throw new Error(
+            `Tipo de trabajo inválido en ${getTargetLabel(target)}. Solo REPARACION o CAMBIO`
+          );
+        }
+      }
+    }
+  }
+};
+
 /* =========================================================
    1) Asignar Solicitudes a UNA OT
 ========================================================= */
@@ -113,79 +144,133 @@ async function asignarSolicitudesDeTratamientoAOT({
 }
 
 /* =========================================================
-   2) Copiar actividades SIEMPRE desde TRATAMIENTO
+   2) Copiar actividades a OT
+   - si vienen en payload, usa esas
+   - si no vienen, copia desde tratamiento
 ========================================================= */
-async function copiarActividadesDesdeTratamiento({ avisoId, targetsOT, t }) {
+async function copiarActividadesATargetsOT({
+  avisoId,
+  targetsOT,
+  targetsPayload = [],
+  t,
+}) {
   if (!Array.isArray(targetsOT) || targetsOT.length === 0) return;
-
-  const tratamiento = await Tratamiento.findOne({
-    where: { aviso_id: avisoId },
-    transaction: t,
-  });
-
-  if (!tratamiento) throw new Error("No existe tratamiento para este aviso");
-
-  const equipoIds = targetsOT.map((x) => x.equipoId).filter(Boolean);
-  const ubicacionIds = targetsOT.map((x) => x.ubicacionTecnicaId).filter(Boolean);
-
-  const where = {
-    tratamientoId: tratamiento.id,
-    [Op.or]: [],
-  };
-
-  if (equipoIds.length) {
-    where[Op.or].push({
-      equipoId: { [Op.in]: equipoIds },
-    });
-  }
-
-  if (ubicacionIds.length) {
-    where[Op.or].push({
-      ubicacionTecnicaId: { [Op.in]: ubicacionIds },
-    });
-  }
-
-  if (!where[Op.or].length) return;
-
-  const tes = await TratamientoEquipo.findAll({
-    where,
-    include: [{ association: "actividades" }],
-    transaction: t,
-  });
-
-  const actsByTargetKey = new Map();
-
-  for (const te of tes) {
-    const key = getTargetKey(te);
-    actsByTargetKey.set(key, te.actividades || []);
-  }
 
   const actividadesCrear = [];
 
+  const payloadByKey = new Map();
+  for (const tp of targetsPayload || []) {
+    const key = getTargetKey(tp);
+    if (key) payloadByKey.set(key, tp);
+  }
+
+  const keysSinPayload = [];
+
   for (const targetOT of targetsOT) {
     const key = getTargetKey(targetOT);
-    const acts = actsByTargetKey.get(key) || [];
+    const payloadTarget = payloadByKey.get(key);
 
-    for (const act of acts) {
-      actividadesCrear.push({
-        ordenTrabajoEquipoId: targetOT.id,
-        planMantenimientoActividadId: act.planMantenimientoActividadId || null,
-        codigoActividad: act.codigoActividad || null,
-        sistema: act.sistema || null,
-        subsistema: act.subsistema || null,
-        componente: act.componente || null,
-        tarea: act.tarea || null,
-        descripcion: act.descripcion || null,
-        tipoTrabajo: act.tipoTrabajo || null,
-        rolTecnico: act.rolTecnico || null,
-        cantidadTecnicos: act.cantidadTecnicos ?? null,
-        duracionEstimadaValor: act.duracionEstimadaValor ?? null,
-        unidadDuracion: act.unidadDuracion || "min",
-        duracionEstimadaMin: act.duracionEstimadaMin ?? null,
-        observaciones: act.observaciones || null,
-        estado: "PENDIENTE",
-        origen: "TRATAMIENTO",
+    const actsPayload = Array.isArray(payloadTarget?.actividades)
+      ? payloadTarget.actividades
+      : null;
+
+    if (actsPayload && actsPayload.length > 0) {
+      for (const act of actsPayload) {
+        actividadesCrear.push({
+          ordenTrabajoEquipoId: targetOT.id,
+          planMantenimientoActividadId: act.planMantenimientoActividadId || null,
+          codigoActividad: act.codigoActividad || null,
+          sistema: act.sistema || null,
+          subsistema: act.subsistema || null,
+          componente: act.componente || null,
+          tarea: act.tarea || null,
+          descripcion: act.descripcion || null,
+          tipoTrabajo: act.tipoTrabajo || null,
+          rolTecnico: act.rolTecnico || null,
+          cantidadTecnicos: act.cantidadTecnicos ?? null,
+          duracionEstimadaValor: act.duracionEstimadaValor ?? null,
+          unidadDuracion: act.unidadDuracion || "min",
+          duracionEstimadaMin: act.duracionEstimadaMin ?? null,
+          observaciones: act.observaciones || null,
+          estado: act.estado || "PENDIENTE",
+          origen: act.origen || "OT",
+        });
+      }
+    } else {
+      keysSinPayload.push(key);
+    }
+  }
+
+  if (keysSinPayload.length > 0) {
+    const tratamiento = await Tratamiento.findOne({
+      where: { aviso_id: avisoId },
+      transaction: t,
+    });
+
+    if (!tratamiento) throw new Error("No existe tratamiento para este aviso");
+
+    const equipoIds = targetsOT.map((x) => x.equipoId).filter(Boolean);
+    const ubicacionIds = targetsOT.map((x) => x.ubicacionTecnicaId).filter(Boolean);
+
+    const where = {
+      tratamientoId: tratamiento.id,
+      [Op.or]: [],
+    };
+
+    if (equipoIds.length) {
+      where[Op.or].push({
+        equipoId: { [Op.in]: equipoIds },
       });
+    }
+
+    if (ubicacionIds.length) {
+      where[Op.or].push({
+        ubicacionTecnicaId: { [Op.in]: ubicacionIds },
+      });
+    }
+
+    if (where[Op.or].length > 0) {
+      const tes = await TratamientoEquipo.findAll({
+        where,
+        include: [{ association: "actividades" }],
+        transaction: t,
+      });
+
+      const actsByTargetKey = new Map();
+
+      for (const te of tes) {
+        const key = getTargetKey(te);
+        actsByTargetKey.set(key, te.actividades || []);
+      }
+
+      for (const targetOT of targetsOT) {
+        const key = getTargetKey(targetOT);
+        if (!keysSinPayload.includes(key)) continue;
+
+        const acts = actsByTargetKey.get(key) || [];
+
+        for (const act of acts) {
+          actividadesCrear.push({
+            ordenTrabajoEquipoId: targetOT.id,
+            planMantenimientoActividadId: act.planMantenimientoActividadId || null,
+            codigoActividad: act.codigoActividad || null,
+            sistema: act.sistema || null,
+            subsistema: act.subsistema || null,
+            componente: act.componente || null,
+            tarea: act.tarea || null,
+            descripcion: act.descripcion || null,
+            tipoTrabajo: act.tipoTrabajo || null,
+            rolTecnico: act.rolTecnico || null,
+            cantidadTecnicos: act.cantidadTecnicos ?? null,
+            duracionEstimadaValor: act.duracionEstimadaValor ?? null,
+            unidadDuracion: act.unidadDuracion || "min",
+            duracionEstimadaMin: act.duracionEstimadaMin ?? null,
+            observaciones: act.observaciones || null,
+            estado: "PENDIENTE",
+            origen: "TRATAMIENTO",
+          });
+        }
+      }
     }
   }
 
@@ -290,9 +375,10 @@ async function crearOTInterna(
     t,
   });
 
-  await copiarActividadesDesdeTratamiento({
+  await copiarActividadesATargetsOT({
     avisoId: aviso.id,
     targetsOT,
+    targetsPayload: targets,
     t,
   });
 
@@ -373,6 +459,7 @@ async function crearOrdenTrabajo(data) {
     }
 
     await validarTargetsDelAviso(aviso.id, targets, t);
+    validarActividadesPayload(targets, otData.tipoMantenimiento);
 
     const shouldAssignGeneral = (key) => {
       if (solicitudGeneralStrategy === "NINGUNA") return false;

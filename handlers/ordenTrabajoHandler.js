@@ -21,7 +21,6 @@ async function crearOrdenTrabajoHandler(req, res) {
     if (!avisoId) errors.push("avisoId es requerido");
 
     // ✅ equipos
-    if (!equipos || !Array.isArray(equipos)) errors.push("equipos debe ser un arreglo");
     if (Array.isArray(equipos) && equipos.length === 0) errors.push("Debe incluir al menos un equipo");
 
     // ✅ modo

@@ -20,7 +20,9 @@ const familiaRouter = require ("./familiaRouter")
 const paisRouter = require("./paisRouter")
 const guiaMantenimientoRouter = require("./guiaMantenimientoRouter")
 const portalClienteRouter = require("./portalClienteRouter")
+const encuestaRouter = require("./encuestaRouter")
 
+router.use("/encuesta", encuestaRouter);
 
 
 
