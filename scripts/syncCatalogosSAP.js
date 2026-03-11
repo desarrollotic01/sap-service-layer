@@ -123,6 +123,7 @@ async function syncContactos() {
       });
     }
   }
+  console.log("DETALLE BP:", JSON.stringify(detalle.data, null, 2));
 
   console.log(`✅ Contactos sincronizados: ${contactosSAP.length}`);
 }
