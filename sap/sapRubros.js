@@ -4,7 +4,7 @@ const { loginSAP } = require("./sapAuth");
 async function getRubrosSAP() {
   const cookie = await loginSAP();
 
-  const response = await sapAxios.get("/ItemsGroups", {
+  const response = await sapAxios.get("/ItemGroups", {
     headers: {
       Cookie: cookie,
     },
