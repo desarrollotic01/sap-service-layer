@@ -4,48 +4,28 @@ const { loginSAP } = require("./sapAuth");
 async function getContactosSAP() {
   const cookie = await loginSAP();
 
-  // 1. Traer clientes
-  const bpResponse = await sapAxios.get("/BusinessPartners?$select=CardCode,CardName", {
+  const response = await sapAxios.get("/Contacts", {
     headers: {
       Cookie: cookie,
     },
   });
 
-  const businessPartners = bpResponse.data.value || [];
-  const contactos = [];
+  const contactos = response.data.value || [];
 
-  // 2. Leer cada cliente por separado
-  for (const bp of businessPartners) {
-    try {
-      const detalle = await sapAxios.get(`/BusinessPartners('${bp.CardCode}')`, {
-        headers: {
-          Cookie: cookie,
-        },
-      });
-
-      const lista = detalle.data.ContactEmployees || [];
-
-      for (const c of lista) {
-        contactos.push({
-          CardCode: bp.CardCode,
-          ContactCode: c.InternalCode ?? null,
-          Name:
-            [c.FirstName, c.MiddleName, c.LastName]
-              .filter(Boolean)
-              .join(" ")
-              .trim() || c.Name || "",
-          E_Mail: c.E_Mail || null,
-          Phone1: c.Phone1 || null,
-          Cellular: c.MobilePhone || null,
-          Position: c.Position || null,
-        });
-      }
-    } catch (err) {
-      console.error(`Error leyendo contactos de ${bp.CardCode}:`, err.response?.data || err.message);
-    }
-  }
-
-  return contactos;
+  return contactos
+    .map((c) => ({
+      CardCode: String(c.CardCode || "").trim(),
+      ContactCode: c.ContactCode ?? c.CntctCode ?? c.InternalCode ?? null,
+      Name:
+        c.Name ||
+        [c.FirstName, c.MiddleName, c.LastName].filter(Boolean).join(" ").trim() ||
+        "",
+      E_Mail: c.E_Mail || c.E_MailL || null,
+      Phone1: c.Phone1 || c.Tel1 || null,
+      Cellular: c.Cellular || c.MobilePhone || c.Cellolar || null,
+      Position: c.Position || null,
+    }))
+    .filter((c) => c.CardCode.startsWith("C"));
 }
 
 module.exports = {

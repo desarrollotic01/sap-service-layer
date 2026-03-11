@@ -83,72 +83,74 @@ async function syncContactos() {
   console.log("====================================");
 
   for (const c of contactosSAP) {
-    console.log("CONTACTO ACTUAL:", c);
+    try {
+      const cardCode = String(c.CardCode || "").trim();
 
-    const cliente = await Cliente.findOne({
-      where: { sapCode: c.CardCode },
-    });
+      if (!cardCode.startsWith("C")) {
+        console.log("⏭️ Se omite contacto porque no es cliente:", cardCode);
+        continue;
+      }
 
-    console.log("BUSCANDO CLIENTE CON CardCode:", c.CardCode);
-    console.log("CLIENTE ENCONTRADO:", cliente ? cliente.sapCode : null);
-
-    if (!cliente) {
-      console.log("⚠️ No se encontró cliente para contacto:", c.CardCode);
-      continue;
-    }
-
-    let contacto = null;
-
-    if (c.ContactCode !== null && c.ContactCode !== undefined) {
-      contacto = await Contacto.findOne({
-        where: {
-          clienteId: cliente.id,
-          sapContactoId: c.ContactCode,
-        },
+      const cliente = await Cliente.findOne({
+        where: { sapCode: cardCode },
       });
-    } else {
-      contacto = await Contacto.findOne({
-        where: {
+
+      console.log("BUSCANDO CLIENTE CON CardCode:", cardCode);
+      console.log("CLIENTE ENCONTRADO:", cliente ? cliente.sapCode : null);
+
+      if (!cliente) {
+        console.log("⚠️ No se encontró cliente para contacto:", cardCode);
+        continue;
+      }
+
+      let contacto = null;
+
+      if (c.ContactCode !== null && c.ContactCode !== undefined) {
+        contacto = await Contacto.findOne({
+          where: {
+            clienteId: cliente.id,
+            sapContactoId: c.ContactCode,
+          },
+        });
+      } else {
+        contacto = await Contacto.findOne({
+          where: {
+            clienteId: cliente.id,
+            nombre: c.Name || "",
+            correo: c.E_Mail || null,
+          },
+        });
+      }
+
+      if (!contacto) {
+        await Contacto.create({
           clienteId: cliente.id,
+          sapContactoId: c.ContactCode ?? null,
           nombre: c.Name || "",
           correo: c.E_Mail || null,
-        },
-      });
-    }
+          telefono: c.Phone1 || c.Cellular || null,
+          cargo: c.Position || null,
+          activo: true,
+        });
 
-    if (!contacto) {
-      console.log("CREANDO CONTACTO:", {
-        clienteId: cliente.id,
-        sapContactoId: c.ContactCode ?? null,
-        nombre: c.Name || "",
-        correo: c.E_Mail || null,
-        telefono: c.Phone1 || c.Cellular || null,
-        cargo: c.Position || null,
-      });
+        console.log("✅ Contacto creado:", c.Name, "->", cliente.sapCode);
+      } else {
+        await contacto.update({
+          nombre: c.Name || contacto.nombre,
+          correo: c.E_Mail || null,
+          telefono: c.Phone1 || c.Cellular || null,
+          cargo: c.Position || null,
+          activo: true,
+        });
 
-      await Contacto.create({
-        clienteId: cliente.id,
-        sapContactoId: c.ContactCode ?? null,
-        nombre: c.Name || "",
-        correo: c.E_Mail || null,
-        telefono: c.Phone1 || c.Cellular || null,
-        cargo: c.Position || null,
-        activo: true,
-      });
-    } else {
-      console.log("ACTUALIZANDO CONTACTO EXISTENTE:", contacto.id);
-
-      await contacto.update({
-        nombre: c.Name || contacto.nombre,
-        correo: c.E_Mail || null,
-        telefono: c.Phone1 || c.Cellular || null,
-        cargo: c.Position || null,
-        activo: true,
-      });
+        console.log("♻️ Contacto actualizado:", c.Name, "->", cliente.sapCode);
+      }
+    } catch (error) {
+      console.error("❌ Error procesando contacto:", c, error.message);
     }
   }
 
-  console.log(`✅ Contactos sincronizados: ${contactosSAP.length}`);
+  console.log(`✅ Contactos sincronizados procesados: ${contactosSAP.length}`);
 }
 
 
