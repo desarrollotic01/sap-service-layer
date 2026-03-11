@@ -77,12 +77,25 @@ async function syncItems() {
 async function syncContactos() {
   const contactosSAP = await getContactosSAP();
 
+  console.log("====================================");
+  console.log("TOTAL CONTACTOS SAP:", contactosSAP.length);
+  console.log("MUESTRA CONTACTOS SAP:", contactosSAP.slice(0, 5));
+  console.log("====================================");
+
   for (const c of contactosSAP) {
+    console.log("CONTACTO ACTUAL:", c);
+
     const cliente = await Cliente.findOne({
       where: { sapCode: c.CardCode },
     });
 
-    if (!cliente) continue;
+    console.log("BUSCANDO CLIENTE CON CardCode:", c.CardCode);
+    console.log("CLIENTE ENCONTRADO:", cliente ? cliente.sapCode : null);
+
+    if (!cliente) {
+      console.log("⚠️ No se encontró cliente para contacto:", c.CardCode);
+      continue;
+    }
 
     let contacto = null;
 
@@ -104,6 +117,15 @@ async function syncContactos() {
     }
 
     if (!contacto) {
+      console.log("CREANDO CONTACTO:", {
+        clienteId: cliente.id,
+        sapContactoId: c.ContactCode ?? null,
+        nombre: c.Name || "",
+        correo: c.E_Mail || null,
+        telefono: c.Phone1 || c.Cellular || null,
+        cargo: c.Position || null,
+      });
+
       await Contacto.create({
         clienteId: cliente.id,
         sapContactoId: c.ContactCode ?? null,
@@ -114,6 +136,8 @@ async function syncContactos() {
         activo: true,
       });
     } else {
+      console.log("ACTUALIZANDO CONTACTO EXISTENTE:", contacto.id);
+
       await contacto.update({
         nombre: c.Name || contacto.nombre,
         correo: c.E_Mail || null,
@@ -123,7 +147,6 @@ async function syncContactos() {
       });
     }
   }
-  console.log("DETALLE BP:", JSON.stringify(detalle.data, null, 2));
 
   console.log(`✅ Contactos sincronizados: ${contactosSAP.length}`);
 }
