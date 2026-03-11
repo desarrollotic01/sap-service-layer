@@ -1,6 +1,19 @@
 const sapAxios = require("./sapClient");
 const { loginSAP } = require("./sapAuth");
 
+function normalizarNextLink(nextLink) {
+  if (!nextLink) return null;
+
+  if (nextLink.startsWith("http://") || nextLink.startsWith("https://")) {
+    const url = new URL(nextLink);
+    nextLink = `${url.pathname}${url.search}`;
+  }
+
+  nextLink = nextLink.replace(/^\/b1s\/v\d\//, "/");
+
+  return nextLink;
+}
+
 async function getContactosSAP() {
   const cookie = await loginSAP();
 
@@ -17,7 +30,9 @@ async function getContactosSAP() {
     const data = response.data;
     contactos = contactos.concat(data.value || []);
 
-    nextUrl = data["odata.nextLink"] || data["@odata.nextLink"] || null;
+    nextUrl = normalizarNextLink(
+      data["odata.nextLink"] || data["@odata.nextLink"] || null
+    );
   }
 
   return contactos
