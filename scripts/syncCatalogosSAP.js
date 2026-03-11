@@ -20,7 +20,7 @@ async function syncRubros() {
   console.log(`✅ Rubros sincronizados: ${rubrosSAP.length}`);
 }
 
-async function syncClientesYContactos() {
+async function syncClientes() {
   const clientesSAP = await getClientesSAP();
 
   for (const bp of clientesSAP) {
@@ -29,7 +29,7 @@ async function syncClientesYContactos() {
     });
 
     if (!cliente) {
-      cliente = await Cliente.create({
+      await Cliente.create({
         sapCode: bp.CardCode,
         razonSocial: bp.CardName || "",
         ruc: bp.FederalTaxID || null,
@@ -50,39 +50,6 @@ async function syncClientesYContactos() {
         activoSAP: true,
         estado: "Activo",
       });
-    }
-
-    if (Array.isArray(bp.ContactEmployees)) {
-      for (const c of bp.ContactEmployees) {
-        if (!c || !c.Name) continue;
-
-        const contactoExistente = await Contacto.findOne({
-          where: {
-            clienteId: cliente.id,
-            sapContactoId: c.InternalCode || null,
-          },
-        });
-
-        if (!contactoExistente) {
-          await Contacto.create({
-            clienteId: cliente.id,
-            sapContactoId: c.InternalCode || null,
-            nombre: c.Name,
-            correo: c.E_Mail || null,
-            telefono: c.MobilePhone || c.Phone1 || null,
-            cargo: c.Position || null,
-            activo: true,
-          });
-        } else {
-          await contactoExistente.update({
-            nombre: c.Name,
-            correo: c.E_Mail || null,
-            telefono: c.MobilePhone || c.Phone1 || null,
-            cargo: c.Position || null,
-            activo: true,
-          });
-        }
-      }
     }
   }
 
@@ -120,13 +87,14 @@ async function syncContactos() {
     let contacto = await Contacto.findOne({
       where: {
         clienteId: cliente.id,
-        nombre: c.Name,
+        sapContactoId: c.ContactCode || null,
       },
     });
 
     if (!contacto) {
       await Contacto.create({
         clienteId: cliente.id,
+        sapContactoId: c.ContactCode || null,
         nombre: c.Name,
         correo: c.E_Mail || null,
         telefono: c.Phone1 || null,
@@ -135,9 +103,11 @@ async function syncContactos() {
       });
     } else {
       await contacto.update({
+        nombre: c.Name,
         correo: c.E_Mail || null,
         telefono: c.Phone1 || null,
         cargo: c.Position || null,
+        activo: true,
       });
     }
   }
@@ -145,10 +115,11 @@ async function syncContactos() {
   console.log(`✅ Contactos sincronizados: ${contactosSAP.length}`);
 }
 
+
 async function main() {
   try {
     await syncRubros();
-    await syncClientesYContactos();
+    await syncClientes();
     await syncContactos();
     await syncItems();
     console.log("🎉 Sincronización SAP completada");

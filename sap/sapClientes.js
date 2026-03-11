@@ -5,7 +5,7 @@ async function getClientesSAP() {
   const cookie = await loginSAP();
 
   const response = await sapAxios.get(
-    "/BusinessPartners?$filter=CardType eq 'cCustomer'&$select=CardCode,CardName,Phone1,Cellular,EmailAddress,FederalTaxID,Address&$expand=ContactEmployees",
+    "/BusinessPartners?$filter=CardType eq 'cCustomer'&$select=CardCode,CardName,Phone1,Cellular,EmailAddress,FederalTaxID,Address",
     {
       headers: {
         Cookie: cookie,
