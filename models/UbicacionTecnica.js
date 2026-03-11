@@ -27,7 +27,7 @@ module.exports = (sequelize) => {
 
       clienteId: {
         type: DataTypes.UUID,
-        allowNull: false,
+        allowNull: true,
       },
 
       tipoEquipoPropiedad: {
