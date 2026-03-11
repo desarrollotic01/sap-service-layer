@@ -4,15 +4,23 @@ const { loginSAP } = require("./sapAuth");
 async function getContactosSAP() {
   const cookie = await loginSAP();
 
-  const response = await sapAxios.get("/Contacts", {
-    headers: {
-      Cookie: cookie,
-    },
-  });
+  let contactos = [];
+  let nextUrl = "/Contacts";
 
-  const contactos = response.data.value || [];
+  while (nextUrl) {
+    const response = await sapAxios.get(nextUrl, {
+      headers: {
+        Cookie: cookie,
+      },
+    });
 
-  const contactosClientes = contactos
+    const data = response.data;
+    contactos = contactos.concat(data.value || []);
+
+    nextUrl = data["odata.nextLink"] || data["@odata.nextLink"] || null;
+  }
+
+  return contactos
     .map((c) => ({
       CardCode: String(c.CardCode || "").trim(),
       ContactCode: c.ContactCode ?? c.CntctCode ?? c.InternalCode ?? null,
@@ -25,9 +33,7 @@ async function getContactosSAP() {
       Cellular: c.Cellular || c.MobilePhone || c.Cellolar || null,
       Position: c.Position || null,
     }))
-    .filter((c) => c.CardCode.startsWith("C")); // 👈 SOLO CLIENTES
-
-  return contactosClientes;
+    .filter((c) => c.CardCode.startsWith("C"));
 }
 
 module.exports = {

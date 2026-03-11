@@ -116,7 +116,7 @@ async function syncContactos() {
         contacto = await Contacto.findOne({
           where: {
             clienteId: cliente.id,
-            nombre: c.Name || "",
+            nombre: c.Name || "SIN NOMBRE",
             correo: c.E_Mail || null,
           },
         });
@@ -126,24 +126,24 @@ async function syncContactos() {
         await Contacto.create({
           clienteId: cliente.id,
           sapContactoId: c.ContactCode ?? null,
-          nombre: c.Name || "",
+          nombre: c.Name || "SIN NOMBRE",
           correo: c.E_Mail || null,
           telefono: c.Phone1 || c.Cellular || null,
           cargo: c.Position || null,
           activo: true,
         });
 
-        console.log("✅ Contacto creado:", c.Name, "->", cliente.sapCode);
+        console.log("✅ Contacto creado:", c.Name || "SIN NOMBRE", "->", cliente.sapCode);
       } else {
         await contacto.update({
-          nombre: c.Name || contacto.nombre,
+          nombre: c.Name || contacto.nombre || "SIN NOMBRE",
           correo: c.E_Mail || null,
           telefono: c.Phone1 || c.Cellular || null,
           cargo: c.Position || null,
           activo: true,
         });
 
-        console.log("♻️ Contacto actualizado:", c.Name, "->", cliente.sapCode);
+        console.log("♻️ Contacto actualizado:", c.Name || "SIN NOMBRE", "->", cliente.sapCode);
       }
     } catch (error) {
       console.error("❌ Error procesando contacto:", c, error.message);
