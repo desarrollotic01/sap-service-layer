@@ -77,7 +77,7 @@ async function seedBase() {
         codigo: "UT-001",
         nombre: "Sala Eléctrica Principal",
         id_cliente: "CLI-UT-001",
-        clienteId: clientes[0].id,
+        clienteId: null,
         tipoEquipoPropiedad: "Vendido",
         paisId: paises[0].id, // PERU
         sede: "Lima",
@@ -98,7 +98,7 @@ async function seedBase() {
         codigo: "UT-002",
         nombre: "Cuarto de Comunicaciones Piso 1",
         id_cliente: "CLI-UT-002",
-        clienteId: clientes[0].id,
+        clienteId: null,
         tipoEquipoPropiedad: "Vendido",
         paisId: paises[0].id, // PERU
         sede: "Lima",
@@ -119,7 +119,7 @@ async function seedBase() {
         codigo: "UT-003",
         nombre: "Sala HVAC Técnica",
         id_cliente: "CLI-UT-003",
-        clienteId: clientes[1].id,
+        clienteId: null,
         tipoEquipoPropiedad: "Atendido",
         paisId: paises[0].id, // PERU
         sede: "Arequipa",
@@ -158,7 +158,7 @@ async function seedBase() {
         numeroOrdenCliente: "OC-9001",
         fechaOrdenCliente: "2025-01-05",
 
-        clienteId: clientes[0].id,
+        clienteId: null,
         paisId: paises[0].id,
 
         id_cliente: "CLI-EQ-001",
@@ -197,7 +197,7 @@ async function seedBase() {
         numeroOrdenCliente: "OC-9002",
         fechaOrdenCliente: "2025-01-08",
 
-        clienteId: clientes[1].id,
+        clienteId: null,
         paisId: paises[0].id,
 
         id_cliente: "CLI-EQ-002",
