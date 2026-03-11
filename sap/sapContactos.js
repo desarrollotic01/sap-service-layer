@@ -12,7 +12,7 @@ async function getContactosSAP() {
 
   const contactos = response.data.value || [];
 
-  return contactos
+  const contactosClientes = contactos
     .map((c) => ({
       CardCode: String(c.CardCode || "").trim(),
       ContactCode: c.ContactCode ?? c.CntctCode ?? c.InternalCode ?? null,
@@ -25,7 +25,9 @@ async function getContactosSAP() {
       Cellular: c.Cellular || c.MobilePhone || c.Cellolar || null,
       Position: c.Position || null,
     }))
-    .filter((c) => c.CardCode.startsWith("C"));
+    .filter((c) => c.CardCode.startsWith("C")); // 👈 SOLO CLIENTES
+
+  return contactosClientes;
 }
 
 module.exports = {
