@@ -1,5 +1,5 @@
 const router = require("express").Router();
-const h = require("../handlers/ubicacionTecnicaHandler");
+const h = require("../handlers/ubicaciontecnicaHandler");
 const auth = require("../middlewares/auth");
 
 
