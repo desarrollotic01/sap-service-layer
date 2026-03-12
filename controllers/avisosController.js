@@ -1,4 +1,213 @@
-const { Aviso, Usuario, AvisoEquipo, sequelize, Equipo , UbicacionTecnica, AvisoUbicacion} = require("../db_connection");
+const { Op } = require("sequelize");
+const {
+  Aviso,
+  Usuario,
+  AvisoEquipo,
+  AvisoUbicacion,
+  Tratamiento,
+  Equipo,
+  UbicacionTecnica,
+  Pais,
+  GuiaMantenimiento,
+  GuiaMantenimientoProgramacion,
+} = require("../db_connection");
+
+const ESTADOS_AVISO_VALIDOS = [
+  "creado",
+  "tratado",
+  "con OT",
+  "rechazado",
+  "finalizado",
+  "finalizado sin facturacion",
+  "facturado",
+];
+
+const TIPOS_AVISO_VALIDOS = ["mantenimiento", "instalacion"];
+const PRIORIDADES_VALIDAS = ["Baja", "Media", "Alta"];
+const TIPOS_MANTENIMIENTO_VALIDOS = [
+  "Preventivo",
+  "Correctivo",
+  "Mejora",
+  "Predictivo",
+];
+
+const PRODUCTOS_VALIDOS = [
+  "Racks",
+  "Vehiculo",
+  "Autosat",
+  "Techo y Cerramiento",
+  "Equipos Propios",
+  "Sanitarias",
+  "HVAC",
+  "DACI",
+  "ACI",
+  "Datos y Comunicaciones",
+  "Eléctrico",
+  "Pisos y Estructuras",
+];
+
+const buildWhereAvisosPorOrigen = (origenAviso, filtros = {}) => {
+  const where = {
+    origenAviso,
+  };
+
+  if (filtros.estadoAviso) {
+    where.estadoAviso = filtros.estadoAviso;
+  }
+
+  if (filtros.tipoAviso) {
+    where.tipoAviso = filtros.tipoAviso;
+  }
+
+  if (filtros.prioridad) {
+    where.prioridad = filtros.prioridad;
+  }
+
+  if (filtros.tipoMantenimiento) {
+    where.tipoMantenimiento = filtros.tipoMantenimiento;
+  }
+
+  if (filtros.producto) {
+    where.producto = filtros.producto;
+  }
+
+  if (filtros.paisId) {
+    where.paisId = filtros.paisId;
+  }
+
+  if (filtros.solicitanteId) {
+    where.solicitanteId = filtros.solicitanteId;
+  }
+
+  if (filtros.creadoPor) {
+    where.creadoPor = filtros.creadoPor;
+  }
+
+  if (filtros.guiaMantenimientoId) {
+    where.guiaMantenimientoId = filtros.guiaMantenimientoId;
+  }
+
+  if (filtros.guiaMantenimientoProgramacionId) {
+    where.guiaMantenimientoProgramacionId =
+      filtros.guiaMantenimientoProgramacionId;
+  }
+
+  if (filtros.numeroAviso) {
+    where.numeroAviso = {
+      [Op.iLike]: `%${filtros.numeroAviso.trim()}%`,
+    };
+  }
+
+  if (filtros.descripcion) {
+    where[Op.or] = [
+      { descripcionResumida: { [Op.iLike]: `%${filtros.descripcion.trim()}%` } },
+      { descripcion: { [Op.iLike]: `%${filtros.descripcion.trim()}%` } },
+    ];
+  }
+
+  if (filtros.fechaDesde && filtros.fechaHasta) {
+    where.fechaAtencion = {
+      [Op.between]: [filtros.fechaDesde, filtros.fechaHasta],
+    };
+  } else if (filtros.fechaDesde) {
+    where.fechaAtencion = {
+      [Op.gte]: filtros.fechaDesde,
+    };
+  } else if (filtros.fechaHasta) {
+    where.fechaAtencion = {
+      [Op.lte]: filtros.fechaHasta,
+    };
+  }
+
+  return where;
+};
+
+const buildIncludeAvisos = () => {
+  return [
+    {
+      model: Usuario,
+      as: "creador",
+      attributes: ["id", "nombre", "apellido", "usuario"],
+      required: false,
+    },
+    {
+      model: Usuario,
+      as: "solicitante",
+      attributes: ["id", "nombre", "apellido", "usuario"],
+      required: false,
+    },
+    {
+      model: Pais,
+      as: "pais",
+      required: false,
+    },
+    {
+      model: AvisoEquipo,
+      as: "equiposRelacion",
+      required: false,
+      include: [
+        {
+          model: Equipo,
+          as: "equipo",
+          required: false,
+        },
+      ],
+    },
+    {
+      model: AvisoUbicacion,
+      as: "ubicacionesRelacion",
+      required: false,
+      include: [
+        {
+          model: UbicacionTecnica,
+          as: "ubicacion",
+          required: false,
+        },
+      ],
+    },
+    {
+      model: Tratamiento,
+      as: "tratamientos",
+      required: false,
+    },
+    {
+      model: GuiaMantenimiento,
+      as: "guiaMantenimiento",
+      required: false,
+    },
+    {
+      model: GuiaMantenimientoProgramacion,
+      as: "programacionGuia",
+      required: false,
+    },
+  ];
+};
+
+const getAvisosManualController = async (filtros = {}) => {
+  const avisos = await Aviso.findAll({
+    where: buildWhereAvisosPorOrigen("manual", filtros),
+    include: buildIncludeAvisos(),
+    order: [
+      ["createdAt", "DESC"],
+      ["fechaAtencion", "DESC"],
+    ],
+  });
+
+  return avisos;
+};
+
+const getAvisosGuiaController = async (filtros = {}) => {
+  const avisos = await Aviso.findAll({
+    where: buildWhereAvisosPorOrigen("guia", filtros),
+    include: buildIncludeAvisos(),
+    order: [
+      ["createdAt", "DESC"],
+      ["fechaAtencion", "DESC"],
+    ],
+  });
+
+  return avisos;
+};
 
 /* =========================
    CREAR AVISO
@@ -217,4 +426,11 @@ module.exports = {
   actualizarAviso,
   eliminarAviso,
   actualizarEstadoAviso,
+   getAvisosManualController,
+  getAvisosGuiaController,
+  ESTADOS_AVISO_VALIDOS,
+  TIPOS_AVISO_VALIDOS,
+  PRIORIDADES_VALIDAS,
+  TIPOS_MANTENIMIENTO_VALIDOS,
+  PRODUCTOS_VALIDOS,
 };
