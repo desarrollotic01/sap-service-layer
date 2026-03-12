@@ -127,13 +127,13 @@ const buildIncludeAvisos = () => {
     {
       model: Usuario,
       as: "creador",
-      attributes: ["id", "nombre", "apellido", "usuario"],
+      attributes: ["id", "nombreApellido"],
       required: false,
     },
     {
       model: Usuario,
       as: "solicitante",
-      attributes: ["id", "nombre", "apellido", "usuario"],
+      attributes: ["id", "nombreApellido"],
       required: false,
     },
     {
