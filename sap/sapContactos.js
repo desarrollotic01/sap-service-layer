@@ -23,8 +23,7 @@ async function getContactosSAP() {
   const cookie = await loginSAP();
 
   let contactos = [];
-  let nextUrl =
-    "/Contacts?$select=CardCode,ContactCode,Name,FirstName,MiddleName,LastName,E_Mail,Phone1,Cellular,Position";
+  let nextUrl = "/Contacts";
 
   while (nextUrl) {
     const response = await sapAxios.get(nextUrl, {
@@ -43,30 +42,53 @@ async function getContactosSAP() {
     );
   }
 
-  return contactos
-    .map((c) => {
-      const cardCode = limpiarTexto(c.CardCode);
+  console.log("====================================");
+  console.log("MUESTRA RAW CONTACTOS SAP:");
+  console.log(JSON.stringify(contactos.slice(0, 3), null, 2));
+  console.log("====================================");
 
-      const nombreCompleto = [
-        limpiarTexto(c.FirstName),
-        limpiarTexto(c.MiddleName),
-        limpiarTexto(c.LastName),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
+  return contactos.map((c) => ({
+    CardCode: limpiarTexto(c.CardCode),
+    ContactCode:
+      c.ContactCode ??
+      c.CntctCode ??
+      c.InternalCode ??
+      c.Code ??
+      null,
 
-      return {
-        CardCode: cardCode,
-        ContactCode: c.ContactCode ?? null,
-        Name: limpiarTexto(c.Name) || nombreCompleto || "",
-        E_Mail: limpiarTexto(c.E_Mail) || "",
-        Phone1: limpiarTexto(c.Phone1) || "",
-        Cellular: limpiarTexto(c.Cellular) || "",
-        Position: limpiarTexto(c.Position) || "",
-      };
-    })
-    .filter((c) => c.CardCode.startsWith("C"));
+    Name:
+      limpiarTexto(c.Name) ||
+      limpiarTexto(c.FirstName) ||
+      limpiarTexto(c.LastName) ||
+      limpiarTexto(c.FirstName && c.LastName
+        ? `${c.FirstName} ${c.LastName}`
+        : "") ||
+      "SIN NOMBRE",
+
+    E_Mail:
+      limpiarTexto(c.E_Mail) ||
+      limpiarTexto(c.E_MailL) ||
+      limpiarTexto(c.Email) ||
+      "",
+
+    Phone1:
+      limpiarTexto(c.Phone1) ||
+      limpiarTexto(c.Tel1) ||
+      limpiarTexto(c.Phone) ||
+      "",
+
+    Cellular:
+      limpiarTexto(c.Cellular) ||
+      limpiarTexto(c.MobilePhone) ||
+      limpiarTexto(c.Cellolar) ||
+      "",
+
+    Position:
+      limpiarTexto(c.Position) ||
+      limpiarTexto(c.Title) ||
+      "",
+  }))
+  .filter((c) => c.CardCode.startsWith("C"));
 }
 
 module.exports = {
