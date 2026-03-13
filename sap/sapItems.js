@@ -1,19 +1,42 @@
 const sapAxios = require("./sapClient");
 const { loginSAP } = require("./sapAuth");
 
+function normalizarNextLink(nextLink) {
+  if (!nextLink) return null;
+
+  if (nextLink.startsWith("http://") || nextLink.startsWith("https://")) {
+    const url = new URL(nextLink);
+    nextLink = `${url.pathname}${url.search}`;
+  }
+
+  nextLink = nextLink.replace(/^\/b1s\/v\d+\//, "/");
+
+  return nextLink;
+}
+
 async function getItemsSAP() {
   const cookie = await loginSAP();
 
-  const response = await sapAxios.get(
-    "/Items?$select=ItemCode,ItemName,ItemsGroupCode,PurchaseUnit,InventoryUOM,SalesUnit,Valid",
-    {
+  let items = [];
+  let nextUrl =
+    "/Items?$select=ItemCode,ItemName,ItemsGroupCode,PurchaseUnit,InventoryUOM,SalesUnit,Valid";
+
+  while (nextUrl) {
+    const response = await sapAxios.get(nextUrl, {
       headers: {
         Cookie: cookie,
       },
-    }
-  );
+    });
 
-  return response.data.value || [];
+    const data = response.data || {};
+    items = items.concat(data.value || []);
+
+    nextUrl = normalizarNextLink(
+      data["@odata.nextLink"] || data["odata.nextLink"] || null
+    );
+  }
+
+  return items;
 }
 
 module.exports = {

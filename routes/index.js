@@ -21,6 +21,12 @@ const paisRouter = require("./paisRouter")
 const guiaMantenimientoRouter = require("./guiaMantenimientoRouter")
 const portalClienteRouter = require("./portalClienteRouter")
 const encuestaRouter = require("./encuestaRouter")
+const itemRouter = require("./itemRouter")
+const rubroRouter = require("./rubroRouter")
+
+router.use("/rubros", rubroRouter);
+
+router.use("/items", itemRouter);
 
 router.use("/encuesta", encuestaRouter);
 

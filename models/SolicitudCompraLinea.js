@@ -21,9 +21,10 @@ module.exports = (sequelize) => {
       },
 
       description: {
-        type: DataTypes.STRING,
-        allowNull: true,
-      },
+  type: DataTypes.STRING,
+  allowNull: false,
+  defaultValue: "",
+},
 
       quantity: {
         type: DataTypes.DECIMAL(15, 2),

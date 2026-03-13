@@ -65,13 +65,11 @@ module.exports = (sequelize) => {
     });
 
     Item.belongsTo(db.Rubro, {
-  foreignKey: "rubroSapCode",
-  targetKey: "sapCode",
-  as: "rubro",
-});
+      foreignKey: "rubroSapCode",
+      targetKey: "sapCode",
+      as: "rubro",
+    });
   };
-
-  
 
   return Item;
 };
