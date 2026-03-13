@@ -24,7 +24,7 @@ async function getContactosSAP() {
 
   let contactos = [];
   let nextUrl =
-    "/Contacts?$select=CardCode,ContactCode,CntctCode,InternalCode,Name,FirstName,MiddleName,LastName,E_Mail,E_MailL,Phone1,Tel1,Cellular,MobilePhone,Cellolar,Position";
+    "/Contacts?$select=CardCode,ContactCode,Name,FirstName,MiddleName,LastName,E_Mail,Phone1,Cellular,Position";
 
   while (nextUrl) {
     const response = await sapAxios.get(nextUrl, {
@@ -34,8 +34,8 @@ async function getContactosSAP() {
     });
 
     const data = response.data || {};
-
     const lote = Array.isArray(data.value) ? data.value : [];
+
     contactos = contactos.concat(lote);
 
     nextUrl = normalizarNextLink(
@@ -58,15 +58,11 @@ async function getContactosSAP() {
 
       return {
         CardCode: cardCode,
-        ContactCode: c.ContactCode ?? c.CntctCode ?? c.InternalCode ?? null,
+        ContactCode: c.ContactCode ?? null,
         Name: limpiarTexto(c.Name) || nombreCompleto || "",
-        E_Mail: limpiarTexto(c.E_Mail) || limpiarTexto(c.E_MailL) || "",
-        Phone1: limpiarTexto(c.Phone1) || limpiarTexto(c.Tel1) || "",
-        Cellular:
-          limpiarTexto(c.Cellular) ||
-          limpiarTexto(c.MobilePhone) ||
-          limpiarTexto(c.Cellolar) ||
-          "",
+        E_Mail: limpiarTexto(c.E_Mail) || "",
+        Phone1: limpiarTexto(c.Phone1) || "",
+        Cellular: limpiarTexto(c.Cellular) || "",
         Position: limpiarTexto(c.Position) || "",
       };
     })
