@@ -1,5 +1,6 @@
 const { Op } = require("sequelize");
 const {
+  sequelize,
   Aviso,
   Usuario,
   AvisoEquipo,
