@@ -95,9 +95,6 @@ async function syncContactos() {
         where: { sapCode: cardCode },
       });
 
-      console.log("BUSCANDO CLIENTE CON CardCode:", cardCode);
-      console.log("CLIENTE ENCONTRADO:", cliente ? cliente.sapCode : null);
-
       if (!cliente) {
         console.log("⚠️ No se encontró cliente para contacto:", cardCode);
         continue;
@@ -153,12 +150,7 @@ async function syncContactos() {
           activo: true,
         });
 
-        console.log(
-          "✅ Contacto creado:",
-          nombreNormalizado,
-          "->",
-          cliente.sapCode
-        );
+        console.log("✅ Contacto creado:", nombreNormalizado, "->", cliente.sapCode);
       } else {
         await contacto.update({
           nombre: nombreNormalizado,
@@ -168,12 +160,7 @@ async function syncContactos() {
           activo: true,
         });
 
-        console.log(
-          "♻️ Contacto actualizado:",
-          nombreNormalizado,
-          "->",
-          cliente.sapCode
-        );
+        console.log("♻️ Contacto actualizado:", nombreNormalizado, "->", cliente.sapCode);
       }
     } catch (error) {
       console.error("❌ Error procesando contacto:", c, error.message);
