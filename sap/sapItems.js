@@ -29,7 +29,7 @@ async function getItemsSAP() {
     });
 
     const data = response.data || {};
-    items = items.concat(data.value || []);
+    items = items.concat(Array.isArray(data.value) ? data.value : []);
 
     nextUrl = normalizarNextLink(
       data["@odata.nextLink"] || data["odata.nextLink"] || null

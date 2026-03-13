@@ -10,9 +10,19 @@ async function syncRubros() {
   const rubrosSAP = await getRubrosSAP();
 
   for (const rubro of rubrosSAP) {
+    const sapCode =
+      rubro.Number !== null && rubro.Number !== undefined
+        ? Number(rubro.Number)
+        : null;
+
+    if (sapCode === null || Number.isNaN(sapCode)) {
+      console.warn("⚠️ Rubro omitido por sapCode inválido:", rubro);
+      continue;
+    }
+
     await Rubro.upsert({
-      sapCode: rubro.Number,
-      nombre: rubro.GroupName,
+      sapCode,
+      nombre: String(rubro.GroupName || "").trim() || `RUBRO ${sapCode}`,
       activo: true,
     });
   }
@@ -59,11 +69,50 @@ async function syncClientes() {
 async function syncItems() {
   const itemsSAP = await getItemsSAP();
 
+  const rubrosDB = await Rubro.findAll({
+    attributes: ["sapCode", "nombre"],
+  });
+
+  const rubrosMap = new Map(
+    rubrosDB.map((r) => [Number(r.sapCode), r.nombre])
+  );
+
+  let itemsSinRubro = 0;
+
   for (const item of itemsSAP) {
+    const sapCode = String(item.ItemCode || "").trim();
+    const nombre = String(item.ItemName || "").trim();
+
+    if (!sapCode) {
+      console.warn("⚠️ Item omitido por ItemCode vacío:", item);
+      continue;
+    }
+
+    const grupoCode =
+      item.ItemsGroupCode !== null && item.ItemsGroupCode !== undefined
+        ? Number(item.ItemsGroupCode)
+        : null;
+
+    let rubroSapCode = null;
+    let rubroNombre = null;
+
+    if (grupoCode !== null && !Number.isNaN(grupoCode)) {
+      if (rubrosMap.has(grupoCode)) {
+        rubroSapCode = grupoCode;
+        rubroNombre = rubrosMap.get(grupoCode) || null;
+      } else {
+        itemsSinRubro++;
+        console.warn(
+          `⚠️ El item ${sapCode} (${nombre}) tiene ItemsGroupCode=${grupoCode}, pero ese rubro no existe en tabla Rubros`
+        );
+      }
+    }
+
     await Item.upsert({
-      sapCode: item.ItemCode,
-      nombre: item.ItemName || "",
-      rubroSapCode: item.ItemsGroupCode || null,
+      sapCode,
+      nombre: nombre || sapCode,
+      rubroSapCode,
+      rubroNombre,
       unidadCompra: item.PurchaseUnit || null,
       unidadInventario: item.InventoryUOM || null,
       unidadVenta: item.SalesUnit || null,
@@ -72,6 +121,9 @@ async function syncItems() {
   }
 
   console.log(`✅ Items sincronizados: ${itemsSAP.length}`);
+  if (itemsSinRubro > 0) {
+    console.log(`⚠️ Items guardados sin rubro relacionado: ${itemsSinRubro}`);
+  }
 }
 
 async function syncContactos() {
@@ -150,7 +202,12 @@ async function syncContactos() {
           activo: true,
         });
 
-        console.log("✅ Contacto creado:", nombreNormalizado, "->", cliente.sapCode);
+        console.log(
+          "✅ Contacto creado:",
+          nombreNormalizado,
+          "->",
+          cliente.sapCode
+        );
       } else {
         await contacto.update({
           nombre: nombreNormalizado,
@@ -160,7 +217,12 @@ async function syncContactos() {
           activo: true,
         });
 
-        console.log("♻️ Contacto actualizado:", nombreNormalizado, "->", cliente.sapCode);
+        console.log(
+          "♻️ Contacto actualizado:",
+          nombreNormalizado,
+          "->",
+          cliente.sapCode
+        );
       }
     } catch (error) {
       console.error("❌ Error procesando contacto:", c, error.message);
@@ -169,7 +231,6 @@ async function syncContactos() {
 
   console.log(`✅ Contactos sincronizados procesados: ${contactosSAP.length}`);
 }
-
 
 async function main() {
   try {
@@ -180,7 +241,10 @@ async function main() {
     console.log("🎉 Sincronización SAP completada");
     process.exit(0);
   } catch (error) {
-    console.error("❌ Error al sincronizar SAP:", error.response?.data || error.message);
+    console.error(
+      "❌ Error al sincronizar SAP:",
+      error.response?.data || error.message
+    );
     process.exit(1);
   }
 }
