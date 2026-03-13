@@ -10,6 +10,12 @@ module.exports = (sequelize) => {
         primaryKey: true,
       },
 
+      sapCode: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true,
+      },
+
       razonSocial: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -17,15 +23,9 @@ module.exports = (sequelize) => {
 
       ruc: {
         type: DataTypes.STRING,
-        allowNull: false,
-        unique: true,
       },
 
       direccion: {
-        type: DataTypes.STRING,
-      },
-
-      contacto: {
         type: DataTypes.STRING,
       },
 
@@ -41,11 +41,15 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
       },
 
+      activoSAP: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+      },
+
       estado: {
         type: DataTypes.ENUM("Activo", "Inactivo"),
         defaultValue: "Activo",
       },
-    
     },
     {
       tableName: "Clientes",
@@ -54,11 +58,11 @@ module.exports = (sequelize) => {
   );
 
   Cliente.associate = (db) => {
-  Cliente.hasMany(db.Contacto, {
-    foreignKey: "clienteId",
-    as: "contactos",
-  });
-};
+    Cliente.hasMany(db.Contacto, {
+      foreignKey: "clienteId",
+      as: "contactos",
+    });
+  };
 
   return Cliente;
 };

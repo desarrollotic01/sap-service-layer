@@ -9,16 +9,22 @@ function normalizarNextLink(nextLink) {
     nextLink = `${url.pathname}${url.search}`;
   }
 
-  nextLink = nextLink.replace(/^\/b1s\/v\d\//, "/");
+  nextLink = nextLink.replace(/^\/b1s\/v\d+\//, "/");
 
   return nextLink;
+}
+
+function limpiarTexto(valor) {
+  if (valor === null || valor === undefined) return "";
+  return String(valor).trim();
 }
 
 async function getContactosSAP() {
   const cookie = await loginSAP();
 
   let contactos = [];
-  let nextUrl = "/Contacts";
+  let nextUrl =
+    "/Contacts?$select=CardCode,ContactCode,CntctCode,InternalCode,Name,FirstName,MiddleName,LastName,E_Mail,E_MailL,Phone1,Tel1,Cellular,MobilePhone,Cellolar,Position";
 
   while (nextUrl) {
     const response = await sapAxios.get(nextUrl, {
@@ -27,8 +33,10 @@ async function getContactosSAP() {
       },
     });
 
-    const data = response.data;
-    contactos = contactos.concat(data.value || []);
+    const data = response.data || {};
+
+    const lote = Array.isArray(data.value) ? data.value : [];
+    contactos = contactos.concat(lote);
 
     nextUrl = normalizarNextLink(
       data["odata.nextLink"] || data["@odata.nextLink"] || null
@@ -36,18 +44,32 @@ async function getContactosSAP() {
   }
 
   return contactos
-    .map((c) => ({
-      CardCode: String(c.CardCode || "").trim(),
-      ContactCode: c.ContactCode ?? c.CntctCode ?? c.InternalCode ?? null,
-      Name:
-        c.Name ||
-        [c.FirstName, c.MiddleName, c.LastName].filter(Boolean).join(" ").trim() ||
-        "",
-      E_Mail: c.E_Mail || c.E_MailL || null,
-      Phone1: c.Phone1 || c.Tel1 || null,
-      Cellular: c.Cellular || c.MobilePhone || c.Cellolar || null,
-      Position: c.Position || null,
-    }))
+    .map((c) => {
+      const cardCode = limpiarTexto(c.CardCode);
+
+      const nombreCompleto = [
+        limpiarTexto(c.FirstName),
+        limpiarTexto(c.MiddleName),
+        limpiarTexto(c.LastName),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      return {
+        CardCode: cardCode,
+        ContactCode: c.ContactCode ?? c.CntctCode ?? c.InternalCode ?? null,
+        Name: limpiarTexto(c.Name) || nombreCompleto || "",
+        E_Mail: limpiarTexto(c.E_Mail) || limpiarTexto(c.E_MailL) || "",
+        Phone1: limpiarTexto(c.Phone1) || limpiarTexto(c.Tel1) || "",
+        Cellular:
+          limpiarTexto(c.Cellular) ||
+          limpiarTexto(c.MobilePhone) ||
+          limpiarTexto(c.Cellolar) ||
+          "",
+        Position: limpiarTexto(c.Position) || "",
+      };
+    })
     .filter((c) => c.CardCode.startsWith("C"));
 }
 

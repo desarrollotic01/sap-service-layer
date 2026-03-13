@@ -4,6 +4,7 @@ const {
   Equipo,
   UbicacionTecnica,
   PlanMantenimiento,
+  GuiaMantenimiento,
   GuiaMantenimientoProgramacion,
 } = require("../db_connection");
 
@@ -39,6 +40,21 @@ const PERIODOS = new Set([
 const CRETICIDAD_VALID = new Set(["A", "B", "C"]);
 const TIPO_ANTICIPACION_VALID = new Set(["MINUTOS", "HORAS", "DIAS", "SEMANAS"]);
 
+const PRODUCTOS_VALIDOS = new Set([
+  "Racks",
+  "Vehiculo",
+  "Autosat",
+  "Techo y Cerramiento",
+  "Equipos Propios",
+  "Sanitarias",
+  "HVAC",
+  "DACI",
+  "ACI",
+  "Datos y Comunicaciones",
+  "Eléctrico",
+  "Pisos y Estructuras",
+]);
+
 const ValidateAdjuntos = (adjuntos) => {
   if (adjuntos === undefined) return;
   if (!Array.isArray(adjuntos)) throw new Error("adjuntos debe ser un arreglo.");
@@ -64,6 +80,13 @@ const toDate = (value) => {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return d;
+};
+
+const toBoolean = (value) => {
+  if (typeof value === "boolean") return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return value;
 };
 
 const BuildNumeroAlerta = async ({ ordenVenta, t }) => {
@@ -133,8 +156,6 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
       creticidad,
       producto,
       adjuntos,
-
-      // ✅ NUEVOS CAMPOS
       alertaActiva,
       tipoAnticipacionAlerta,
       valorAnticipacionAlerta,
@@ -171,7 +192,7 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
       return res.status(400).json({ error: "periodo inválido." });
     }
 
-    if (periodoActivo !== undefined && typeof periodoActivo !== "boolean") {
+    if (periodoActivo !== undefined && typeof toBoolean(periodoActivo) !== "boolean") {
       return res.status(400).json({ error: "periodoActivo debe ser boolean." });
     }
 
@@ -204,7 +225,11 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
     ValidateAdjuntos(adjuntos);
 
     const alertaActivaFinal =
-      alertaActiva === undefined ? true : alertaActiva === true || alertaActiva === "true";
+      alertaActiva === undefined ? true : toBoolean(alertaActiva);
+
+    if (typeof alertaActivaFinal !== "boolean") {
+      return res.status(400).json({ error: "alertaActiva debe ser boolean." });
+    }
 
     if (alertaActivaFinal) {
       if (!tipoAnticipacionAlerta || !TIPO_ANTICIPACION_VALID.has(tipoAnticipacionAlerta)) {
@@ -228,9 +253,9 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
         });
       }
 
-      if (!producto || typeof producto !== "string" || !producto.trim()) {
+      if (!producto || typeof producto !== "string" || !PRODUCTOS_VALIDOS.has(producto)) {
         return res.status(400).json({
-          error: "producto es obligatorio si no envías equipoId.",
+          error: "producto es obligatorio si no envías equipoId y debe ser válido.",
         });
       }
 
@@ -255,7 +280,7 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
 
       if (hasEquipo) {
         const equipo = await Equipo.findByPk(equipoId, { transaction: t });
-        if (!equipo) throw new Error("Equipo no existe.");
+        if (!equipo || equipo.state === false) throw new Error("Equipo no existe.");
 
         await ValidatePlanBelongsToEquipo({ equipo, planMantenimientoId, t });
 
@@ -275,7 +300,9 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
           transaction: t,
         });
 
-        if (!ubicacion) throw new Error("Ubicación técnica no existe.");
+        if (!ubicacion || ubicacion.state === false) {
+          throw new Error("Ubicación técnica no existe.");
+        }
 
         await ValidatePlanBelongsToUbicacion({
           ubicacionTecnica: ubicacion,
@@ -296,7 +323,7 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
           ubicacionTecnicaId: hasUbic ? ubicacionTecnicaId : null,
           planMantenimientoId,
           periodo,
-          periodoActivo: periodoActivo ?? true,
+          periodoActivo: toBoolean(periodoActivo) ?? true,
           ordenVenta: ordenVentaFinal,
           numeroAlerta,
           paisId: paisIdFinal,
@@ -372,7 +399,14 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
 ======================= */
 const GetAllGuiaMantenimientoHandler = async (req, res) => {
   try {
-    const { search, periodo, paisId, equipoId, planMantenimientoId } = req.query;
+    const {
+      search,
+      periodo,
+      paisId,
+      equipoId,
+      ubicacionTecnicaId,
+      planMantenimientoId,
+    } = req.query;
 
     const where = { state: true };
 
@@ -391,6 +425,13 @@ const GetAllGuiaMantenimientoHandler = async (req, res) => {
     if (equipoId !== undefined) {
       if (!isUUID(equipoId)) return res.status(400).json({ error: "equipoId inválido." });
       where.equipoId = equipoId;
+    }
+
+    if (ubicacionTecnicaId !== undefined) {
+      if (!isUUID(ubicacionTecnicaId)) {
+        return res.status(400).json({ error: "ubicacionTecnicaId inválido." });
+      }
+      where.ubicacionTecnicaId = ubicacionTecnicaId;
     }
 
     if (planMantenimientoId !== undefined) {
@@ -466,8 +507,11 @@ const UpdateGuiaMantenimientoHandler = async (req, res) => {
       return res.status(400).json({ error: "periodo inválido." });
     }
 
-    if (payload.periodoActivo !== undefined && typeof payload.periodoActivo !== "boolean") {
-      return res.status(400).json({ error: "periodoActivo debe ser boolean." });
+    if (payload.periodoActivo !== undefined) {
+      payload.periodoActivo = toBoolean(payload.periodoActivo);
+      if (typeof payload.periodoActivo !== "boolean") {
+        return res.status(400).json({ error: "periodoActivo debe ser boolean." });
+      }
     }
 
     if (
@@ -485,8 +529,11 @@ const UpdateGuiaMantenimientoHandler = async (req, res) => {
       return res.status(400).json({ error: "descripcionDetallada inválida." });
     }
 
-    if (payload.alertaActiva !== undefined && typeof payload.alertaActiva !== "boolean") {
-      return res.status(400).json({ error: "alertaActiva debe ser boolean." });
+    if (payload.alertaActiva !== undefined) {
+      payload.alertaActiva = toBoolean(payload.alertaActiva);
+      if (typeof payload.alertaActiva !== "boolean") {
+        return res.status(400).json({ error: "alertaActiva debe ser boolean." });
+      }
     }
 
     if (
@@ -512,39 +559,171 @@ const UpdateGuiaMantenimientoHandler = async (req, res) => {
       payload.valorAnticipacionAlerta = v;
     }
 
-    const updated = await sequelize.transaction(async (t) => {
-      if (payload.equipoId && payload.planMantenimientoId) {
-        if (!isUUID(payload.equipoId)) throw new Error("equipoId inválido.");
-        if (!isUUID(payload.planMantenimientoId)) throw new Error("planMantenimientoId inválido.");
+    if (payload.equipoId !== undefined && payload.equipoId !== null && !isUUID(payload.equipoId)) {
+      return res.status(400).json({ error: "equipoId inválido." });
+    }
 
-        const equipo = await Equipo.findByPk(payload.equipoId, { transaction: t });
-        if (!equipo) throw new Error("Equipo no existe.");
+    if (
+      payload.ubicacionTecnicaId !== undefined &&
+      payload.ubicacionTecnicaId !== null &&
+      !isUUID(payload.ubicacionTecnicaId)
+    ) {
+      return res.status(400).json({ error: "ubicacionTecnicaId inválido." });
+    }
+
+    if (
+      payload.planMantenimientoId !== undefined &&
+      payload.planMantenimientoId !== null &&
+      !isUUID(payload.planMantenimientoId)
+    ) {
+      return res.status(400).json({ error: "planMantenimientoId inválido." });
+    }
+
+    if (payload.paisId !== undefined && payload.paisId !== null && !isUUID(payload.paisId)) {
+      return res.status(400).json({ error: "paisId inválido." });
+    }
+
+    if (payload.solicitanteId !== undefined && !isUUID(payload.solicitanteId)) {
+      return res.status(400).json({ error: "solicitanteId inválido." });
+    }
+
+    if (payload.fechaInicioAlerta !== undefined) {
+      const fecha = toDate(payload.fechaInicioAlerta);
+      if (!fecha) {
+        return res.status(400).json({ error: "fechaInicioAlerta inválida." });
+      }
+      payload.fechaInicioAlerta = fecha;
+    }
+
+    const updated = await sequelize.transaction(async (t) => {
+      const guiaActual = await GuiaMantenimiento.findByPk(id, { transaction: t });
+      if (!guiaActual || guiaActual.state === false) {
+        throw new Error("Guía no encontrada.");
+      }
+
+      const equipoIdFinal =
+        payload.equipoId !== undefined ? payload.equipoId : guiaActual.equipoId;
+
+      const ubicacionTecnicaIdFinal =
+        payload.ubicacionTecnicaId !== undefined
+          ? payload.ubicacionTecnicaId
+          : guiaActual.ubicacionTecnicaId;
+
+      const hasEquipoFinal = !!equipoIdFinal;
+      const hasUbicFinal = !!ubicacionTecnicaIdFinal;
+
+      if (!hasEquipoFinal && !hasUbicFinal) {
+        throw new Error("La guía debe tener equipoId o ubicacionTecnicaId.");
+      }
+
+      if (hasEquipoFinal && hasUbicFinal) {
+        throw new Error("La guía solo puede tener equipoId o ubicacionTecnicaId, no ambos.");
+      }
+
+      const planMantenimientoIdFinal =
+        payload.planMantenimientoId !== undefined
+          ? payload.planMantenimientoId
+          : guiaActual.planMantenimientoId;
+
+      let ordenVentaFinal = guiaActual.ordenVenta;
+      let paisIdFinal = guiaActual.paisId;
+      let creticidadFinal = guiaActual.creticidad;
+      let productoFinal = guiaActual.producto;
+
+      if (hasEquipoFinal) {
+        const equipo = await Equipo.findByPk(equipoIdFinal, { transaction: t });
+        if (!equipo || equipo.state === false) {
+          throw new Error("Equipo no existe.");
+        }
 
         await ValidatePlanBelongsToEquipo({
           equipo,
-          planMantenimientoId: payload.planMantenimientoId,
+          planMantenimientoId: planMantenimientoIdFinal,
           t,
         });
+
+        ordenVentaFinal = equipo.numeroOV;
+        paisIdFinal = equipo.paisId;
+        creticidadFinal = equipo.creticidad;
+        productoFinal = equipo.producto || equipo.nombre;
+
+        if (!ordenVentaFinal) throw new Error("El equipo no tiene numeroOV.");
+        if (!paisIdFinal) throw new Error("El equipo no tiene paisId.");
+        if (!creticidadFinal) throw new Error("El equipo no tiene creticidad.");
+        if (!productoFinal) throw new Error("El equipo no tiene producto o nombre.");
+
+        payload.equipoId = equipoIdFinal;
+        payload.ubicacionTecnicaId = null;
+        payload.ordenVenta = ordenVentaFinal;
+        payload.paisId = paisIdFinal;
+        payload.creticidad = creticidadFinal;
+        payload.producto = productoFinal;
       }
 
-      if (payload.ubicacionTecnicaId && payload.planMantenimientoId) {
-        if (!isUUID(payload.ubicacionTecnicaId)) {
-          throw new Error("ubicacionTecnicaId inválido.");
-        }
-        if (!isUUID(payload.planMantenimientoId)) {
-          throw new Error("planMantenimientoId inválido.");
-        }
-
-        const ubicacion = await UbicacionTecnica.findByPk(payload.ubicacionTecnicaId, {
+      if (hasUbicFinal) {
+        const ubicacion = await UbicacionTecnica.findByPk(ubicacionTecnicaIdFinal, {
           transaction: t,
         });
-        if (!ubicacion) throw new Error("Ubicación técnica no existe.");
+        if (!ubicacion || ubicacion.state === false) {
+          throw new Error("Ubicación técnica no existe.");
+        }
 
         await ValidatePlanBelongsToUbicacion({
           ubicacionTecnica: ubicacion,
-          planMantenimientoId: payload.planMantenimientoId,
+          planMantenimientoId: planMantenimientoIdFinal,
           t,
         });
+
+        payload.equipoId = null;
+        payload.ubicacionTecnicaId = ubicacionTecnicaIdFinal;
+
+        if (payload.ordenVentaManual !== undefined) ordenVentaFinal = payload.ordenVentaManual;
+        if (payload.paisIdManual !== undefined) paisIdFinal = payload.paisIdManual;
+        if (payload.creticidadManual !== undefined) creticidadFinal = payload.creticidadManual;
+        if (payload.productoManual !== undefined) productoFinal = payload.productoManual;
+
+        delete payload.ordenVentaManual;
+        delete payload.paisIdManual;
+        delete payload.creticidadManual;
+        delete payload.productoManual;
+
+        payload.ordenVenta = ordenVentaFinal;
+        payload.paisId = paisIdFinal;
+        payload.creticidad = creticidadFinal;
+        payload.producto = productoFinal;
+      }
+
+      const alertaActivaFinal =
+        payload.alertaActiva !== undefined ? payload.alertaActiva : guiaActual.alertaActiva;
+
+      const tipoAnticipacionFinal =
+        payload.tipoAnticipacionAlerta !== undefined
+          ? payload.tipoAnticipacionAlerta
+          : guiaActual.tipoAnticipacionAlerta;
+
+      const valorAnticipacionFinal =
+        payload.valorAnticipacionAlerta !== undefined
+          ? payload.valorAnticipacionAlerta
+          : guiaActual.valorAnticipacionAlerta;
+
+      if (alertaActivaFinal) {
+        if (!tipoAnticipacionFinal || !TIPO_ANTICIPACION_VALID.has(tipoAnticipacionFinal)) {
+          throw new Error("tipoAnticipacionAlerta inválido.");
+        }
+
+        const v = Number(valorAnticipacionFinal);
+        if (!Number.isFinite(v) || v <= 0) {
+          throw new Error("valorAnticipacionAlerta debe ser número > 0.");
+        }
+
+        payload.valorAnticipacionAlerta = v;
+      } else {
+        payload.tipoAnticipacionAlerta = null;
+        payload.valorAnticipacionAlerta = null;
+      }
+
+      if (payload.descripcion !== undefined) {
+        payload.descripcion = payload.descripcion.trim();
       }
 
       const guia = await UpdateGuiaMantenimiento(id, payload, t);

@@ -3,6 +3,7 @@ const {
   GuiaMantenimientoAdjunto,
   GuiaMantenimientoProgramacion,
   Equipo,
+  UbicacionTecnica,
   PlanMantenimiento,
 } = require("../db_connection");
 
@@ -11,7 +12,11 @@ const CreateGuiaMantenimiento = async (payload, t) => {
   return guia;
 };
 
-const CreateAdjuntosGuiaMantenimiento = async (guiaMantenimientoId, adjuntos, t) => {
+const CreateAdjuntosGuiaMantenimiento = async (
+  guiaMantenimientoId,
+  adjuntos,
+  t
+) => {
   if (!adjuntos || !Array.isArray(adjuntos) || adjuntos.length === 0) return [];
 
   const rows = adjuntos.map((a) => ({
@@ -23,28 +28,53 @@ const CreateAdjuntosGuiaMantenimiento = async (guiaMantenimientoId, adjuntos, t)
     state: true,
   }));
 
-  const created = await GuiaMantenimientoAdjunto.bulkCreate(rows, { transaction: t });
+  const created = await GuiaMantenimientoAdjunto.bulkCreate(rows, {
+    transaction: t,
+  });
+
   return created;
 };
 
 const GetAllGuiaMantenimiento = async (where = {}) => {
   const guias = await GuiaMantenimiento.findAll({
     where,
-    order: [["createdAt", "DESC"]],
     include: [
-      { model: GuiaMantenimientoAdjunto, as: "adjuntos" },
-      { model: Equipo, as: "equipo" },
-      { model: PlanMantenimiento, as: "planMantenimiento" },
+      {
+        model: GuiaMantenimientoAdjunto,
+        as: "adjuntos",
+        required: false,
+        where: { state: true },
+      },
+      {
+        model: Equipo,
+        as: "equipo",
+        required: false,
+      },
+      {
+        model: UbicacionTecnica,
+        as: "ubicacionTecnica",
+        required: false,
+      },
+      {
+        model: PlanMantenimiento,
+        as: "planMantenimiento",
+        required: false,
+      },
       {
         model: GuiaMantenimientoProgramacion,
         as: "programaciones",
         required: false,
+        where: { state: true },
       },
     ],
     order: [
-      [{ model: GuiaMantenimientoProgramacion, as: "programaciones" }, "fechaProgramada", "ASC"],
+      ["createdAt", "DESC"],
+      [
+        { model: GuiaMantenimientoProgramacion, as: "programaciones" },
+        "fechaProgramada",
+        "ASC",
+      ],
     ],
-
   });
 
   return guias;
@@ -53,17 +83,40 @@ const GetAllGuiaMantenimiento = async (where = {}) => {
 const GetGuiaMantenimientoById = async (id) => {
   const guia = await GuiaMantenimiento.findByPk(id, {
     include: [
-      { model: GuiaMantenimientoAdjunto, as: "adjuntos" },
-      { model: Equipo, as: "equipo" },
-      { model: PlanMantenimiento, as: "planMantenimiento" },
+      {
+        model: GuiaMantenimientoAdjunto,
+        as: "adjuntos",
+        required: false,
+        where: { state: true },
+      },
+      {
+        model: Equipo,
+        as: "equipo",
+        required: false,
+      },
+      {
+        model: UbicacionTecnica,
+        as: "ubicacionTecnica",
+        required: false,
+      },
+      {
+        model: PlanMantenimiento,
+        as: "planMantenimiento",
+        required: false,
+      },
       {
         model: GuiaMantenimientoProgramacion,
         as: "programaciones",
         required: false,
+        where: { state: true },
       },
     ],
     order: [
-      [{ model: GuiaMantenimientoProgramacion, as: "programaciones" }, "fechaProgramada", "ASC"],
+      [
+        { model: GuiaMantenimientoProgramacion, as: "programaciones" },
+        "fechaProgramada",
+        "ASC",
+      ],
     ],
   });
 
@@ -72,7 +125,10 @@ const GetGuiaMantenimientoById = async (id) => {
 
 const UpdateGuiaMantenimiento = async (id, payload, t) => {
   const guia = await GuiaMantenimiento.findByPk(id, { transaction: t });
-  if (!guia || guia.state === false) throw new Error("Guía no encontrada.");
+
+  if (!guia || guia.state === false) {
+    throw new Error("Guía no encontrada.");
+  }
 
   await guia.update(payload, { transaction: t });
   return guia;
@@ -80,17 +136,25 @@ const UpdateGuiaMantenimiento = async (id, payload, t) => {
 
 const DeleteGuiaMantenimiento = async (id) => {
   const guia = await GuiaMantenimiento.findByPk(id);
-  if (!guia || guia.state === false) throw new Error("Guía no encontrada.");
+
+  if (!guia || guia.state === false) {
+    throw new Error("Guía no encontrada.");
+  }
 
   await guia.update({ state: false });
+
   return { message: "Guía eliminada (state=false) correctamente." };
 };
 
 const DeleteAdjuntoGuiaMantenimiento = async (adjuntoId) => {
   const adj = await GuiaMantenimientoAdjunto.findByPk(adjuntoId);
-  if (!adj || adj.state === false) throw new Error("Adjunto no encontrado.");
+
+  if (!adj || adj.state === false) {
+    throw new Error("Adjunto no encontrado.");
+  }
 
   await adj.update({ state: false });
+
   return { message: "Adjunto eliminado (state=false) correctamente." };
 };
 

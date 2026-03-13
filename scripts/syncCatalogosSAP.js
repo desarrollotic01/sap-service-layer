@@ -103,21 +103,41 @@ async function syncContactos() {
         continue;
       }
 
+      const nombreNormalizado =
+        String(c.Name || "").trim() || "SIN NOMBRE";
+
+      const sapContactoId =
+        c.ContactCode !== null && c.ContactCode !== undefined
+          ? c.ContactCode
+          : null;
+
+      const correoNormalizado =
+        String(c.E_Mail || "").trim() ||
+        `sin-correo+${cardCode}-${sapContactoId ?? nombreNormalizado.replace(/\s+/g, "-").toLowerCase()}@placeholder.local`;
+
+      const telefonoNormalizado =
+        String(c.Phone1 || c.Cellular || "").trim() || "SIN TELEFONO";
+
+      const cargoNormalizado =
+        String(c.Position || "").trim() || "SIN CARGO";
+
       let contacto = null;
 
-      if (c.ContactCode !== null && c.ContactCode !== undefined) {
+      if (sapContactoId !== null) {
         contacto = await Contacto.findOne({
           where: {
             clienteId: cliente.id,
-            sapContactoId: c.ContactCode,
+            sapContactoId: sapContactoId,
           },
         });
-      } else {
+      }
+
+      if (!contacto) {
         contacto = await Contacto.findOne({
           where: {
             clienteId: cliente.id,
-            nombre: c.Name || "SIN NOMBRE",
-            correo: c.E_Mail || null,
+            nombre: nombreNormalizado,
+            correo: correoNormalizado,
           },
         });
       }
@@ -125,25 +145,35 @@ async function syncContactos() {
       if (!contacto) {
         await Contacto.create({
           clienteId: cliente.id,
-          sapContactoId: c.ContactCode ?? null,
-          nombre: c.Name || "SIN NOMBRE",
-          correo: c.E_Mail || null,
-          telefono: c.Phone1 || c.Cellular || null,
-          cargo: c.Position || null,
+          sapContactoId: sapContactoId,
+          nombre: nombreNormalizado,
+          correo: correoNormalizado,
+          telefono: telefonoNormalizado,
+          cargo: cargoNormalizado,
           activo: true,
         });
 
-        console.log("✅ Contacto creado:", c.Name || "SIN NOMBRE", "->", cliente.sapCode);
+        console.log(
+          "✅ Contacto creado:",
+          nombreNormalizado,
+          "->",
+          cliente.sapCode
+        );
       } else {
         await contacto.update({
-          nombre: c.Name || contacto.nombre || "SIN NOMBRE",
-          correo: c.E_Mail || null,
-          telefono: c.Phone1 || c.Cellular || null,
-          cargo: c.Position || null,
+          nombre: nombreNormalizado,
+          correo: correoNormalizado,
+          telefono: telefonoNormalizado,
+          cargo: cargoNormalizado,
           activo: true,
         });
 
-        console.log("♻️ Contacto actualizado:", c.Name || "SIN NOMBRE", "->", cliente.sapCode);
+        console.log(
+          "♻️ Contacto actualizado:",
+          nombreNormalizado,
+          "->",
+          cliente.sapCode
+        );
       }
     } catch (error) {
       console.error("❌ Error procesando contacto:", c, error.message);
