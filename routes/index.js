@@ -23,6 +23,7 @@ const portalClienteRouter = require("./portalClienteRouter")
 const encuestaRouter = require("./encuestaRouter")
 const itemRouter = require("./itemRouter")
 const rubroRouter = require("./rubroRouter")
+const sedeRouter = require("./sedeRouter")
 
 router.use("/rubros", rubroRouter);
 router.use("/items", itemRouter);
@@ -47,6 +48,7 @@ router.use("/cliente", clienteRouter);
 router.use("/equipo", equipoRouter);
 router.use("/ubicacion-tecnica", ubicacionTecnicaRouter);  
 router.use("/contacto", contactoRouter); 
+router.use("/sede", sedeRouter);
 
 
 

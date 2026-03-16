@@ -43,6 +43,10 @@ module.exports = (sequelize) => {
       sede: {
         type: DataTypes.STRING,
       },
+      sedeId: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
 
       almacen: {
         type: DataTypes.STRING,
@@ -126,6 +130,11 @@ module.exports = (sequelize) => {
       foreignKey: "ubicacionTecnicaObjetivoId",
       as: "planesComoObjetivo",
     });
+
+    UbicacionTecnica.belongsTo(models.Sede, {
+  foreignKey: "sedeId",
+  as: "sede",
+});
   };
 
   return UbicacionTecnica;

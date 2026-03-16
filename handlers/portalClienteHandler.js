@@ -63,9 +63,11 @@ const obtenerPortalClientePorTokenHandler = async (req, res) => {
     return res.status(200).json(result);
   } catch (error) {
     const msg = error.message || "Error";
-    const status = msg.toLowerCase().includes("inválido") || msg.toLowerCase().includes("expirado")
-      ? 401
-      : 400;
+    const status =
+      msg.toLowerCase().includes("inválido") ||
+      msg.toLowerCase().includes("expirado")
+        ? 401
+        : 400;
 
     return res.status(status).json({ error: msg });
   }

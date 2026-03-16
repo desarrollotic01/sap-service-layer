@@ -9,6 +9,7 @@ const {
   Familia,
   Adjunto,
   UbicacionTecnica,
+  Sede,
 } = require("../db_connection");
 
 const generarTokenSeguro = () => crypto.randomBytes(32).toString("hex");
@@ -89,9 +90,68 @@ const obtenerPortalClientePorToken = async (token) => {
     ultimoUso: new Date(),
   });
 
-  const equipos = await Equipo.findAll({
+  const sedes = await Sede.findAll({
     where: {
       clienteId: acceso.clienteId,
+      estado: "Activo",
+    },
+    include: [
+      {
+        model: Equipo,
+        as: "equipos",
+        required: false,
+        include: [
+          {
+            model: Cliente,
+            as: "cliente",
+            attributes: ["id", "razonSocial", "ruc"],
+          },
+          {
+            model: Pais,
+            as: "pais",
+            attributes: ["id", "codigo", "nombre"],
+          },
+          {
+            model: Familia,
+            as: "familia",
+            attributes: ["id", "nombre"],
+          },
+          {
+            model: Adjunto,
+            as: "adjuntos",
+            required: false,
+          },
+        ],
+      },
+      {
+        model: UbicacionTecnica,
+        as: "ubicacionesTecnicas",
+        required: false,
+        include: [
+          {
+            model: Cliente,
+            as: "cliente",
+            attributes: ["id", "razonSocial", "ruc"],
+          },
+          {
+            model: Pais,
+            as: "pais",
+            attributes: ["id", "codigo", "nombre"],
+          },
+        ],
+      },
+    ],
+    order: [
+      ["createdAt", "DESC"],
+      [{ model: Equipo, as: "equipos" }, "createdAt", "DESC"],
+      [{ model: UbicacionTecnica, as: "ubicacionesTecnicas" }, "createdAt", "DESC"],
+    ],
+  });
+
+  const equiposSinSede = await Equipo.findAll({
+    where: {
+      clienteId: acceso.clienteId,
+      sedeId: null,
     },
     include: [
       {
@@ -112,14 +172,16 @@ const obtenerPortalClientePorToken = async (token) => {
       {
         model: Adjunto,
         as: "adjuntos",
+        required: false,
       },
     ],
     order: [["createdAt", "DESC"]],
   });
 
-  const ubicacionesTecnicas = await UbicacionTecnica.findAll({
+  const ubicacionesTecnicasSinSede = await UbicacionTecnica.findAll({
     where: {
       clienteId: acceso.clienteId,
+      sedeId: null,
     },
     include: [
       {
@@ -144,8 +206,9 @@ const obtenerPortalClientePorToken = async (token) => {
       expiraEn: acceso.expiraEn,
       ultimoUso: acceso.ultimoUso,
     },
-    equipos,
-    ubicacionesTecnicas,
+    sedes,
+    equiposSinSede,
+    ubicacionesTecnicasSinSede,
   };
 };
 
@@ -156,7 +219,9 @@ const listarLinksPortalPorCliente = async (clienteId) => {
   const cliente = await Cliente.findByPk(clienteId);
   if (!cliente) throw new Error("Cliente no encontrado");
 
-  return await PortalClienteToken.findAll({
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+  const links = await PortalClienteToken.findAll({
     where: {
       clienteId,
     },
@@ -169,6 +234,19 @@ const listarLinksPortalPorCliente = async (clienteId) => {
       },
     ],
   });
+
+  return links.map((link) => ({
+    id: link.id,
+    clienteId: link.clienteId,
+    token: link.token,
+    activo: link.activo,
+    expiraEn: link.expiraEn,
+    ultimoUso: link.ultimoUso,
+    createdAt: link.createdAt,
+    updatedAt: link.updatedAt,
+    cliente: link.cliente,
+    link: `${baseUrl}/portal/cliente/${link.token}`,
+  }));
 };
 
 /* =========================================================

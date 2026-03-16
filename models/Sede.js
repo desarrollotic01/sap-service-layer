@@ -1,83 +1,61 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
-  const Cliente = sequelize.define(
-    "Cliente",
+  const Sede = sequelize.define(
+    "Sede",
     {
       id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
-
-      sapCode: {
-        type: DataTypes.STRING,
+      clienteId: {
+        type: DataTypes.UUID,
         allowNull: false,
-        unique: true,
       },
-
-      razonSocial: {
+      nombre: {
         type: DataTypes.STRING,
         allowNull: false,
       },
-
-      ruc: {
-        type: DataTypes.STRING,
-      },
-
       direccion: {
         type: DataTypes.STRING,
       },
-
       telefono: {
         type: DataTypes.STRING,
       },
-
+      contacto: {
+        type: DataTypes.STRING,
+      },
       correo: {
         type: DataTypes.STRING,
       },
-
-      tipoCliente: {
-        type: DataTypes.STRING,
-      },
-
-      activoSAP: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true,
-      },
-
       estado: {
         type: DataTypes.ENUM("Activo", "Inactivo"),
         defaultValue: "Activo",
       },
     },
     {
-      tableName: "Clientes",
+      tableName: "Sedes",
       timestamps: true,
     }
   );
 
-  Cliente.associate = (db) => {
-    Cliente.hasMany(db.Contacto, {
+  Sede.associate = (models) => {
+    Sede.belongsTo(models.Cliente, {
       foreignKey: "clienteId",
-      as: "contactos",
+      as: "cliente",
     });
 
-    Cliente.hasMany(db.Equipo, {
-      foreignKey: "clienteId",
+    Sede.hasMany(models.Equipo, {
+      foreignKey: "sedeId",
       as: "equipos",
     });
 
-    Cliente.hasMany(db.Sede, {
-      foreignKey: "clienteId",
-      as: "sedes",
-    });
-
-    Cliente.hasOne(db.PortalCliente, {
-      foreignKey: "clienteId",
-      as: "portal",
+    Sede.hasMany(models.UbicacionTecnica, {
+      foreignKey: "sedeId",
+      as: "ubicacionesTecnicas",
     });
   };
 
-  return Cliente;
-};
+  return Sede;
+};  
