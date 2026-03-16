@@ -193,7 +193,7 @@ module.exports = (sequelize) => {
 
 Equipo.belongsTo(models.Sede, {
   foreignKey: "sedeId",
-  as: "sede",
+  as: "sedeRelacion",
 });
 
   };
