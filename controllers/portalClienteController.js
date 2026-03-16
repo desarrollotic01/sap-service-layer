@@ -90,6 +90,27 @@ const obtenerPortalClientePorToken = async (token) => {
     ultimoUso: new Date(),
   });
 
+  const includeAdjuntosPortal = {
+    model: Adjunto,
+    as: "adjuntos",
+    required: false,
+    where: {
+      mostrarEnPortal: true,
+    },
+    attributes: [
+      "id",
+      "nombre",
+      "url",
+      "extension",
+      "categoria",
+      "tituloPortal",
+      "descripcionPortal",
+      "ordenPortal",
+      "createdAt",
+      "updatedAt",
+    ],
+  };
+
   const sedes = await Sede.findAll({
     where: {
       clienteId: acceso.clienteId,
@@ -116,11 +137,7 @@ const obtenerPortalClientePorToken = async (token) => {
             as: "familia",
             attributes: ["id", "nombre"],
           },
-          {
-            model: Adjunto,
-            as: "adjuntos",
-            required: false,
-          },
+          includeAdjuntosPortal,
         ],
       },
       {
@@ -144,6 +161,7 @@ const obtenerPortalClientePorToken = async (token) => {
     order: [
       ["createdAt", "DESC"],
       [{ model: Equipo, as: "equipos" }, "createdAt", "DESC"],
+      [{ model: Equipo, as: "equipos" }, { model: Adjunto, as: "adjuntos" }, "ordenPortal", "ASC"],
       [{ model: UbicacionTecnica, as: "ubicacionesTecnicas" }, "createdAt", "DESC"],
     ],
   });
@@ -169,13 +187,12 @@ const obtenerPortalClientePorToken = async (token) => {
         as: "familia",
         attributes: ["id", "nombre"],
       },
-      {
-        model: Adjunto,
-        as: "adjuntos",
-        required: false,
-      },
+      includeAdjuntosPortal,
     ],
-    order: [["createdAt", "DESC"]],
+    order: [
+      ["createdAt", "DESC"],
+      [{ model: Adjunto, as: "adjuntos" }, "ordenPortal", "ASC"],
+    ],
   });
 
   const ubicacionesTecnicasSinSede = await UbicacionTecnica.findAll({
