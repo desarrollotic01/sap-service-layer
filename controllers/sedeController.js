@@ -246,9 +246,8 @@ const AsignarEquiposASede = async (sedeId, equipoIds = []) => {
     { sedeId },
     {
       where: {
-        id: equipoIds,
-        clienteId: sede.clienteId,
-      },
+        id: equipoIds
+          },
     }
   );
 
@@ -330,7 +329,6 @@ const AsignarUbicacionesTecnicasASede = async (sedeId, ubicacionIds = []) => {
     {
       where: {
         id: ubicacionIds,
-        clienteId: sede.clienteId,
       },
     }
   );
