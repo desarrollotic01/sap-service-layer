@@ -10,7 +10,8 @@ const {
 ========================================================= */
 const generarLinkPortalClienteHandler = async (req, res) => {
   try {
-    const { clienteId, diasVigencia, permanente } = req.body;
+    const { clienteId } = req.params;
+    const { diasVigencia, permanente } = req.body;
 
     if (!clienteId || typeof clienteId !== "string" || !clienteId.trim()) {
       return res.status(400).json({
