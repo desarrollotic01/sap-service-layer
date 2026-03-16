@@ -53,7 +53,7 @@ const GetUbicacionesTecnicasByClienteId = async (clienteId) => {
       },
       {
         model: Sede,
-        as: "sede",
+        as: "sedeRelacion",
         required: false,
         attributes: ["id", "nombre", "direccion"],
       },
