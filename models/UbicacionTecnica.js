@@ -133,7 +133,7 @@ module.exports = (sequelize) => {
 
     UbicacionTecnica.belongsTo(models.Sede, {
   foreignKey: "sedeId",
-  as: "sede",
+  as: "sedeRelacion",
 });
   };
 
