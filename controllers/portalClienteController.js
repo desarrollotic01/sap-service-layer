@@ -15,6 +15,31 @@ const {
 const generarTokenSeguro = () => crypto.randomBytes(32).toString("hex");
 
 /* =========================================================
+   INCLUDE REUTILIZABLE DE ADJUNTOS PORTAL
+========================================================= */
+const includeAdjuntosPortal = {
+  model: Adjunto,
+  as: "adjuntos",
+  required: false,
+  where: {
+    mostrarEnPortal: true,
+  },
+  attributes: [
+    "id",
+    "nombre",
+    "url",
+    "extension",
+    "categoria",
+    "mostrarEnPortal",
+    "tituloPortal",
+    "descripcionPortal",
+    "ordenPortal",
+    "createdAt",
+    "updatedAt",
+  ],
+};
+
+/* =========================================================
    GENERAR LINK PORTAL CLIENTE
 ========================================================= */
 const generarLinkPortalCliente = async ({
@@ -23,11 +48,15 @@ const generarLinkPortalCliente = async ({
   permanente = false,
 }) => {
   const cliente = await Cliente.findByPk(clienteId);
-  if (!cliente) throw new Error("Cliente no encontrado");
+
+  if (!cliente) {
+    throw new Error("Cliente no encontrado");
+  }
 
   const token = generarTokenSeguro();
 
   let expiraEn = null;
+
   if (!permanente) {
     expiraEn = new Date();
     expiraEn.setDate(expiraEn.getDate() + Number(diasVigencia || 30));
@@ -48,6 +77,9 @@ const generarLinkPortalCliente = async ({
     token,
     activo: access.activo,
     expiraEn: access.expiraEn,
+    ultimoUso: access.ultimoUso,
+    createdAt: access.createdAt,
+    updatedAt: access.updatedAt,
     link: `${baseUrl}/portal/cliente/${token}`,
   };
 };
@@ -89,27 +121,6 @@ const obtenerPortalClientePorToken = async (token) => {
   await acceso.update({
     ultimoUso: new Date(),
   });
-
-  const includeAdjuntosPortal = {
-    model: Adjunto,
-    as: "adjuntos",
-    required: false,
-    where: {
-      mostrarEnPortal: true,
-    },
-    attributes: [
-      "id",
-      "nombre",
-      "url",
-      "extension",
-      "categoria",
-      "tituloPortal",
-      "descripcionPortal",
-      "ordenPortal",
-      "createdAt",
-      "updatedAt",
-    ],
-  };
 
   const sedes = await Sede.findAll({
     where: {
@@ -222,6 +233,8 @@ const obtenerPortalClientePorToken = async (token) => {
       activo: acceso.activo,
       expiraEn: acceso.expiraEn,
       ultimoUso: acceso.ultimoUso,
+      createdAt: acceso.createdAt,
+      updatedAt: acceso.updatedAt,
     },
     sedes,
     equiposSinSede,
@@ -234,7 +247,10 @@ const obtenerPortalClientePorToken = async (token) => {
 ========================================================= */
 const listarLinksPortalPorCliente = async (clienteId) => {
   const cliente = await Cliente.findByPk(clienteId);
-  if (!cliente) throw new Error("Cliente no encontrado");
+
+  if (!cliente) {
+    throw new Error("Cliente no encontrado");
+  }
 
   const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
 
@@ -271,15 +287,25 @@ const listarLinksPortalPorCliente = async (clienteId) => {
 ========================================================= */
 const desactivarLinkPortalCliente = async (id) => {
   const link = await PortalClienteToken.findByPk(id);
-  if (!link) throw new Error("Link no encontrado");
+
+  if (!link) {
+    throw new Error("Link no encontrado");
+  }
 
   await link.update({
     activo: false,
   });
 
   return {
+    id: link.id,
+    clienteId: link.clienteId,
+    token: link.token,
+    activo: link.activo,
+    expiraEn: link.expiraEn,
+    ultimoUso: link.ultimoUso,
+    createdAt: link.createdAt,
+    updatedAt: link.updatedAt,
     message: "Link desactivado correctamente",
-    link,
   };
 };
 
