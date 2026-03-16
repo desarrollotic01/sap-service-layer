@@ -72,11 +72,18 @@ module.exports = (sequelize) => {
       foreignKey: "clienteId",
       as: "sedes",
     });
-    
+
 Cliente.hasMany(db.PortalClienteToken, {
   foreignKey: "clienteId",
   as: "portalTokens",
 });
+
+Cliente.hasMany(db.UbicacionTecnica, {
+  foreignKey: "clienteId",
+  as: "ubicacionesTecnicas"
+});
+
+
   };
 
   return Cliente;
