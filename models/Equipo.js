@@ -58,7 +58,6 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
       },
 
-      // 🔄 CAMBIADO
       nombre: {
         type: DataTypes.STRING(60),
         allowNull: false,

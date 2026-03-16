@@ -25,19 +25,8 @@ const itemRouter = require("./itemRouter")
 const rubroRouter = require("./rubroRouter")
 
 router.use("/rubros", rubroRouter);
-
 router.use("/items", itemRouter);
-
 router.use("/encuesta", encuestaRouter);
-
-
-
-
-
-
-
-
-
 router.use("/portal-cliente", portalClienteRouter);
 router.use("/guia-mantenimiento", guiaMantenimientoRouter);
 router.use("/pais",paisRouter)
