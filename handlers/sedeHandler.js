@@ -491,16 +491,6 @@ const AsignarEquiposASedeHandler = async (req, res) => {
       });
     }
 
-    const equiposDeOtroCliente = equipos.filter(
-      (equipo) => equipo.clienteId !== sede.clienteId
-    );
-
-    if (equiposDeOtroCliente.length > 0) {
-      return res.status(400).json({
-        error: "Solo puedes asignar equipos del mismo cliente de la sede",
-      });
-    }
-
     const sedeActualizada = await AsignarEquiposASede(sedeId, idsUnicos);
 
     return res.status(200).json({
@@ -736,12 +726,6 @@ const QuitarUbicacionTecnicaDeSedeHandler = async (req, res) => {
     const ubicacion = await UbicacionTecnica.findByPk(ubicacionId);
     if (!ubicacion) {
       return res.status(404).json({ error: "Ubicación técnica no encontrada" });
-    }
-
-    if (ubicacion.clienteId !== sede.clienteId) {
-      return res.status(400).json({
-        error: "La ubicación técnica no pertenece al mismo cliente de la sede",
-      });
     }
 
     if (ubicacion.sedeId !== sedeId) {
