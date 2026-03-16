@@ -72,6 +72,28 @@ module.exports = (sequelize) => {
         type: DataTypes.UUID,
         allowNull: true,
       },
+
+      mostrarEnPortal: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+
+      tituloPortal: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+
+      descripcionPortal: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+
+      ordenPortal: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+      },
     },
     {
       tableName: "adjuntos",

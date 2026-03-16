@@ -65,16 +65,20 @@ const crear = async (data, files = []) => {
     }
 
     if (files && files.length > 0) {
-      const adjuntosData = files.map((file) => ({
-        nombre: file.originalname,
-        url: `/uploads/equipos/${file.filename}`,
-        extension: file.mimetype,
-        categoria: "OTRO",
-        equipoId: equipo.id,
-      }));
+  const adjuntosData = files.map((file) => ({
+    nombre: file.originalname,
+    url: `/uploads/equipos/${file.filename}`,
+    extension: file.mimetype,
+    categoria: "OTRO",
+    equipoId: equipo.id,
+    mostrarEnPortal: false,
+    tituloPortal: null,
+    descripcionPortal: null,
+    ordenPortal: 0,
+  }));
 
-      await Adjunto.bulkCreate(adjuntosData, { transaction: t });
-    }
+  await Adjunto.bulkCreate(adjuntosData, { transaction: t });
+}
 
     return await obtenerEquipoCompleto(equipo.id, t);
   });
@@ -241,6 +245,87 @@ const GetEquiposByClienteId = async (clienteId) => {
 };
 
 
+const actualizarAdjuntosPortalEquipo = async (equipoId, adjuntosPortal = []) => {
+  return await sequelize.transaction(async (t) => {
+    const equipo = await Equipo.findByPk(equipoId, { transaction: t });
+
+    if (!equipo) {
+      throw new Error("El equipo no existe");
+    }
+
+    await Adjunto.update(
+      {
+        mostrarEnPortal: false,
+        tituloPortal: null,
+        descripcionPortal: null,
+        ordenPortal: 0,
+      },
+      {
+        where: { equipoId },
+        transaction: t,
+      }
+    );
+
+    for (const item of adjuntosPortal) {
+      await Adjunto.update(
+        {
+          mostrarEnPortal: true,
+          tituloPortal: item.tituloPortal ? String(item.tituloPortal).trim() : null,
+          descripcionPortal: item.descripcionPortal
+            ? String(item.descripcionPortal).trim()
+            : null,
+          ordenPortal: Number(item.ordenPortal) || 0,
+        },
+        {
+          where: {
+            id: item.adjuntoId,
+            equipoId,
+          },
+          transaction: t,
+        }
+      );
+    }
+
+    return await Equipo.findByPk(equipoId, {
+      include: [
+        {
+          model: Adjunto,
+          as: "adjuntos",
+        },
+      ],
+      transaction: t,
+    });
+  });
+};
+
+const obtenerEquipoPortal = async (equipoId) => {
+  const equipo = await Equipo.findByPk(equipoId, {
+    include: [
+      {
+        model: Adjunto,
+        as: "adjuntos",
+        where: {
+          mostrarEnPortal: true,
+        },
+        required: false,
+        attributes: [
+          "id",
+          "nombre",
+          "url",
+          "extension",
+          "categoria",
+          "tituloPortal",
+          "descripcionPortal",
+          "ordenPortal",
+          "createdAt",
+        ],
+      },
+    ],
+    order: [[{ model: Adjunto, as: "adjuntos" }, "ordenPortal", "ASC"]],
+  });
+
+  return equipo;
+};
 
 module.exports = {
   crear,
@@ -249,5 +334,7 @@ module.exports = {
   actualizar,
   eliminar,
   obtenerPlanesMantenimientoPorEquipo,
-  GetEquiposByClienteId
+  GetEquiposByClienteId,
+  actualizarAdjuntosPortalEquipo,
+  obtenerEquipoPortal,
 };
