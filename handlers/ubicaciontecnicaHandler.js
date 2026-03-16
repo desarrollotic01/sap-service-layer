@@ -43,10 +43,28 @@ const eliminarUbicacion = async (req, res) => {
   }
 };
 
+const getUbicacionesByClienteIdHandler = async (req, res) => {
+  try {
+    const { clienteId } = req.params;
+    const data = await UbicacionController.GetUbicacionesTecnicasByClienteId(clienteId);
+
+    return res.status(200).json({
+      message: "Ubicaciones técnicas del cliente obtenidas correctamente",
+      data,
+    });
+  } catch (error) {
+    console.error("Error getUbicacionesByClienteIdHandler:", error);
+    return res.status(500).json({
+      error: "Error al obtener las ubicaciones técnicas del cliente",
+    });
+  }
+};
+
 module.exports = {
   crearUbicacion,
   listarUbicaciones,
   obtenerUbicacion,
   actualizarUbicacion,
   eliminarUbicacion,
+  getUbicacionesByClienteIdHandler,
 };

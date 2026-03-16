@@ -6,6 +6,7 @@ const {
   actualizarEquipo,
   eliminarEquipo,
   obtenerPlanesMantenimientoEquipo,
+  getEquiposByClienteIdHandler,
 } = require("../handlers/equipoHandler");
 const uploadEquipoAdjuntos = require("../middlewares/uploadEquipoAdjuntos");
 
@@ -17,5 +18,6 @@ router.get("/:id", obtenerEquipo);
 router.put("/:id", uploadEquipoAdjuntos.array("adjuntos"), actualizarEquipo);
 router.delete("/:id", eliminarEquipo);
 router.get("/:id/planes-mantenimiento", obtenerPlanesMantenimientoEquipo);
+router.get("/cliente/:clienteId", getEquiposByClienteIdHandler);
 
 module.exports = router;

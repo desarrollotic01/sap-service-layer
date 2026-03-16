@@ -72,6 +72,23 @@ const obtenerPlanesMantenimientoEquipo = async (req, res) => {
   }
 };
 
+const getEquiposByClienteIdHandler = async (req, res) => {
+  try {
+    const { clienteId } = req.params;
+    const data = await EquipoController.GetEquiposByClienteId(clienteId);
+
+    return res.status(200).json({
+      message: "Equipos del cliente obtenidos correctamente",
+      data,
+    });
+  } catch (error) {
+    console.error("Error getEquiposByClienteIdHandler:", error);
+    return res.status(500).json({
+      error: "Error al obtener los equipos del cliente",
+    });
+  }
+};
+
 module.exports = {
   crearEquipo,
   listarEquipos,
@@ -79,4 +96,5 @@ module.exports = {
   actualizarEquipo,
   eliminarEquipo,
   obtenerPlanesMantenimientoEquipo,
+  getEquiposByClienteIdHandler,
 };

@@ -4,6 +4,7 @@ const {
   Familia,
   Adjunto,
   Pais,
+  Sede,
   sequelize,
   PlanMantenimiento,
   PlanMantenimientoActividad,
@@ -200,6 +201,47 @@ const obtenerPlanesMantenimientoPorEquipo = async (equipoId) => {
   return equipo.planesMantenimiento || [];
 };
 
+
+/* =========================================================
+   GET EQUIPOS BY CLIENTE ID
+========================================================= */
+const GetEquiposByClienteId = async (clienteId) => {
+  return await Equipo.findAll({
+    where: { clienteId },
+    include: [
+      {
+        model: Cliente,
+        as: "cliente",
+        attributes: ["id", "razonSocial", "ruc"],
+      },
+      {
+        model: Pais,
+        as: "pais",
+        attributes: ["id", "codigo", "nombre"],
+      },
+      {
+        model: Familia,
+        as: "familia",
+        attributes: ["id", "nombre"],
+      },
+      {
+        model: Adjunto,
+        as: "adjuntos",
+        required: false,
+      },
+      {
+        model: Sede,
+        as: "sedeRelacion",
+        required: false,
+        attributes: ["id", "nombre", "direccion"],
+      },
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+};
+
+
+
 module.exports = {
   crear,
   listar,
@@ -207,4 +249,5 @@ module.exports = {
   actualizar,
   eliminar,
   obtenerPlanesMantenimientoPorEquipo,
+  GetEquiposByClienteId
 };

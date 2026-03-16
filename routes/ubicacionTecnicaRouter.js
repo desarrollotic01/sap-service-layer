@@ -8,4 +8,5 @@ router.get("/:id", auth, h.obtenerUbicacion);
 router.post("/", auth, h.crearUbicacion);
 router.put("/:id", auth, h.actualizarUbicacion);
 router.delete("/:id", auth, h.eliminarUbicacion);
+router.get("/cliente/:clienteId", h.getUbicacionesByClienteIdHandler);
 module.exports = router;
