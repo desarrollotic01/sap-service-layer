@@ -24,7 +24,9 @@ const encuestaRouter = require("./encuestaRouter")
 const itemRouter = require("./itemRouter")
 const rubroRouter = require("./rubroRouter")
 const sedeRouter = require("./sedeRouter")
+const solicitudAlmacenRouter = require("./solicitudAlmacenRouter")
 
+router.use("/solicitudalmacen", solicitudAlmacenRouter);
 router.use("/rubros", rubroRouter);
 router.use("/items", itemRouter);
 router.use("/encuesta", encuestaRouter);
