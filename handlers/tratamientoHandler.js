@@ -447,6 +447,105 @@ const solicitudesAlmacenPorEquipo = normalizarSolicitudesPorTarget(rawSolicitude
       }
     }
 
+    if (
+  tratamiento.actividadesPlanEditadas !== undefined &&
+  tratamiento.actividadesPlanEditadas !== null &&
+  !esObjetoPlano(tratamiento.actividadesPlanEditadas)
+) {
+  return res.status(400).json({
+    success: false,
+    message: "tratamiento.actividadesPlanEditadas debe ser un objeto válido",
+  });
+}
+
+if (esObjetoPlano(tratamiento.actividadesPlanEditadas)) {
+  for (const key of Object.keys(tratamiento.actividadesPlanEditadas)) {
+    const actividades = tratamiento.actividadesPlanEditadas[key];
+
+    if (!Array.isArray(actividades)) {
+      return res.status(400).json({
+        success: false,
+        message: `tratamiento.actividadesPlanEditadas (${key}) debe ser un arreglo`,
+      });
+    }
+
+    for (let i = 0; i < actividades.length; i++) {
+      const act = actividades[i];
+
+      if (!act || !esObjetoPlano(act)) {
+        return res.status(400).json({
+          success: false,
+          message: `tratamiento.actividadesPlanEditadas (${key})[${i}] debe ser un objeto válido`,
+        });
+      }
+
+      if (
+        !act.planMantenimientoActividadId ||
+        typeof act.planMantenimientoActividadId !== "string" ||
+        !esUUID(act.planMantenimientoActividadId)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `planMantenimientoActividadId inválido en tratamiento.actividadesPlanEditadas (${key})[${i}]`,
+        });
+      }
+
+      if (
+        act.cantidadTecnicos !== undefined &&
+        (!Number.isFinite(Number(act.cantidadTecnicos)) ||
+          Number(act.cantidadTecnicos) <= 0)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `cantidadTecnicos inválido en tratamiento.actividadesPlanEditadas (${key})[${i}]`,
+        });
+      }
+
+      if (
+        act.duracionEstimadaValor !== undefined &&
+        !Number.isFinite(Number(act.duracionEstimadaValor))
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `duracionEstimadaValor inválido en tratamiento.actividadesPlanEditadas (${key})[${i}]`,
+        });
+      }
+
+      if (
+        act.duracionEstimadaMin !== undefined &&
+        !Number.isFinite(Number(act.duracionEstimadaMin))
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `duracionEstimadaMin inválido en tratamiento.actividadesPlanEditadas (${key})[${i}]`,
+        });
+      }
+
+      if (
+        act.unidadDuracion !== undefined &&
+        act.unidadDuracion !== "min" &&
+        act.unidadDuracion !== "h"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `unidadDuracion inválida en tratamiento.actividadesPlanEditadas (${key})[${i}]`,
+        });
+      }
+
+      if (
+        act.observaciones !== undefined &&
+        act.observaciones !== null &&
+        typeof act.observaciones !== "string"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `observaciones inválidas en tratamiento.actividadesPlanEditadas (${key})[${i}]`,
+        });
+      }
+    }
+  }
+}
+
     const errorSolicitudCompraGeneral = validarSolicitud(
       solicitudCompraGeneral,
       "Solicitud de compra general"

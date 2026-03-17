@@ -7,7 +7,7 @@ const {
   SolicitudAlmacen,
   SolicitudAlmacenLinea,
   TratamientoEquipo,
-  TratamientoEquipoActividad,
+  TratamientoEquipoActividad, 
   PlanMantenimiento,
   PlanMantenimientoActividad,
   Equipo,
@@ -227,6 +227,9 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     const solicitudesAlmacenPorEquipo =
       normalizarSolicitudesPorTarget(rawSolicitudesAlmacenPorEquipo);
 
+    const actividadesPlanEditadas =
+      tratamiento?.actividadesPlanEditadas || {};
+
     /* ===============================
        VALIDACIONES BASE
     =============================== */
@@ -280,7 +283,8 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       })),
       ...(aviso.ubicacionesRelacion || []).map((rel) => ({
         equipoId: null,
-        ubicacionId: rel.ubicacionId,
+        ubicacionId:
+          rel.ubicacionTecnicaId || rel.ubicacionId || null,
       })),
     ].filter((x) => x.equipoId || x.ubicacionId);
 
@@ -380,15 +384,44 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
           { transaction: t }
         );
 
+        const edits = Array.isArray(actividadesPlanEditadas[targetKey])
+          ? actividadesPlanEditadas[targetKey]
+          : [];
+
         for (const act of plan.actividades || []) {
-          const unidad = act.unidadDuracion || "min";
-          const min = act.duracionMinutos ?? null;
-          const valor =
-            min == null
+          const edit = edits.find(
+            (e) =>
+              String(e.planMantenimientoActividadId) === String(act.id)
+          );
+
+          const unidadBase = act.unidadDuracion || "min";
+          const minBase = act.duracionMinutos ?? null;
+          const valorBase =
+            minBase == null
               ? null
-              : unidad === "h"
-              ? Number(min) / 60
-              : Number(min);
+              : unidadBase === "h"
+              ? Number(minBase) / 60
+              : Number(minBase);
+
+          const unidadFinal = edit?.unidadDuracion || unidadBase || "min";
+
+          const valorFinal =
+            edit?.duracionEstimadaValor !== undefined &&
+            edit?.duracionEstimadaValor !== null
+              ? Number(edit.duracionEstimadaValor)
+              : valorBase;
+
+          const minFinal =
+            edit?.duracionEstimadaMin !== undefined &&
+            edit?.duracionEstimadaMin !== null
+              ? Number(edit.duracionEstimadaMin)
+              : toMinutes(valorFinal, unidadFinal);
+
+          const cantidadFinal =
+            edit?.cantidadTecnicos !== undefined &&
+            edit?.cantidadTecnicos !== null
+              ? Number(edit.cantidadTecnicos)
+              : Number(act.cantidadTecnicos ?? 1);
 
           await TratamientoEquipoActividad.create(
             {
@@ -396,18 +429,21 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
               planMantenimientoActividadId: act.id,
 
               codigoActividad: act.codigoActividad || null,
-              sistema: act.sistema,
-              subsistema: act.subsistema,
-              componente: act.componente,
-              tarea: act.tarea,
-              tipoTrabajo: act.tipoTrabajo,
-              rolTecnico: act.rolTecnico,
-              cantidadTecnicos: act.cantidadTecnicos ?? 1,
+              sistema: act.sistema || null,
+              subsistema: act.subsistema || null,
+              componente: act.componente || null,
+              tarea: act.tarea || null,
+              descripcion: act.descripcion || null,
 
-              duracionEstimadaValor: valor,
-              unidadDuracion: unidad,
-              duracionEstimadaMin: min,
+              tipoTrabajo: act.tipoTrabajo || null,
+              rolTecnico: act.rolTecnico || null,
+              cantidadTecnicos: cantidadFinal > 0 ? cantidadFinal : 1,
 
+              duracionEstimadaValor: valorFinal,
+              unidadDuracion: unidadFinal,
+              duracionEstimadaMin: minFinal,
+
+              observaciones: edit?.observaciones || null,
               origen: "PLAN",
               estado: "PENDIENTE",
             },
@@ -634,7 +670,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     throw error;
   }
 };
-
 
 const obtenerTratamientoPorAviso = async (avisoId) => {
   return Tratamiento.findOne({
