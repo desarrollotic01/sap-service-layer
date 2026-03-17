@@ -49,7 +49,8 @@ module.exports = (sequelize) => {
         type: DataTypes.ENUM(
           "CREADO",        // recién definido
           "CON_SOLICITUD", // tiene solicitud de compra
-          "APROBADO"       // listo para OT
+          "APROBADO",
+          "SIN_SOLICITUD"     // listo para OT
         ),
         defaultValue: "CREADO",
       },
