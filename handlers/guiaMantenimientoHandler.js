@@ -291,7 +291,6 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
 
         if (!ordenVentaFinal) throw new Error("El equipo no tiene numeroOV.");
         if (!paisIdFinal) throw new Error("El equipo no tiene paisId.");
-        if (!creticidadFinal) throw new Error("El equipo no tiene creticidad.");
         if (!productoFinal) throw new Error("El equipo no tiene producto o nombre.");
       }
 
