@@ -96,6 +96,49 @@ const validarLineaSolicitud = (linea, index, nombreSolicitud) => {
   return null;
 };
 
+const esSolicitudVacia = (solicitud) => {
+  if (!solicitud || typeof solicitud !== "object" || Array.isArray(solicitud)) {
+    return true;
+  }
+
+  const requiredDateVacio =
+    !solicitud.requiredDate || !String(solicitud.requiredDate).trim();
+
+  const emailVacio =
+    !solicitud.email || !String(solicitud.email).trim();
+
+  const lineasVacias =
+    !Array.isArray(solicitud.lineas) ||
+    solicitud.lineas.length === 0 ||
+    solicitud.lineas.every(
+      (l) =>
+        (!l?.itemCode || !String(l.itemCode).trim()) &&
+        (!l?.description || !String(l.description).trim()) &&
+        (l?.quantity === undefined || l?.quantity === null || Number(l.quantity) <= 0)
+    );
+
+  return requiredDateVacio && emailVacio && lineasVacias;
+};
+
+const normalizarSolicitudOpcional = (solicitud) => {
+  return esSolicitudVacia(solicitud) ? null : solicitud;
+};
+
+const normalizarSolicitudesPorTarget = (obj = {}) => {
+  const resultado = {};
+
+  if (!esObjetoPlano(obj)) return resultado;
+
+  for (const key of Object.keys(obj)) {
+    const solicitud = normalizarSolicitudOpcional(obj[key]);
+    if (solicitud) {
+      resultado[key] = solicitud;
+    }
+  }
+
+  return resultado;
+};
+
 const validarSolicitud = (solicitud, nombreSolicitud) => {
   if (solicitud === undefined || solicitud === null) return null;
 
@@ -272,13 +315,19 @@ const crearTratamiento = async (req, res) => {
       });
     }
 
-    const {
-      tratamiento,
-      solicitudCompraGeneral,
-      solicitudesCompraPorEquipo,
-      solicitudAlmacenGeneral,
-      solicitudesAlmacenPorEquipo,
-    } = body;
+   const {
+  tratamiento,
+  solicitudCompraGeneral: rawSolicitudCompraGeneral,
+  solicitudesCompraPorEquipo: rawSolicitudesCompraPorEquipo,
+  solicitudAlmacenGeneral: rawSolicitudAlmacenGeneral,
+  solicitudesAlmacenPorEquipo: rawSolicitudesAlmacenPorEquipo,
+} = body;
+
+const solicitudCompraGeneral = normalizarSolicitudOpcional(rawSolicitudCompraGeneral);
+const solicitudesCompraPorEquipo = normalizarSolicitudesPorTarget(rawSolicitudesCompraPorEquipo);
+
+const solicitudAlmacenGeneral = normalizarSolicitudOpcional(rawSolicitudAlmacenGeneral);
+const solicitudesAlmacenPorEquipo = normalizarSolicitudesPorTarget(rawSolicitudesAlmacenPorEquipo);
 
     if (!tratamiento || !esObjetoPlano(tratamiento)) {
       return res.status(400).json({
@@ -397,10 +446,16 @@ const crearTratamiento = async (req, res) => {
     }
 
     const nuevoTratamiento = await TratamientoController.crearTratamiento({
-      avisoId,
-      body,
-      usuarioId,
-    });
+  avisoId,
+  body: {
+    ...body,
+    solicitudCompraGeneral,
+    solicitudesCompraPorEquipo,
+    solicitudAlmacenGeneral,
+    solicitudesAlmacenPorEquipo,
+  },
+  usuarioId,
+});
 
     return res.status(201).json({
       success: true,
@@ -508,10 +563,6 @@ const guardarCambiosTratamientoHandler = async (req, res) => {
         }
       }
     }
-
-    // ✅ SOLICITUD GENERAL (obligatoria en tu flujo)
-    if (!solicitudGeneral) throw new Error("Debe enviar la solicitud general");
-    validarLineasSolicitud(solicitudGeneral.lineas, "Solicitud General");
 
     // ✅ SOLICITUDES POR EQUIPO (opcional)
     if (solicitudesPorEquipo !== undefined && solicitudesPorEquipo !== null) {
