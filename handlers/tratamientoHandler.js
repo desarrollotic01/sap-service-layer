@@ -95,6 +95,46 @@ const validarLineaSolicitud = (linea, index, nombreSolicitud) => {
 
   return null;
 };
+const esLineaVacia = (linea) => {
+  if (!linea || typeof linea !== "object" || Array.isArray(linea)) return true;
+
+  const itemCodeVacio =
+    !linea.itemCode || !String(linea.itemCode).trim();
+
+  const descriptionVacia =
+    !linea.description || !String(linea.description).trim();
+
+  const warehouseCodeVacio =
+    !linea.warehouseCode || !String(linea.warehouseCode).trim();
+
+  const costCenterVacio =
+    !linea.costCenter || !String(linea.costCenter).trim();
+
+  const costingCodeVacio =
+    !linea.costingCode || !String(linea.costingCode).trim();
+
+  const projectCodeVacio =
+    !linea.projectCode || !String(linea.projectCode).trim();
+
+  const rubroSapCodeVacio =
+    linea.rubroSapCode === undefined ||
+    linea.rubroSapCode === null ||
+    String(linea.rubroSapCode).trim() === "";
+
+  const paqueteTrabajoVacio =
+    !linea.paqueteTrabajo || !String(linea.paqueteTrabajo).trim();
+
+  return (
+    itemCodeVacio &&
+    descriptionVacia &&
+    warehouseCodeVacio &&
+    costCenterVacio &&
+    costingCodeVacio &&
+    projectCodeVacio &&
+    rubroSapCodeVacio &&
+    paqueteTrabajoVacio
+  );
+};
 
 const esSolicitudVacia = (solicitud) => {
   if (!solicitud || typeof solicitud !== "object" || Array.isArray(solicitud)) {
@@ -107,19 +147,25 @@ const esSolicitudVacia = (solicitud) => {
   const emailVacio =
     !solicitud.email || !String(solicitud.email).trim();
 
+  const departmentVacio =
+    !solicitud.department || !String(solicitud.department).trim();
+
+  const commentsVacio =
+    !solicitud.comments || !String(solicitud.comments).trim();
+
   const lineasVacias =
     !Array.isArray(solicitud.lineas) ||
     solicitud.lineas.length === 0 ||
-    solicitud.lineas.every(
-      (l) =>
-        (!l?.itemCode || !String(l.itemCode).trim()) &&
-        (!l?.description || !String(l.description).trim()) &&
-        (l?.quantity === undefined || l?.quantity === null || Number(l.quantity) <= 0)
-    );
+    solicitud.lineas.every((l) => esLineaVacia(l));
 
-  return requiredDateVacio && emailVacio && lineasVacias;
+  return (
+    requiredDateVacio &&
+    emailVacio &&
+    departmentVacio &&
+    commentsVacio &&
+    lineasVacias
+  );
 };
-
 const normalizarSolicitudOpcional = (solicitud) => {
   return esSolicitudVacia(solicitud) ? null : solicitud;
 };
