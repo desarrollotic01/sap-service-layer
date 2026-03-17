@@ -646,6 +646,11 @@ const obtenerTratamientoPorAviso = async (avisoId) => {
         include: [{ model: SolicitudCompraLinea, as: "lineas" }],
       },
       {
+        model: SolicitudAlmacen,
+        as: "solicitudesAlmacen",
+        include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+      },
+      {
         model: TratamientoEquipo,
         as: "equipos",
         include: [
@@ -659,6 +664,17 @@ const obtenerTratamientoPorAviso = async (avisoId) => {
           { model: PlanMantenimiento, as: "planMantenimiento" },
         ],
       },
+    ],
+    order: [
+      [{ model: SolicitudCompra, as: "solicitudesCompra" }, "createdAt", "ASC"],
+      [{ model: SolicitudAlmacen, as: "solicitudesAlmacen" }, "createdAt", "ASC"],
+      [{ model: TratamientoEquipo, as: "equipos" }, "createdAt", "ASC"],
+      [
+        { model: TratamientoEquipo, as: "equipos" },
+        { model: TratamientoEquipoActividad, as: "actividades" },
+        "createdAt",
+        "ASC",
+      ],
     ],
   });
 };
