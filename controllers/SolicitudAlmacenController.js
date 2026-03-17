@@ -169,10 +169,18 @@ const updateSolicitudAlmacen = async ({ id, data }) => {
 
   try {
     const solicitud = await SolicitudAlmacen.findByPk(id, {
-      include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
-      transaction: t,
-      lock: t.LOCK.UPDATE,
-    });
+  transaction: t,
+  lock: t.LOCK.UPDATE,
+});
+
+if (!solicitud) {
+  throw new Error("Solicitud de almacén no encontrada");
+}
+
+const lineas = await SolicitudAlmacenLinea.findAll({
+  where: { solicitud_almacen_id: id },
+  transaction: t,
+});
 
     if (!solicitud) {
       throw new Error("Solicitud de almacén no encontrada");
