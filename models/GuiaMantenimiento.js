@@ -86,7 +86,7 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      // ✅ Criticidad (se carga del equipo)
+      // ✅ creticidad (se carga del equipo)
       creticidad: {
         type: DataTypes.ENUM("A", "B", "C"),
         allowNull: false,

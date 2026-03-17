@@ -32,7 +32,7 @@ const BuildNumeroAviso = async (t) => {
   return `${prefix}${String(nextN).padStart(5, "0")}`;
 };
 
-const BuildPrioridadFromCriticidad = (creticidad) => {
+const BuildPrioridadFromcreticidad = (creticidad) => {
   if (creticidad === "A") return "Alta";
   if (creticidad === "B") return "Media";
   return "Baja";
@@ -81,7 +81,7 @@ const JobCrearAvisosDesdeAlertasGuiaMantenimientoHandler = async (req, res) => {
             numeroAviso,
             descripcionResumida: guia.descripcion,
             descripcion: guia.descripcionDetallada || guia.descripcion,
-            prioridad: BuildPrioridadFromCriticidad(guia.creticidad),
+            prioridad: BuildPrioridadFromcreticidad(guia.creticidad),
             tipoMantenimiento: "Preventivo",
             producto: guia.producto,
             fechaAtencion: prog.fechaProgramada,
