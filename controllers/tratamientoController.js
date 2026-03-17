@@ -14,7 +14,6 @@ const {
   UbicacionTecnica,
 } = require("../db_connection");
 
-
 const toMinutes = (valor, unidad) => {
   if (valor === null || valor === undefined) return null;
   const v = Number(valor);
@@ -23,12 +22,49 @@ const toMinutes = (valor, unidad) => {
 };
 
 /* ===============================
+   HELPERS SOLICITUD OPCIONAL
+=============================== */
+const esSolicitudVacia = (solicitud) => {
+  if (!solicitud || typeof solicitud !== "object") return true;
+
+  const requiredDateVacio =
+    !solicitud.requiredDate || !String(solicitud.requiredDate).trim();
+
+  const emailVacio =
+    !solicitud.email || !String(solicitud.email).trim();
+
+  const lineasVacias =
+    !Array.isArray(solicitud.lineas) || solicitud.lineas.length === 0;
+
+  return requiredDateVacio && emailVacio && lineasVacias;
+};
+
+const normalizarSolicitudOpcional = (solicitud) => {
+  return esSolicitudVacia(solicitud) ? null : solicitud;
+};
+
+const normalizarSolicitudesPorTarget = (obj = {}) => {
+  const resultado = {};
+
+  if (!obj || typeof obj !== "object") return resultado;
+
+  for (const key of Object.keys(obj)) {
+    const solicitudNormalizada = normalizarSolicitudOpcional(obj[key]);
+    if (solicitudNormalizada) {
+      resultado[key] = solicitudNormalizada;
+    }
+  }
+
+  return resultado;
+};
+
+/* ===============================
    HELPERS VALIDACION SOLICITUDES
 =============================== */
 const validarSolicitud = (solicitud, nombre) => {
   if (!solicitud) return;
 
-  if (!solicitud.requiredDate) {
+  if (!solicitud.requiredDate || !String(solicitud.requiredDate).trim()) {
     throw new Error(`${nombre}: requiredDate es obligatorio`);
   }
 
@@ -172,12 +208,24 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     const {
       tratamiento,
 
-      solicitudCompraGeneral = null,
-      solicitudesCompraPorEquipo = {},
+      solicitudCompraGeneral: rawSolicitudCompraGeneral = null,
+      solicitudesCompraPorEquipo: rawSolicitudesCompraPorEquipo = {},
 
-      solicitudAlmacenGeneral = null,
-      solicitudesAlmacenPorEquipo = {},
+      solicitudAlmacenGeneral: rawSolicitudAlmacenGeneral = null,
+      solicitudesAlmacenPorEquipo: rawSolicitudesAlmacenPorEquipo = {},
     } = body;
+
+    const solicitudCompraGeneral =
+      normalizarSolicitudOpcional(rawSolicitudCompraGeneral);
+
+    const solicitudesCompraPorEquipo =
+      normalizarSolicitudesPorTarget(rawSolicitudesCompraPorEquipo);
+
+    const solicitudAlmacenGeneral =
+      normalizarSolicitudOpcional(rawSolicitudAlmacenGeneral);
+
+    const solicitudesAlmacenPorEquipo =
+      normalizarSolicitudesPorTarget(rawSolicitudesAlmacenPorEquipo);
 
     /* ===============================
        VALIDACIONES BASE
@@ -252,8 +300,8 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     const tieneSolicitudes =
       !!solicitudCompraGeneral ||
       !!solicitudAlmacenGeneral ||
-      Object.keys(solicitudesCompraPorEquipo || {}).length > 0 ||
-      Object.keys(solicitudesAlmacenPorEquipo || {}).length > 0;
+      Object.keys(solicitudesCompraPorEquipo).length > 0 ||
+      Object.keys(solicitudesAlmacenPorEquipo).length > 0;
 
     /* ===============================
        1️⃣ CREAR TRATAMIENTO
@@ -586,6 +634,7 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     throw error;
   }
 };
+
 
 const obtenerTratamientoPorAviso = async (avisoId) => {
   return Tratamiento.findOne({
