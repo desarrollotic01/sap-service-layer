@@ -4,6 +4,8 @@ const {
   sequelize,
   SolicitudCompra,
   SolicitudCompraLinea,
+  SolicitudAlmacen,
+  SolicitudAlmacenLinea,
   TratamientoEquipo,
   TratamientoEquipoActividad,
   PlanMantenimiento,
@@ -12,6 +14,7 @@ const {
   UbicacionTecnica,
 } = require("../db_connection");
 
+
 const toMinutes = (valor, unidad) => {
   if (valor === null || valor === undefined) return null;
   const v = Number(valor);
@@ -19,21 +22,181 @@ const toMinutes = (valor, unidad) => {
   return unidad === "h" ? Math.round(v * 60) : Math.round(v);
 };
 
+/* ===============================
+   HELPERS VALIDACION SOLICITUDES
+=============================== */
+const validarSolicitud = (solicitud, nombre) => {
+  if (!solicitud) return;
+
+  if (!solicitud.requiredDate) {
+    throw new Error(`${nombre}: requiredDate es obligatorio`);
+  }
+
+  if (!solicitud.email || !String(solicitud.email).trim()) {
+    throw new Error(`${nombre}: email es obligatorio`);
+  }
+
+  if (!Array.isArray(solicitud.lineas) || solicitud.lineas.length === 0) {
+    throw new Error(`${nombre}: debe tener al menos una línea`);
+  }
+
+  for (let i = 0; i < solicitud.lineas.length; i++) {
+    const linea = solicitud.lineas[i];
+
+    if (!linea.itemCode || !String(linea.itemCode).trim()) {
+      throw new Error(`${nombre}: itemCode es obligatorio en la línea ${i + 1}`);
+    }
+
+    if (
+      linea.quantity === undefined ||
+      linea.quantity === null ||
+      Number.isNaN(Number(linea.quantity)) ||
+      Number(linea.quantity) <= 0
+    ) {
+      throw new Error(`${nombre}: quantity inválido en la línea ${i + 1}`);
+    }
+  }
+};
+
+const validarSolicitudesPorTarget = (obj, nombre) => {
+  if (!obj || typeof obj !== "object") return;
+
+  for (const key of Object.keys(obj)) {
+    validarSolicitud(obj[key], `${nombre} (${key})`);
+  }
+};
+
+/* ===============================
+   HELPERS CREAR SOLICITUD COMPRA
+=============================== */
+const crearSolicitudCompra = async ({
+  data,
+  tratamientoId,
+  usuarioId,
+  t,
+  esGeneral,
+  equipoId = null,
+  ubicacionId = null,
+}) => {
+  const solicitud = await SolicitudCompra.create(
+    {
+      tratamiento_id: tratamientoId,
+      equipo_id: equipoId,
+      ubicacion_tecnica_id: ubicacionId,
+      esGeneral,
+      docDate: new Date(),
+      requiredDate: data.requiredDate,
+      department: data.department || null,
+      requester: data.email,
+      comments: data.comments || null,
+      usuario_id: usuarioId,
+      estado: "DRAFT",
+    },
+    { transaction: t }
+  );
+
+  await SolicitudCompraLinea.bulkCreate(
+    data.lineas.map((l) => ({
+      solicitud_compra_id: solicitud.id,
+      itemId: l.itemId || null,
+      itemCode: l.itemCode,
+      description: l.description || "",
+      quantity: l.quantity,
+      warehouseCode: l.warehouseCode || "01",
+      costingCode: l.costCenter || l.costingCode || null,
+      projectCode: l.projectCode || null,
+      rubroSapCode: l.rubroSapCode || null,
+      paqueteTrabajo: l.paqueteTrabajo || null,
+    })),
+    { transaction: t }
+  );
+
+  return solicitud;
+};
+
+/* ===============================
+   HELPERS CREAR SOLICITUD ALMACEN
+=============================== */
+const crearSolicitudAlmacen = async ({
+  data,
+  tratamientoId,
+  usuarioId,
+  t,
+  esGeneral,
+  equipoId = null,
+  ubicacionId = null,
+}) => {
+  const solicitud = await SolicitudAlmacen.create(
+    {
+      tratamiento_id: tratamientoId,
+      equipo_id: equipoId,
+      ubicacion_tecnica_id: ubicacionId,
+      esGeneral,
+      docDate: new Date(),
+      requiredDate: data.requiredDate,
+      department: data.department || null,
+      requester: data.email,
+      comments: data.comments || null,
+      usuario_id: usuarioId,
+      estado: "DRAFT",
+    },
+    { transaction: t }
+  );
+
+  await SolicitudAlmacenLinea.bulkCreate(
+    data.lineas.map((l) => ({
+      solicitud_almacen_id: solicitud.id,
+      itemId: l.itemId || null,
+      itemCode: l.itemCode,
+      description: l.description || "",
+      quantity: l.quantity,
+      warehouseCode: l.warehouseCode || "01",
+      costingCode: l.costCenter || l.costingCode || null,
+      projectCode: l.projectCode || null,
+      rubroSapCode: l.rubroSapCode || null,
+      paqueteTrabajo: l.paqueteTrabajo || null,
+    })),
+    { transaction: t }
+  );
+
+  return solicitud;
+};
+
+/* ===============================
+   CONTROLADOR PRINCIPAL
+=============================== */
 const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
   const t = await sequelize.transaction();
 
   try {
-    const { tratamiento, solicitudGeneral, solicitudesPorEquipo = {} } = body;
+    const {
+      tratamiento,
+
+      solicitudCompraGeneral = null,
+      solicitudesCompraPorEquipo = {},
+
+      solicitudAlmacenGeneral = null,
+      solicitudesAlmacenPorEquipo = {},
+    } = body;
 
     /* ===============================
        VALIDACIONES BASE
     =============================== */
-    if (!tratamiento) throw new Error("Datos de tratamiento requeridos");
-
-    if (!solicitudGeneral) throw new Error("Debe enviar la solicitud general");
-    if (!Array.isArray(solicitudGeneral.lineas) || solicitudGeneral.lineas.length === 0) {
-      throw new Error("La solicitud general debe tener al menos una línea");
+    if (!tratamiento) {
+      throw new Error("Datos de tratamiento requeridos");
     }
+
+    validarSolicitud(solicitudCompraGeneral, "Solicitud de compra general");
+    validarSolicitudesPorTarget(
+      solicitudesCompraPorEquipo,
+      "Solicitud de compra por equipo/ubicación"
+    );
+
+    validarSolicitud(solicitudAlmacenGeneral, "Solicitud de almacén general");
+    validarSolicitudesPorTarget(
+      solicitudesAlmacenPorEquipo,
+      "Solicitud de almacén por equipo/ubicación"
+    );
 
     /* ===============================
        VALIDAR QUE NO EXISTA
@@ -43,7 +206,9 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       transaction: t,
     });
 
-    if (existe) throw new Error("Este aviso ya tiene un tratamiento registrado");
+    if (existe) {
+      throw new Error("Este aviso ya tiene un tratamiento registrado");
+    }
 
     /* ===============================
        OBTENER AVISO + TARGETS
@@ -56,7 +221,9 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       transaction: t,
     });
 
-    if (!aviso) throw new Error("Aviso no encontrado");
+    if (!aviso) {
+      throw new Error("Aviso no encontrado");
+    }
 
     const targets = [
       ...(aviso.equiposRelacion || []).map((rel) => ({
@@ -80,20 +247,28 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     }
 
     /* ===============================
-       1️⃣ CREAR TRATAMIENTO (cabecera)
+       DEFINIR ESTADO DEL TRATAMIENTO
+    =============================== */
+    const tieneSolicitudes =
+      !!solicitudCompraGeneral ||
+      !!solicitudAlmacenGeneral ||
+      Object.keys(solicitudesCompraPorEquipo || {}).length > 0 ||
+      Object.keys(solicitudesAlmacenPorEquipo || {}).length > 0;
+
+    /* ===============================
+       1️⃣ CREAR TRATAMIENTO
     =============================== */
     const nuevoTratamiento = await Tratamiento.create(
       {
         aviso_id: avisoId,
         creado_por: usuarioId,
-        estado: "CON_SOLICITUD",
+        estado: tieneSolicitudes ? "CON_SOLICITUD" : "SIN_SOLICITUD",
       },
       { transaction: t }
     );
 
     /* ===============================
        2️⃣ CREAR TRATAMIENTO_EQUIPOS + ACTIVIDADES
-       SOPORTA EQUIPO Y UBICACION TECNICA
     =============================== */
     for (const target of targets) {
       const targetKey = String(target.equipoId || target.ubicacionId);
@@ -108,8 +283,7 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       );
 
       /* =====================================
-         🔵 PREVENTIVO → PLAN SELECCIONADO
-         EQUIPO o UBICACION TECNICA
+         PREVENTIVO → PLAN SELECCIONADO
       ===================================== */
       if (
         aviso.tipoAviso === "mantenimiento" &&
@@ -144,19 +318,29 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
           );
         }
 
-        if (target.ubicacionId && plan.contextoObjetivo !== "UBICACION_TECNICA") {
+        if (
+          target.ubicacionId &&
+          plan.contextoObjetivo !== "UBICACION_TECNICA"
+        ) {
           throw new Error(
             `El plan seleccionado no corresponde al contexto UBICACION_TECNICA (${targetKey})`
           );
         }
 
-        await te.update({ planMantenimientoId: plan.id }, { transaction: t });
+        await te.update(
+          { planMantenimientoId: plan.id },
+          { transaction: t }
+        );
 
         for (const act of plan.actividades || []) {
           const unidad = act.unidadDuracion || "min";
           const min = act.duracionMinutos ?? null;
           const valor =
-            min == null ? null : unidad === "h" ? Number(min) / 60 : Number(min);
+            min == null
+              ? null
+              : unidad === "h"
+              ? Number(min) / 60
+              : Number(min);
 
           await TratamientoEquipoActividad.create(
             {
@@ -185,8 +369,7 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       }
 
       /* =====================================
-         🔴 CORRECTIVO → ACTIVIDADES MANUALES
-         EQUIPO o UBICACION TECNICA
+         CORRECTIVO → ACTIVIDADES MANUALES
       ===================================== */
       if (
         aviso.tipoAviso === "mantenimiento" &&
@@ -219,7 +402,10 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
             );
           }
 
-          if (act.tipoTrabajo && !["REPARACION", "CAMBIO"].includes(act.tipoTrabajo)) {
+          if (
+            act.tipoTrabajo &&
+            !["REPARACION", "CAMBIO"].includes(act.tipoTrabajo)
+          ) {
             throw new Error(
               `TipoTrabajo inválido (solo REPARACION o CAMBIO) para ${
                 target.equipoId ? "equipo" : "ubicación técnica"
@@ -245,7 +431,8 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
 
           const unidad = act.unidadDuracion || "min";
           const min =
-            act.duracionEstimadaMin ?? toMinutes(act.duracionEstimadaValor, unidad);
+            act.duracionEstimadaMin ??
+            toMinutes(act.duracionEstimadaValor, unidad);
 
           await TratamientoEquipoActividad.create(
             {
@@ -281,111 +468,116 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     }
 
     /* ===============================
-       3️⃣ SOLICITUD GENERAL
+       3️⃣ SOLICITUD COMPRA GENERAL
     =============================== */
-    const solicitudGen = await SolicitudCompra.create(
-      {
-        tratamiento_id: nuevoTratamiento.id,
+    if (solicitudCompraGeneral) {
+      await crearSolicitudCompra({
+        data: solicitudCompraGeneral,
+        tratamientoId: nuevoTratamiento.id,
+        usuarioId,
+        t,
         esGeneral: true,
-        docDate: new Date(),
-        requiredDate: solicitudGeneral.requiredDate,
-        department: solicitudGeneral.department,
-        requester: solicitudGeneral.email,
-        comments: solicitudGeneral.comments,
-        usuario_id: usuarioId,
-        estado: "DRAFT",
-      },
-      { transaction: t }
-    );
-
-    await SolicitudCompraLinea.bulkCreate(
-      solicitudGeneral.lineas.map((l) => ({
-        solicitud_compra_id: solicitudGen.id,
-        itemCode: l.itemCode,
-        description: l.description,
-        quantity: l.quantity,
-        costingCode: l.costCenter,
-        projectCode: l.projectCode,
-        warehouseCode: l.warehouseCode || "01",
-        rubro: l.rubro,
-        paqueteTrabajo: l.paqueteTrabajo,
-      })),
-      { transaction: t }
-    );
-
-    /* ===============================
-       4️⃣ SOLICITUDES POR TARGET
-    =============================== */
-    for (const target of targets) {
-      const key = String(target.equipoId || target.ubicacionId);
-      const dataSolicitud = solicitudesPorEquipo[key];
-      if (!dataSolicitud) continue;
-
-      const solicitud = await SolicitudCompra.create(
-        {
-          tratamiento_id: nuevoTratamiento.id,
-          equipo_id: target.equipoId,
-          ubicacion_tecnica_id: target.ubicacionId,
-          esGeneral: false,
-          docDate: new Date(),
-          requiredDate: dataSolicitud.requiredDate,
-          department: dataSolicitud.department,
-          requester: dataSolicitud.email,
-          comments: dataSolicitud.comments,
-          usuario_id: usuarioId,
-          estado: "DRAFT",
-        },
-        { transaction: t }
-      );
-
-      await SolicitudCompraLinea.bulkCreate(
-        dataSolicitud.lineas.map((l) => ({
-          solicitud_compra_id: solicitud.id,
-          itemCode: l.itemCode,
-          description: l.description,
-          quantity: l.quantity,
-          costingCode: l.costCenter,
-          projectCode: l.projectCode,
-          warehouseCode: l.warehouseCode || "01",
-          rubro: l.rubro,
-          paqueteTrabajo: l.paqueteTrabajo,
-        })),
-        { transaction: t }
-      );
+      });
     }
 
     /* ===============================
-       5️⃣ ACTUALIZAR AVISO
+       4️⃣ SOLICITUDES COMPRA POR TARGET
+    =============================== */
+    for (const target of targets) {
+      const key = String(target.equipoId || target.ubicacionId);
+      const dataSolicitud = solicitudesCompraPorEquipo[key];
+
+      if (!dataSolicitud) continue;
+
+      await crearSolicitudCompra({
+        data: dataSolicitud,
+        tratamientoId: nuevoTratamiento.id,
+        usuarioId,
+        t,
+        esGeneral: false,
+        equipoId: target.equipoId,
+        ubicacionId: target.ubicacionId,
+      });
+    }
+
+    /* ===============================
+       5️⃣ SOLICITUD ALMACEN GENERAL
+    =============================== */
+    if (solicitudAlmacenGeneral) {
+      await crearSolicitudAlmacen({
+        data: solicitudAlmacenGeneral,
+        tratamientoId: nuevoTratamiento.id,
+        usuarioId,
+        t,
+        esGeneral: true,
+      });
+    }
+
+    /* ===============================
+       6️⃣ SOLICITUDES ALMACEN POR TARGET
+    =============================== */
+    for (const target of targets) {
+      const key = String(target.equipoId || target.ubicacionId);
+      const dataSolicitud = solicitudesAlmacenPorEquipo[key];
+
+      if (!dataSolicitud) continue;
+
+      await crearSolicitudAlmacen({
+        data: dataSolicitud,
+        tratamientoId: nuevoTratamiento.id,
+        usuarioId,
+        t,
+        esGeneral: false,
+        equipoId: target.equipoId,
+        ubicacionId: target.ubicacionId,
+      });
+    }
+
+    /* ===============================
+       7️⃣ ACTUALIZAR AVISO
     =============================== */
     await Aviso.update(
       { estadoAviso: "tratado" },
       { where: { id: avisoId }, transaction: t }
     );
 
-    const tratamientoCompleto = await Tratamiento.findByPk(nuevoTratamiento.id, {
-      include: [
-        {
-          model: SolicitudCompra,
-          as: "solicitudesCompra",
-          include: [{ model: SolicitudCompraLinea, as: "lineas" }],
-        },
-        {
-          model: TratamientoEquipo,
-          as: "equipos",
-          include: [
-            { model: Equipo, as: "equipo" },
-            { model: UbicacionTecnica, as: "ubicacionTecnica" },
-            {
-              model: TratamientoEquipoActividad,
-              as: "actividades",
-              include: [{ model: PlanMantenimientoActividad, as: "actividadPlan" }],
-            },
-            { model: PlanMantenimiento, as: "planMantenimiento" },
-          ],
-        },
-      ],
-      transaction: t,
-    });
+    /* ===============================
+       8️⃣ OBTENER TRATAMIENTO COMPLETO
+    =============================== */
+    const tratamientoCompleto = await Tratamiento.findByPk(
+      nuevoTratamiento.id,
+      {
+        include: [
+          {
+            model: SolicitudCompra,
+            as: "solicitudesCompra",
+            include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+          },
+          {
+            model: SolicitudAlmacen,
+            as: "solicitudesAlmacen",
+            include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+          },
+          {
+            model: TratamientoEquipo,
+            as: "equipos",
+            include: [
+              { model: Equipo, as: "equipo" },
+              { model: UbicacionTecnica, as: "ubicacionTecnica" },
+              {
+                model: TratamientoEquipoActividad,
+                as: "actividades",
+                include: [
+                  { model: PlanMantenimientoActividad, as: "actividadPlan" },
+                ],
+              },
+              { model: PlanMantenimiento, as: "planMantenimiento" },
+            ],
+          },
+        ],
+        transaction: t,
+      }
+    );
 
     await t.commit();
     return tratamientoCompleto;

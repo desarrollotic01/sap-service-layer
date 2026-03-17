@@ -87,6 +87,11 @@ module.exports = (sequelize) => {
   as: "solicitudesCompra",
 });
 
+Tratamiento.hasMany(db.SolicitudAlmacen, {
+  foreignKey: "tratamiento_id",
+  as: "solicitudesAlmacen",
+});
+
     Tratamiento.hasMany(db.TratamientoTrabajador, {
       foreignKey: "tratamiento_id",
       as: "trabajadores",
