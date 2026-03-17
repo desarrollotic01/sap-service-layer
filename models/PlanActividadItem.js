@@ -15,14 +15,9 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      recurso: {
-        type: DataTypes.ENUM("MATERIAL", "MANO_OBRA", "SERVICIO"),
-        allowNull: false,
-      },
-
-      item: {
-        type: DataTypes.STRING,
-        allowNull: false,
+      itemId: {
+        type: DataTypes.UUID,
+        allowNull: true,
       },
 
       itemCode: {
@@ -30,15 +25,41 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      unidad: {
+      description: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
 
-      cantidad: {
-        type: DataTypes.FLOAT,
+      quantity: {
+        type: DataTypes.DECIMAL(15, 2),
         allowNull: false,
         defaultValue: 1,
+      },
+
+      warehouseCode: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "01",
+      },
+
+      costingCode: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+
+      projectCode: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+
+      rubroSapCode: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+
+      paqueteTrabajo: {
+        type: DataTypes.STRING,
+        allowNull: true,
       },
 
       observacion: {
@@ -47,7 +68,7 @@ module.exports = (sequelize) => {
       },
     },
     {
-      tableName: "plan_actividad_items",
+      tableName: "PlanActividadItems",
       timestamps: true,
     }
   );
@@ -56,6 +77,17 @@ module.exports = (sequelize) => {
     PlanActividadItem.belongsTo(models.PlanMantenimientoActividad, {
       foreignKey: "actividadId",
       as: "actividad",
+    });
+
+    PlanActividadItem.belongsTo(models.Item, {
+      foreignKey: "itemId",
+      as: "item",
+    });
+
+    PlanActividadItem.belongsTo(models.Rubro, {
+      foreignKey: "rubroSapCode",
+      targetKey: "sapCode",
+      as: "rubro",
     });
   };
 

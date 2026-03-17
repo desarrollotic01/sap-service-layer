@@ -302,41 +302,44 @@ const crearPlan = async (data, files = []) => {
     // ITEMS GENERALES DEL PLAN
     // =========================
     if (Array.isArray(itemsPlan) && itemsPlan.length > 0) {
-      await PlanMantenimientoItem.bulkCreate(
-        itemsPlan.map((it, idx) => {
-          if (!it?.itemCode) {
-            throw new Error(`ItemPlan ${idx + 1}: itemCode obligatorio`);
-          }
+  await PlanMantenimientoItem.bulkCreate(
+    itemsPlan.map((it, idx) => {
+      if (!it?.itemCode || !String(it.itemCode).trim()) {
+        throw new Error(`ItemPlan ${idx + 1}: itemCode obligatorio`);
+      }
 
-          const quantity = Number(it.quantity ?? it.cantidad);
-          if (!Number.isFinite(quantity) || quantity <= 0) {
-            throw new Error(`ItemPlan ${idx + 1}: quantity debe ser > 0`);
-          }
+      const quantity = Number(it.quantity ?? it.cantidad);
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        throw new Error(`ItemPlan ${idx + 1}: quantity debe ser > 0`);
+      }
 
-          const warehouseCode = (it.warehouseCode || it.almacen || "01")
-            .toString()
-            .trim();
+      const warehouseCode = String(it.warehouseCode || it.almacen || "01").trim();
+      if (!warehouseCode) {
+        throw new Error(`ItemPlan ${idx + 1}: warehouseCode obligatorio`);
+      }
 
-          if (!warehouseCode) {
-            throw new Error(`ItemPlan ${idx + 1}: warehouseCode obligatorio`);
-          }
-
-          return {
-            planMantenimientoId: plan.id,
-            itemCode: String(it.itemCode).trim(),
-            description: it.description ?? it.item ?? null,
-            quantity,
-            warehouseCode,
-            costingCode: it.costingCode ?? it.costCenter ?? null,
-            projectCode: it.projectCode ?? null,
-            rubro: it.rubro ?? null,
-            paqueteTrabajo: it.paqueteTrabajo ?? null,
-            observacion: it.observacion ?? null,
-          };
-        }),
-        { transaction }
-      );
-    }
+      return {
+        planMantenimientoId: plan.id,
+        itemId: normalize(it.itemId),
+        itemCode: String(it.itemCode).trim(),
+        description: normalize(it.description ?? it.item ?? null),
+        quantity,
+        warehouseCode,
+        costingCode: normalize(it.costingCode ?? it.costCenter ?? null),
+        projectCode: normalize(it.projectCode ?? null),
+        rubroSapCode:
+          it.rubroSapCode !== undefined &&
+          it.rubroSapCode !== null &&
+          it.rubroSapCode !== ""
+            ? Number(it.rubroSapCode)
+            : null,
+        paqueteTrabajo: normalize(it.paqueteTrabajo ?? null),
+        observacion: normalize(it.observacion ?? null),
+      };
+    }),
+    { transaction }
+  );
+}
 
     // =========================
     // ADJUNTOS DEL PLAN (archivos)
@@ -418,49 +421,61 @@ const crearPlan = async (data, files = []) => {
 
       // ITEMS POR ACTIVIDAD
       if (Array.isArray(items) && items.length > 0) {
-        await PlanActividadItem.bulkCreate(
-          items.map((it, idx) => {
-            if (!it?.recurso) {
-              throw new Error(
-                `Actividad ${index + 1} Item ${idx + 1}: recurso obligatorio`
-              );
-            }
-            if (!it?.item) {
-              throw new Error(
-                `Actividad ${index + 1} Item ${idx + 1}: item obligatorio`
-              );
-            }
-            if (!it?.itemCode) {
-              throw new Error(
-                `Actividad ${index + 1} Item ${idx + 1}: itemCode obligatorio`
-              );
-            }
-            if (!it?.unidad) {
-              throw new Error(
-                `Actividad ${index + 1} Item ${idx + 1}: unidad obligatoria`
-              );
-            }
-
-            const cantidad = Number(it.cantidad);
-            if (!Number.isFinite(cantidad) || cantidad <= 0) {
-              throw new Error(
-                `Actividad ${index + 1} Item ${idx + 1}: cantidad debe ser > 0`
-              );
-            }
-
-            return {
-              recurso: it.recurso,
-              item: it.item,
-              itemCode: it.itemCode,
-              unidad: it.unidad,
-              cantidad,
-              observacion: it.observacion ?? null,
-              actividadId: nuevaActividad.id,
-            };
-          }),
-          { transaction }
+  await PlanActividadItem.bulkCreate(
+    items.map((it, idx) => {
+      if (!it?.itemCode || !String(it.itemCode).trim()) {
+        throw new Error(
+          `Actividad ${index + 1} Item ${idx + 1}: itemCode obligatorio`
         );
       }
+
+      const quantity = Number(it.quantity ?? it.cantidad);
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        throw new Error(
+          `Actividad ${index + 1} Item ${idx + 1}: quantity debe ser > 0`
+        );
+      }
+
+      const warehouseCode = String(it.warehouseCode || it.almacen || "01").trim();
+      if (!warehouseCode) {
+        throw new Error(
+          `Actividad ${index + 1} Item ${idx + 1}: warehouseCode obligatorio`
+        );
+      }
+
+      const rubroSapCode =
+        it.rubroSapCode !== undefined &&
+        it.rubroSapCode !== null &&
+        it.rubroSapCode !== ""
+          ? Number(it.rubroSapCode)
+          : null;
+
+      if (
+        rubroSapCode !== null &&
+        (!Number.isFinite(rubroSapCode) || Number.isNaN(rubroSapCode))
+      ) {
+        throw new Error(
+          `Actividad ${index + 1} Item ${idx + 1}: rubroSapCode inválido`
+        );
+      }
+
+      return {
+        actividadId: nuevaActividad.id,
+        itemId: normalize(it.itemId),
+        itemCode: String(it.itemCode).trim(),
+        description: normalize(it.description ?? it.item ?? null),
+        quantity,
+        warehouseCode,
+        costingCode: normalize(it.costingCode ?? it.costCenter ?? null),
+        projectCode: normalize(it.projectCode ?? null),
+        rubroSapCode,
+        paqueteTrabajo: normalize(it.paqueteTrabajo ?? null),
+        observacion: normalize(it.observacion ?? null),
+      };
+    }),
+    { transaction }
+  );
+}
 
       // ADJUNTOS DE ACTIVIDAD (archivos)
       // key esperada: adjuntosActividad_0, adjuntosActividad_1, etc.

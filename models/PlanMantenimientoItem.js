@@ -15,6 +15,11 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
+      itemId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
+
       itemCode: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -47,8 +52,8 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
-      rubro: {
-        type: DataTypes.STRING,
+      rubroSapCode: {
+        type: DataTypes.INTEGER,
         allowNull: true,
       },
 
@@ -72,6 +77,17 @@ module.exports = (sequelize) => {
     PlanMantenimientoItem.belongsTo(models.PlanMantenimiento, {
       foreignKey: "planMantenimientoId",
       as: "plan",
+    });
+
+    PlanMantenimientoItem.belongsTo(models.Item, {
+      foreignKey: "itemId",
+      as: "item",
+    });
+
+    PlanMantenimientoItem.belongsTo(models.Rubro, {
+      foreignKey: "rubroSapCode",
+      targetKey: "sapCode",
+      as: "rubro",
     });
   };
 

@@ -41,4 +41,4 @@ module.exports = (sequelize) => {
   };
 
   return Rubro;
-};
+};  
