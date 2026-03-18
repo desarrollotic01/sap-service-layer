@@ -338,6 +338,10 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
       throw new Error("ubicacion_tecnica_id inválido");
     }
 
+    if (data.equipo_id && data.ubicacion_tecnica_id) {
+      throw new Error("La solicitud no puede tener equipo_id y ubicacion_tecnica_id al mismo tiempo");
+    }
+
     if (data.esGeneral === true && (data.equipo_id || data.ubicacion_tecnica_id)) {
       throw new Error("Una solicitud general no debe tener equipo_id ni ubicacion_tecnica_id");
     }
@@ -348,6 +352,44 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
       !data.ubicacion_tecnica_id
     ) {
       throw new Error("Una solicitud individual debe tener equipo_id o ubicacion_tecnica_id");
+    }
+
+    const tratamiento = await Tratamiento.findByPk(data.tratamiento_id, {
+      transaction: t,
+    });
+
+    if (!tratamiento) {
+      throw new Error("El tratamiento indicado no existe");
+    }
+
+    if (data.equipo_id) {
+      const equipo = await Equipo.findByPk(data.equipo_id, { transaction: t });
+      if (!equipo) {
+        throw new Error("El equipo indicado no existe");
+      }
+    }
+
+    if (data.ubicacion_tecnica_id) {
+      const ubicacion = await UbicacionTecnica.findByPk(data.ubicacion_tecnica_id, {
+        transaction: t,
+      });
+      if (!ubicacion) {
+        throw new Error("La ubicación técnica indicada no existe");
+      }
+    }
+
+    const existente = await SolicitudAlmacen.findOne({
+      where: {
+        tratamiento_id: data.tratamiento_id,
+        esGeneral: !!data.esGeneral,
+        equipo_id: data.equipo_id || null,
+        ubicacion_tecnica_id: data.ubicacion_tecnica_id || null,
+      },
+      transaction: t,
+    });
+
+    if (existente) {
+      throw new Error("Ya existe una solicitud de almacén para ese tratamiento y objetivo");
     }
 
     const requester = String(data.requester || data.email || "").trim();
@@ -374,23 +416,21 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
       { transaction: t }
     );
 
-    for (const linea of lineasNormalizadas) {
-      await SolicitudAlmacenLinea.create(
-        {
-          solicitud_almacen_id: solicitud.id,
-          itemId: linea.itemId,
-          itemCode: linea.itemCode,
-          description: linea.description,
-          quantity: linea.quantity,
-          warehouseCode: linea.warehouseCode,
-          costingCode: linea.costingCode,
-          projectCode: linea.projectCode,
-          rubroSapCode: linea.rubroSapCode,
-          paqueteTrabajo: linea.paqueteTrabajo,
-        },
-        { transaction: t }
-      );
-    }
+    await SolicitudAlmacenLinea.bulkCreate(
+      lineasNormalizadas.map((linea) => ({
+        solicitud_almacen_id: solicitud.id,
+        itemId: linea.itemId,
+        itemCode: linea.itemCode,
+        description: linea.description,
+        quantity: linea.quantity,
+        warehouseCode: linea.warehouseCode,
+        costingCode: linea.costingCode,
+        projectCode: linea.projectCode,
+        rubroSapCode: linea.rubroSapCode,
+        paqueteTrabajo: linea.paqueteTrabajo,
+      })),
+      { transaction: t }
+    );
 
     const creada = await SolicitudAlmacen.findByPk(solicitud.id, {
       include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],

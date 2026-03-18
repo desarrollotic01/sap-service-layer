@@ -126,17 +126,30 @@ const createSolicitudAlmacenHandler = async (req, res) => {
   try {
     const usuarioId = req.user?.id || req.usuario?.id || null;
 
-    const result = await SolicitudAlmacenController.createSolicitudAlmacen({
+    if (!usuarioId) {
+      return res.status(401).json({
+        success: false,
+        message: "Usuario no autenticado",
+      });
+    }
+
+    const result = await controller.createSolicitudAlmacen({
       usuarioId,
       data: req.body,
     });
 
-    return res.status(201).json(result);
+    return res.status(201).json({
+      success: true,
+      message: "Solicitud de almacén creada correctamente",
+      data: result,
+    });
   } catch (error) {
     console.error("Error en createSolicitudAlmacenHandler:", error);
+
     return res.status(400).json({
       success: false,
-      message: error.message || "Error al crear solicitud de almacén",
+      message:
+        error.message || "Error al crear la solicitud de almacén",
     });
   }
 };
