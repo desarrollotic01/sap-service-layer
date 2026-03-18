@@ -625,6 +625,9 @@ async function obtenerOrdenTrabajoPorId(id) {
   return await OrdenTrabajo.findByPk(id, {
     include: [
       {
+        association: "tratamiento",
+      },
+      {
         association: "equipos",
         include: [
           { association: "equipo" },
