@@ -408,6 +408,7 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
         ubicacion_tecnica_id: data.ubicacion_tecnica_id || null,
         esGeneral: !!data.esGeneral,
         requiredDate: data.requiredDate,
+        docDate: data.docDate || new Date(),
         department: data.department || null,
         requester,
         comments: data.comments || null,
