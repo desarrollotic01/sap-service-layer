@@ -1,5 +1,6 @@
 const ordenTrabajoController = require("../controllers/ordenTrabajoController");
-const {getDetalleTratamientoOrdenTrabajo} = require("../controllers/ordenTrabajoDetalleController");
+const {  getDetalleSolicitudesTratamientoPorOrdenTrabajo,
+} = require("../controllers/ordenTrabajoDetalleController");
 
 /* =========================
    CREAR OT
@@ -164,7 +165,7 @@ const liberarOrdenTrabajo = async (req, res) => {
   }
 };
 
-const getDetalleTratamientoOrdenTrabajoHandler = async (req, res) => {
+const getDetalleSolicitudesTratamientoPorOrdenTrabajoHandler = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -175,21 +176,21 @@ const getDetalleTratamientoOrdenTrabajoHandler = async (req, res) => {
       });
     }
 
-    const data = await getDetalleTratamientoOrdenTrabajo(id);
+    const data = await getDetalleSolicitudesTratamientoPorOrdenTrabajo(id);
 
     return res.status(200).json({
       success: true,
       data,
     });
   } catch (error) {
-    console.error("Error al obtener detalle de tratamiento de la OT:", error);
-
+    console.error("Error al obtener solicitudes del tratamiento por OT:", error);
     return res.status(500).json({
       success: false,
       message: error.message || "Error interno del servidor",
     });
   }
 };
+
 
 /* =========================
    EXPORTS
@@ -201,5 +202,5 @@ module.exports = {
   actualizarOrdenTrabajoHandler,
   eliminarOrdenTrabajoHandler,
   liberarOrdenTrabajo,
-  getDetalleTratamientoOrdenTrabajoHandler
+  getDetalleSolicitudesTratamientoPorOrdenTrabajoHandler
 };

@@ -46,52 +46,17 @@ function uniqueIds(arr = []) {
   return [...new Set(arr.filter(Boolean))];
 }
 
-function toPlain(data) {
-  if (!data) return null;
-  if (typeof data.toJSON === "function") return data.toJSON();
-  return data;
-}
-
-function clasificarPorRelacion(solicitud, orden, equipoIds, ubicacionTecnicaIds) {
-  if (!solicitud) return "SIN_RELACION_CLARA";
-
-  if (solicitud.ordenTrabajoId && solicitud.ordenTrabajoId === orden.id) {
-    return "ORDEN_TRABAJO";
-  }
-
-  if (solicitud.equipo_id && equipoIds.includes(solicitud.equipo_id)) {
-    return "EQUIPO";
-  }
-
-  if (
-    solicitud.ubicacion_tecnica_id &&
-    ubicacionTecnicaIds.includes(solicitud.ubicacion_tecnica_id)
-  ) {
-    return "UBICACION_TECNICA";
-  }
-
-  if (
-    orden.tratamientoId &&
-    solicitud.tratamiento_id === orden.tratamientoId
-  ) {
-    return "TRATAMIENTO";
-  }
-
-  return "SIN_RELACION_CLARA";
-}
-
-async function getDetalleTratamientoOrdenTrabajo(ordenTrabajoId) {
+async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
   if (!ordenTrabajoId) {
     throw new Error("ordenTrabajoId es requerido");
   }
 
   const orden = await OrdenTrabajo.findByPk(ordenTrabajoId, {
     include: [
-      {
-        association: "tratamiento",
-      },
+      { association: "tratamiento" },
       {
         association: "equipos",
+        attributes: ["id", "equipoId", "ubicacionTecnicaId"],
         include: [
           { association: "equipo" },
           { association: "ubicacionTecnica" },
@@ -101,7 +66,6 @@ async function getDetalleTratamientoOrdenTrabajo(ordenTrabajoId) {
         ],
       },
       { association: "adjuntos" },
-      { association: "solicitudesCompra" },
     ],
   });
 
@@ -109,7 +73,30 @@ async function getDetalleTratamientoOrdenTrabajo(ordenTrabajoId) {
     throw new Error("Orden de trabajo no encontrada");
   }
 
-  const ordenPlain = toPlain(orden);
+  const ordenPlain = typeof orden.toJSON === "function" ? orden.toJSON() : orden;
+
+  if (!ordenPlain.tratamientoId) {
+    return {
+      ordenTrabajo: ordenPlain,
+      tratamiento: null,
+      resumen: {
+        tratamientoId: null,
+        equipoIds: [],
+        ubicacionTecnicaIds: [],
+        totalSolicitudesCompra: 0,
+        totalSolicitudesAlmacen: 0,
+      },
+      solicitudesCompra: {
+        generales: [],
+        especificas: [],
+      },
+      solicitudesAlmacen: {
+        generales: [],
+        especificas: [],
+        lineasAgrupadasSap: [],
+      },
+    };
+  }
 
   const equipoIds = uniqueIds(
     (ordenPlain.equipos || []).map((eq) => eq.equipoId || eq.equipo_id)
@@ -122,80 +109,12 @@ async function getDetalleTratamientoOrdenTrabajo(ordenTrabajoId) {
   );
 
   // =========================
-  // SOLICITUDES DE ALMACÉN
+  // COMPRA GENERAL
   // =========================
-
-  const solicitudesAlmacenGenerales = await SolicitudAlmacen.findAll({
-    where: {
-      esGeneral: true,
-      [Op.or]: [
-        { ordenTrabajoId: ordenPlain.id },
-        ...(ordenPlain.tratamientoId
-          ? [{ tratamiento_id: ordenPlain.tratamientoId }]
-          : []),
-      ],
-    },
-    include: [
-      {
-        model: SolicitudAlmacenLinea,
-        as: "lineas",
-      },
-    ],
-    order: [["createdAt", "ASC"]],
-  });
-
-  const solicitudesAlmacenEspecificas = await SolicitudAlmacen.findAll({
-    where: {
-      esGeneral: false,
-      [Op.or]: [
-        { ordenTrabajoId: ordenPlain.id },
-        ...(equipoIds.length > 0
-          ? [
-              {
-                equipo_id: {
-                  [Op.in]: equipoIds,
-                },
-              },
-            ]
-          : []),
-        ...(ubicacionTecnicaIds.length > 0
-          ? [
-              {
-                ubicacion_tecnica_id: {
-                  [Op.in]: ubicacionTecnicaIds,
-                },
-              },
-            ]
-          : []),
-      ],
-    },
-    include: [
-      {
-        model: SolicitudAlmacenLinea,
-        as: "lineas",
-      },
-    ],
-    order: [["createdAt", "ASC"]],
-  });
-
-  // =========================
-  // SOLICITUDES DE COMPRA
-  // =========================
-  // IMPORTANTE:
-  // Aquí asumimos que también usas snake_case:
-  // tratamiento_id, equipo_id, ubicacion_tecnica_id
-  // Si alguno en tu modelo real cambia, ajusta ese nombre.
-  // =========================
-
   const solicitudesCompraGenerales = await SolicitudCompra.findAll({
     where: {
+      tratamiento_id: ordenPlain.tratamientoId,
       esGeneral: true,
-      [Op.or]: [
-        { ordenTrabajoId: ordenPlain.id },
-        ...(ordenPlain.tratamientoId
-          ? [{ tratamiento_id: ordenPlain.tratamientoId }]
-          : []),
-      ],
     },
     include: [
       {
@@ -206,122 +125,165 @@ async function getDetalleTratamientoOrdenTrabajo(ordenTrabajoId) {
     order: [["createdAt", "ASC"]],
   });
 
-  const solicitudesCompraEspecificas = await SolicitudCompra.findAll({
+  // =========================
+  // COMPRA ESPECIFICA SOLO DE ESTA OT
+  // =========================
+  const compraSpecificOr = [];
+
+  if (ordenPlain.id) {
+    compraSpecificOr.push({ ordenTrabajoId: ordenPlain.id });
+  }
+
+  if (equipoIds.length > 0) {
+    compraSpecificOr.push({
+      equipo_id: {
+        [Op.in]: equipoIds,
+      },
+    });
+  }
+
+  if (ubicacionTecnicaIds.length > 0) {
+    compraSpecificOr.push({
+      ubicacion_tecnica_id: {
+        [Op.in]: ubicacionTecnicaIds,
+      },
+    });
+  }
+
+  const solicitudesCompraEspecificas = compraSpecificOr.length
+    ? await SolicitudCompra.findAll({
+        where: {
+          tratamiento_id: ordenPlain.tratamientoId,
+          esGeneral: false,
+          [Op.or]: compraSpecificOr,
+        },
+        include: [
+          {
+            model: SolicitudCompraLinea,
+            as: "lineas",
+          },
+        ],
+        order: [["createdAt", "ASC"]],
+      })
+    : [];
+
+  // =========================
+  // ALMACEN GENERAL
+  // =========================
+  const solicitudesAlmacenGenerales = await SolicitudAlmacen.findAll({
     where: {
-      esGeneral: false,
-      [Op.or]: [
-        { ordenTrabajoId: ordenPlain.id },
-        ...(equipoIds.length > 0
-          ? [
-              {
-                equipo_id: {
-                  [Op.in]: equipoIds,
-                },
-              },
-            ]
-          : []),
-        ...(ubicacionTecnicaIds.length > 0
-          ? [
-              {
-                ubicacion_tecnica_id: {
-                  [Op.in]: ubicacionTecnicaIds,
-                },
-              },
-            ]
-          : []),
-      ],
+      tratamiento_id: ordenPlain.tratamientoId,
+      esGeneral: true,
     },
     include: [
       {
-        model: SolicitudCompraLinea,
+        model: SolicitudAlmacenLinea,
         as: "lineas",
       },
     ],
     order: [["createdAt", "ASC"]],
   });
 
-  const solicitudesAlmacen = {
-    generales: solicitudesAlmacenGenerales.map((s) => ({
-      ...s.toJSON(),
-      vinculacion: "TRATAMIENTO_GENERAL",
-    })),
-    porEquipo: solicitudesAlmacenEspecificas.map((s) => {
-      const plain = s.toJSON();
-      return {
-        ...plain,
-        vinculacion: clasificarPorRelacion(
-          plain,
-          ordenPlain,
-          equipoIds,
-          ubicacionTecnicaIds
-        ),
-      };
-    }),
-  };
+  // =========================
+  // ALMACEN ESPECIFICA SOLO DE ESTA OT
+  // =========================
+  const almacenSpecificOr = [];
 
-  const solicitudesCompra = {
-    generales: solicitudesCompraGenerales.map((s) => ({
-      ...s.toJSON(),
-      vinculacion: "TRATAMIENTO_GENERAL",
-    })),
-    porEquipo: solicitudesCompraEspecificas.map((s) => {
-      const plain = s.toJSON();
-      return {
-        ...plain,
-        vinculacion: clasificarPorRelacion(
-          plain,
-          ordenPlain,
-          equipoIds,
-          ubicacionTecnicaIds
-        ),
-      };
-    }),
-  };
+  if (ordenPlain.id) {
+    almacenSpecificOr.push({ ordenTrabajoId: ordenPlain.id });
+  }
 
-  const lineasAlmacenAgrupadas = agruparLineas(
-    [...solicitudesAlmacen.generales, ...solicitudesAlmacen.porEquipo].flatMap(
-      (s) =>
-        (s.lineas || []).map((l) => ({
-          itemId: l.itemId,
-          itemCode: l.itemCode,
-          description: l.description,
-          quantity: l.quantity,
-          warehouseCode: l.warehouseCode,
-          costingCode: l.costingCode,
-          projectCode: l.projectCode,
-          rubroSapCode: l.rubroSapCode,
-          paqueteTrabajo: l.paqueteTrabajo,
-        }))
+  if (equipoIds.length > 0) {
+    almacenSpecificOr.push({
+      equipo_id: {
+        [Op.in]: equipoIds,
+      },
+    });
+  }
+
+  if (ubicacionTecnicaIds.length > 0) {
+    almacenSpecificOr.push({
+      ubicacion_tecnica_id: {
+        [Op.in]: ubicacionTecnicaIds,
+      },
+    });
+  }
+
+  const solicitudesAlmacenEspecificas = almacenSpecificOr.length
+    ? await SolicitudAlmacen.findAll({
+        where: {
+          tratamiento_id: ordenPlain.tratamientoId,
+          esGeneral: false,
+          [Op.or]: almacenSpecificOr,
+        },
+        include: [
+          {
+            model: SolicitudAlmacenLinea,
+            as: "lineas",
+          },
+        ],
+        order: [["createdAt", "ASC"]],
+      })
+    : [];
+
+  const compraGenerales = solicitudesCompraGenerales.map((s) => ({
+    ...s.toJSON(),
+    origenVista: "GENERAL",
+  }));
+
+  const compraEspecificas = solicitudesCompraEspecificas.map((s) => ({
+    ...s.toJSON(),
+    origenVista: "ESPECIFICA_OT",
+  }));
+
+  const almacenGenerales = solicitudesAlmacenGenerales.map((s) => ({
+    ...s.toJSON(),
+    origenVista: "GENERAL",
+  }));
+
+  const almacenEspecificas = solicitudesAlmacenEspecificas.map((s) => ({
+    ...s.toJSON(),
+    origenVista: "ESPECIFICA_OT",
+  }));
+
+  const lineasAlmacenAgrupadasSap = agruparLineas(
+    [...almacenGenerales, ...almacenEspecificas].flatMap((s) =>
+      (s.lineas || []).map((l) => ({
+        itemId: l.itemId,
+        itemCode: l.itemCode,
+        description: l.description,
+        quantity: l.quantity,
+        warehouseCode: l.warehouseCode,
+        costingCode: l.costingCode,
+        projectCode: l.projectCode,
+        rubroSapCode: l.rubroSapCode,
+        paqueteTrabajo: l.paqueteTrabajo,
+      }))
     )
   );
 
   return {
     ordenTrabajo: ordenPlain,
     tratamiento: ordenPlain.tratamiento || null,
-
     resumen: {
+      tratamientoId: ordenPlain.tratamientoId,
       equipoIds,
       ubicacionTecnicaIds,
-      totalSolicitudesCompra:
-        solicitudesCompra.generales.length + solicitudesCompra.porEquipo.length,
-      totalSolicitudesAlmacen:
-        solicitudesAlmacen.generales.length + solicitudesAlmacen.porEquipo.length,
-      totalLineasAlmacenAgrupadas: lineasAlmacenAgrupadas.length,
+      totalSolicitudesCompra: compraGenerales.length + compraEspecificas.length,
+      totalSolicitudesAlmacen: almacenGenerales.length + almacenEspecificas.length,
     },
-
     solicitudesCompra: {
-      generales: solicitudesCompra.generales,
-      porEquipo: solicitudesCompra.porEquipo,
+      generales: compraGenerales,
+      especificas: compraEspecificas,
     },
-
     solicitudesAlmacen: {
-      generales: solicitudesAlmacen.generales,
-      porEquipo: solicitudesAlmacen.porEquipo,
-      lineasAgrupadasSap: lineasAlmacenAgrupadas,
+      generales: almacenGenerales,
+      especificas: almacenEspecificas,
+      lineasAgrupadasSap,
     },
   };
 }
 
 module.exports = {
-  getDetalleTratamientoOrdenTrabajo,
+  getDetalleSolicitudesTratamientoPorOrdenTrabajo,
 };

@@ -6,7 +6,7 @@ const auth = require("../middlewares/auth");
 
 router.post("/", auth, handler.crearOrdenTrabajoHandler);
 router.get("/", auth, handler.obtenerOrdenesTrabajoHandler);
-router.get("/detalle-tratamiento/:id", auth, handler.getDetalleTratamientoOrdenTrabajoHandler);
+router.get("/:id/solicitudes-tratamiento", getDetalleSolicitudesTratamientoPorOrdenTrabajoHandler);
 router.get("/:id", auth, handler.obtenerOrdenTrabajoPorIdHandler);
 router.put("/:id", auth, handler.actualizarOrdenTrabajoHandler);
 router.delete("/:id", auth, handler.eliminarOrdenTrabajoHandler);
