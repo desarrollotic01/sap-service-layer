@@ -7,7 +7,7 @@ const {
   SolicitudAlmacen,
   SolicitudAlmacenLinea,
   TratamientoEquipo,
-  TratamientoEquipoActividad, 
+  TratamientoEquipoActividad,
   PlanMantenimiento,
   PlanMantenimientoActividad,
   Equipo,
@@ -33,10 +33,13 @@ const esSolicitudVacia = (solicitud) => {
   const emailVacio =
     !solicitud.email || !String(solicitud.email).trim();
 
+  const requesterVacio =
+    !solicitud.requester || !String(solicitud.requester).trim();
+
   const lineasVacias =
     !Array.isArray(solicitud.lineas) || solicitud.lineas.length === 0;
 
-  return requiredDateVacio && emailVacio && lineasVacias;
+  return requiredDateVacio && emailVacio && requesterVacio && lineasVacias;
 };
 
 const normalizarSolicitudOpcional = (solicitud) => {
@@ -68,7 +71,12 @@ const validarSolicitud = (solicitud, nombre) => {
     throw new Error(`${nombre}: requiredDate es obligatorio`);
   }
 
-
+  if (
+    (!solicitud.requester || !String(solicitud.requester).trim()) &&
+    (!solicitud.email || !String(solicitud.email).trim())
+  ) {
+    throw new Error(`${nombre}: requester o email es obligatorio`);
+  }
 
   if (!Array.isArray(solicitud.lineas) || solicitud.lineas.length === 0) {
     throw new Error(`${nombre}: debe tener al menos una línea`);
@@ -112,6 +120,12 @@ const crearSolicitudCompra = async ({
   equipoId = null,
   ubicacionId = null,
 }) => {
+  const requester = String(data.requester || data.email || "").trim();
+
+  if (!requester) {
+    throw new Error("Solicitud de compra: requester o email es obligatorio");
+  }
+
   const solicitud = await SolicitudCompra.create(
     {
       tratamiento_id: tratamientoId,
@@ -121,7 +135,7 @@ const crearSolicitudCompra = async ({
       docDate: new Date(),
       requiredDate: data.requiredDate,
       department: data.department || null,
-      requester: data.email,
+      requester,
       comments: data.comments || null,
       usuario_id: usuarioId,
       estado: "DRAFT",
@@ -160,6 +174,12 @@ const crearSolicitudAlmacen = async ({
   equipoId = null,
   ubicacionId = null,
 }) => {
+  const requester = String(data.requester || data.email || "").trim();
+
+  if (!requester) {
+    throw new Error("Solicitud de almacén: requester o email es obligatorio");
+  }
+
   const solicitud = await SolicitudAlmacen.create(
     {
       tratamiento_id: tratamientoId,
@@ -169,7 +189,7 @@ const crearSolicitudAlmacen = async ({
       docDate: new Date(),
       requiredDate: data.requiredDate,
       department: data.department || null,
-      requester: data.email,
+      requester,
       comments: data.comments || null,
       usuario_id: usuarioId,
       estado: "DRAFT",
@@ -228,9 +248,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
     const actividadesPlanEditadas =
       tratamiento?.actividadesPlanEditadas || {};
 
-    /* ===============================
-       VALIDACIONES BASE
-    =============================== */
     if (!tratamiento) {
       throw new Error("Datos de tratamiento requeridos");
     }
@@ -247,9 +264,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       "Solicitud de almacén por equipo/ubicación"
     );
 
-    /* ===============================
-       VALIDAR QUE NO EXISTA
-    =============================== */
     const existe = await Tratamiento.findOne({
       where: { aviso_id: avisoId },
       transaction: t,
@@ -259,9 +273,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       throw new Error("Este aviso ya tiene un tratamiento registrado");
     }
 
-    /* ===============================
-       OBTENER AVISO + TARGETS
-    =============================== */
     const aviso = await Aviso.findByPk(avisoId, {
       include: [
         { association: "equiposRelacion" },
@@ -296,18 +307,12 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       }
     }
 
-    /* ===============================
-       DEFINIR ESTADO DEL TRATAMIENTO
-    =============================== */
     const tieneSolicitudes =
       !!solicitudCompraGeneral ||
       !!solicitudAlmacenGeneral ||
       Object.keys(solicitudesCompraPorEquipo).length > 0 ||
       Object.keys(solicitudesAlmacenPorEquipo).length > 0;
 
-    /* ===============================
-       1️⃣ CREAR TRATAMIENTO
-    =============================== */
     const nuevoTratamiento = await Tratamiento.create(
       {
         aviso_id: avisoId,
@@ -317,9 +322,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       { transaction: t }
     );
 
-    /* ===============================
-       2️⃣ CREAR TRATAMIENTO_EQUIPOS + ACTIVIDADES
-    =============================== */
     for (const target of targets) {
       const targetKey = String(target.equipoId || target.ubicacionId);
 
@@ -332,9 +334,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
         { transaction: t }
       );
 
-      /* =====================================
-         PREVENTIVO → PLAN SELECCIONADO
-      ===================================== */
       if (
         aviso.tipoAviso === "mantenimiento" &&
         aviso.tipoMantenimiento === "Preventivo"
@@ -450,9 +449,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
         }
       }
 
-      /* =====================================
-         CORRECTIVO → ACTIVIDADES MANUALES
-      ===================================== */
       if (
         aviso.tipoAviso === "mantenimiento" &&
         aviso.tipoMantenimiento === "Correctivo"
@@ -549,9 +545,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       }
     }
 
-    /* ===============================
-       3️⃣ SOLICITUD COMPRA GENERAL
-    =============================== */
     if (solicitudCompraGeneral) {
       await crearSolicitudCompra({
         data: solicitudCompraGeneral,
@@ -562,9 +555,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       });
     }
 
-    /* ===============================
-       4️⃣ SOLICITUDES COMPRA POR TARGET
-    =============================== */
     for (const target of targets) {
       const key = String(target.equipoId || target.ubicacionId);
       const dataSolicitud = solicitudesCompraPorEquipo[key];
@@ -582,9 +572,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       });
     }
 
-    /* ===============================
-       5️⃣ SOLICITUD ALMACEN GENERAL
-    =============================== */
     if (solicitudAlmacenGeneral) {
       await crearSolicitudAlmacen({
         data: solicitudAlmacenGeneral,
@@ -595,9 +582,6 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       });
     }
 
-    /* ===============================
-       6️⃣ SOLICITUDES ALMACEN POR TARGET
-    =============================== */
     for (const target of targets) {
       const key = String(target.equipoId || target.ubicacionId);
       const dataSolicitud = solicitudesAlmacenPorEquipo[key];
@@ -615,17 +599,11 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       });
     }
 
-    /* ===============================
-       7️⃣ ACTUALIZAR AVISO
-    =============================== */
     await Aviso.update(
       { estadoAviso: "tratado" },
       { where: { id: avisoId }, transaction: t }
     );
 
-    /* ===============================
-       8️⃣ OBTENER TRATAMIENTO COMPLETO
-    =============================== */
     const tratamientoCompleto = await Tratamiento.findByPk(
       nuevoTratamiento.id,
       {
@@ -730,11 +708,17 @@ const upsertSolicitud = async ({
 
   let solicitud = await SolicitudCompra.findOne({ where, transaction: t });
 
+  const requester = String(data.requester || data.email || "").trim();
+
+  if (!requester) {
+    throw new Error("Solicitud de compra: requester o email es obligatorio");
+  }
+
   const header = {
     docDate: new Date(),
     requiredDate: data.requiredDate,
     department: data.department,
-    requester: data.email,
+    requester,
     comments: data.comments,
     usuario_id: usuarioId,
     estado: "DRAFT",
@@ -761,7 +745,7 @@ const upsertSolicitud = async ({
       itemCode: l.itemCode || null,
       description: l.description || null,
       quantity: Number(l.quantity),
-      costingCode: l.costCenter || null,
+      costingCode: l.costCenter || l.costingCode || null,
       projectCode: l.projectCode || null,
       warehouseCode: l.warehouseCode || "01",
       rubro: l.rubro || null,
