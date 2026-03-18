@@ -72,13 +72,12 @@ function clasificarPorRelacion(solicitud, orden, equipoIds, ubicacionTecnicaIds)
     return "UBICACION_TECNICA";
   }
 
-  if (
-    orden.tratamientoId &&
-    (solicitud.tratamiento_id === orden.tratamientoId ||
-      solicitud.tratamientoId === orden.tratamientoId)
-  ) {
-    return "TRATAMIENTO";
-  }
+ if (
+  orden.tratamientoId &&
+  solicitud.tratamiento_id === orden.tratamientoId
+) {
+  return "TRATAMIENTO";
+}
 
   return "SIN_RELACION_CLARA";
 }
@@ -158,7 +157,7 @@ async function getDetalleTratamientoOrdenTrabajo(ordenTrabajoId) {
 
   if (ordenPlain.tratamientoId) {
     whereAlmacenOr.push({ tratamiento_id: ordenPlain.tratamientoId });
-    whereCompraOr.push({ tratamientoId: ordenPlain.tratamientoId });
+    whereCompraOr.push({ tratamiento_id: ordenPlain.tratamientoId });
   }
 
   if (equipoIds.length > 0) {
@@ -167,7 +166,7 @@ async function getDetalleTratamientoOrdenTrabajo(ordenTrabajoId) {
     });
 
     whereCompraOr.push({
-      equipoId: { [Op.in]: equipoIds },
+      equipo_id: { [Op.in]: equipoIds },
     });
   }
 
@@ -178,7 +177,7 @@ async function getDetalleTratamientoOrdenTrabajo(ordenTrabajoId) {
 
     // solo si tu modelo SolicitudCompra realmente tiene este campo
     whereCompraOr.push({
-      ubicacionTecnicaId: { [Op.in]: ubicacionTecnicaIds },
+      ubicacion_tecnica_id: { [Op.in]: ubicacionTecnicaIds },
     });
   }
 
