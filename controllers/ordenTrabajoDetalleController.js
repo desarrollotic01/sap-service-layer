@@ -277,10 +277,10 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
       especificas: compraEspecificas,
     },
     solicitudesAlmacen: {
-      generales: almacenGenerales,
-      especificas: almacenEspecificas,
-      lineasAgrupadasSap,
-    },
+  generales: almacenGenerales,
+  especificas: almacenEspecificas,
+  lineasAgrupadasSap: lineasAlmacenAgrupadasSap,
+},
   };
 }
 
