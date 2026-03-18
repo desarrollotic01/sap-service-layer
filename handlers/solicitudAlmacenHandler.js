@@ -120,7 +120,32 @@ const getSolicitudesAlmacenAgrupadasParaSap = async (req, res) => {
   }
 };
 
+
+
+const createSolicitudAlmacenHandler = async (req, res) => {
+  try {
+    const usuarioId = req.user?.id || req.usuario?.id || null;
+
+    const result = await SolicitudAlmacenController.createSolicitudAlmacen({
+      usuarioId,
+      data: req.body,
+    });
+
+    return res.status(201).json(result);
+  } catch (error) {
+    console.error("Error en createSolicitudAlmacenHandler:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Error al crear solicitud de almacén",
+    });
+  }
+};
+
+
+
+
 module.exports = {
+    createSolicitudAlmacenHandler,
   getSolicitudAlmacenById,
   updateSolicitudAlmacen,
   getSolicitudesAlmacenAgrupadasParaSap,

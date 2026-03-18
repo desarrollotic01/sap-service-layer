@@ -316,8 +316,99 @@ const getSolicitudesAlmacenAgrupadasParaSap = async ({
   };
 };
 
+
+const createSolicitudAlmacen = async ({ usuarioId, data }) => {
+  const t = await sequelize.transaction();
+
+  try {
+    const errorValidacion = validarSolicitudAlmacenPayload(data);
+    if (errorValidacion) {
+      throw new Error(errorValidacion);
+    }
+
+    if (!data.tratamiento_id || !esUUID(data.tratamiento_id)) {
+      throw new Error("tratamiento_id es obligatorio y debe ser un UUID válido");
+    }
+
+    if (data.equipo_id && !esUUID(data.equipo_id)) {
+      throw new Error("equipo_id inválido");
+    }
+
+    if (data.ubicacion_tecnica_id && !esUUID(data.ubicacion_tecnica_id)) {
+      throw new Error("ubicacion_tecnica_id inválido");
+    }
+
+    if (data.esGeneral === true && (data.equipo_id || data.ubicacion_tecnica_id)) {
+      throw new Error("Una solicitud general no debe tener equipo_id ni ubicacion_tecnica_id");
+    }
+
+    if (
+      data.esGeneral === false &&
+      !data.equipo_id &&
+      !data.ubicacion_tecnica_id
+    ) {
+      throw new Error("Una solicitud individual debe tener equipo_id o ubicacion_tecnica_id");
+    }
+
+    const requester = String(data.requester || data.email || "").trim();
+    if (!requester) {
+      throw new Error("requester o email es obligatorio");
+    }
+
+    const lineasNormalizadas = data.lineas.map(normalizarLinea);
+
+    const solicitud = await SolicitudAlmacen.create(
+      {
+        usuario_id: usuarioId || null,
+        tratamiento_id: data.tratamiento_id,
+        ordenTrabajoId: data.ordenTrabajoId || null,
+        equipo_id: data.equipo_id || null,
+        ubicacion_tecnica_id: data.ubicacion_tecnica_id || null,
+        esGeneral: !!data.esGeneral,
+        requiredDate: data.requiredDate,
+        department: data.department || null,
+        requester,
+        comments: data.comments || null,
+        estado: data.estado || "DRAFT",
+      },
+      { transaction: t }
+    );
+
+    for (const linea of lineasNormalizadas) {
+      await SolicitudAlmacenLinea.create(
+        {
+          solicitud_almacen_id: solicitud.id,
+          itemId: linea.itemId,
+          itemCode: linea.itemCode,
+          description: linea.description,
+          quantity: linea.quantity,
+          warehouseCode: linea.warehouseCode,
+          costingCode: linea.costingCode,
+          projectCode: linea.projectCode,
+          rubroSapCode: linea.rubroSapCode,
+          paqueteTrabajo: linea.paqueteTrabajo,
+        },
+        { transaction: t }
+      );
+    }
+
+    const creada = await SolicitudAlmacen.findByPk(solicitud.id, {
+      include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+      transaction: t,
+    });
+
+    await t.commit();
+    return creada;
+  } catch (error) {
+    await t.rollback();
+    throw error;
+  }
+};
+
+
 module.exports = {
   getSolicitudAlmacenById,
   updateSolicitudAlmacen,
   getSolicitudesAlmacenAgrupadasParaSap,
+  createSolicitudAlmacen
 };

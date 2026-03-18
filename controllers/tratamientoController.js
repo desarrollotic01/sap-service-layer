@@ -68,9 +68,7 @@ const validarSolicitud = (solicitud, nombre) => {
     throw new Error(`${nombre}: requiredDate es obligatorio`);
   }
 
-  if (!solicitud.email || !String(solicitud.email).trim()) {
-    throw new Error(`${nombre}: email es obligatorio`);
-  }
+
 
   if (!Array.isArray(solicitud.lineas) || solicitud.lineas.length === 0) {
     throw new Error(`${nombre}: debe tener al menos una línea`);

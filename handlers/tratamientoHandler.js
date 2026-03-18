@@ -200,9 +200,6 @@ const validarSolicitud = (solicitud, nombreSolicitud) => {
     return `${nombreSolicitud}: requiredDate no tiene un formato de fecha válido`;
   }
 
-  if (!solicitud.email || typeof solicitud.email !== "string" || !solicitud.email.trim()) {
-    return `${nombreSolicitud}: email es obligatorio`;
-  }
 
   if (
     solicitud.department !== undefined &&
