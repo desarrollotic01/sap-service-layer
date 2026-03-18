@@ -85,11 +85,29 @@ const updateSolicitudHandler = async (req, res) => {
 };
 
 
+const getSolicitudCompraByIdHandler = async (req, res) => {
+  try {
+    const solicitud = await controller.getSolicitudCompraById(req.params.id);
 
+    if (!solicitud) {
+      return res.status(404).json({
+        errors: ["Solicitud no encontrada"],
+      });
+    }
+
+    return res.status(200).json(solicitud);
+  } catch (error) {
+    console.error("Error en getSolicitudCompraByIdHandler:", error);
+    return res.status(500).json({
+      errors: ["Error interno del servidor al obtener la solicitud"],
+    });
+  }
+};
 
 
 module.exports = {
   validarCreateSolicitud,
   validarUpdateSolicitud,
   updateSolicitudHandler,
+  getSolicitudCompraByIdHandler,
 };

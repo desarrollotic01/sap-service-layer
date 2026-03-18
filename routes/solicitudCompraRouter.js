@@ -16,6 +16,7 @@ router.post("/general/enviar", auth, handler.enviarSolicitudGeneralHandler);
 
 router.post("/:id/sync", auth, handler.syncSolicitudHandler);
 router.put("/:id", auth, update.updateSolicitudHandler);
+router.get("/:id", auth, update.getSolicitudCompraByIdHandler);
 
 
 module.exports = router;
