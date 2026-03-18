@@ -103,7 +103,7 @@ Tratamiento.hasMany(db.SolicitudAlmacen, {
   as: "equipos",
 });
 
-Tratamiento.hasMany(models.OrdenTrabajo, {
+Tratamiento.hasMany(db.OrdenTrabajo, {
   foreignKey: "tratamientoId",
   as: "ordenesTrabajo",
 });
