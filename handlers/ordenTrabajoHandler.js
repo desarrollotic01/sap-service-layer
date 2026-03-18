@@ -163,9 +163,17 @@ const liberarOrdenTrabajo = async (req, res) => {
     });
   }
 };
+
 const getDetalleTratamientoOrdenTrabajoHandler = async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "El id de la orden de trabajo es requerido",
+      });
+    }
 
     const data = await getDetalleTratamientoOrdenTrabajo(id);
 
@@ -175,6 +183,7 @@ const getDetalleTratamientoOrdenTrabajoHandler = async (req, res) => {
     });
   } catch (error) {
     console.error("Error al obtener detalle de tratamiento de la OT:", error);
+
     return res.status(500).json({
       success: false,
       message: error.message || "Error interno del servidor",

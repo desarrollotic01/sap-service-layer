@@ -5,10 +5,8 @@ const {
   SolicitudAlmacenLinea,
   SolicitudCompra,
   SolicitudCompraLinea,
-  Tratamiento,
 } = require("../db_connection"); // ajusta la ruta real
 
-// Si ya la tienes en otro archivo, impórtala de ahí
 function agruparLineas(lineas = []) {
   const mapa = new Map();
 
@@ -72,45 +70,14 @@ function clasificarPorRelacion(solicitud, orden, equipoIds, ubicacionTecnicaIds)
     return "UBICACION_TECNICA";
   }
 
- if (
-  orden.tratamientoId &&
-  solicitud.tratamiento_id === orden.tratamientoId
-) {
-  return "TRATAMIENTO";
-}
-
-  return "SIN_RELACION_CLARA";
-}
-
-function separarSolicitudes(lista = [], orden, equipoIds, ubicacionTecnicaIds) {
-  const generales = [];
-  const porEquipo = [];
-
-  for (const item of lista) {
-    const solicitud = toPlain(item);
-    const vinculacion = clasificarPorRelacion(
-      solicitud,
-      orden,
-      equipoIds,
-      ubicacionTecnicaIds
-    );
-
-    const enriched = {
-      ...solicitud,
-      vinculacion,
-    };
-
-    if (solicitud.esGeneral === true) {
-      generales.push(enriched);
-    } else {
-      porEquipo.push(enriched);
-    }
+  if (
+    orden.tratamientoId &&
+    solicitud.tratamiento_id === orden.tratamientoId
+  ) {
+    return "TRATAMIENTO";
   }
 
-  return {
-    generales,
-    porEquipo,
-  };
+  return "SIN_RELACION_CLARA";
 }
 
 async function getDetalleTratamientoOrdenTrabajo(ordenTrabajoId) {
@@ -145,97 +112,186 @@ async function getDetalleTratamientoOrdenTrabajo(ordenTrabajoId) {
   const ordenPlain = toPlain(orden);
 
   const equipoIds = uniqueIds(
-    (ordenPlain.equipos || []).map((eq) => eq.equipoId)
+    (ordenPlain.equipos || []).map((eq) => eq.equipoId || eq.equipo_id)
   );
 
   const ubicacionTecnicaIds = uniqueIds(
-    (ordenPlain.equipos || []).map((eq) => eq.ubicacionTecnicaId)
+    (ordenPlain.equipos || []).map(
+      (eq) => eq.ubicacionTecnicaId || eq.ubicacion_tecnica_id
+    )
   );
 
-  const whereAlmacenOr = [{ ordenTrabajoId: ordenPlain.id }];
-  const whereCompraOr = [{ ordenTrabajoId: ordenPlain.id }];
+  // =========================
+  // SOLICITUDES DE ALMACÉN
+  // =========================
 
-  if (ordenPlain.tratamientoId) {
-    whereAlmacenOr.push({ tratamiento_id: ordenPlain.tratamientoId });
-    whereCompraOr.push({ tratamiento_id: ordenPlain.tratamientoId });
-  }
-
-  if (equipoIds.length > 0) {
-    whereAlmacenOr.push({
-      equipo_id: { [Op.in]: equipoIds },
-    });
-
-    whereCompraOr.push({
-      equipo_id: { [Op.in]: equipoIds },
-    });
-  }
-
-  if (ubicacionTecnicaIds.length > 0) {
-    whereAlmacenOr.push({
-      ubicacion_tecnica_id: { [Op.in]: ubicacionTecnicaIds },
-    });
-
-    // solo si tu modelo SolicitudCompra realmente tiene este campo
-    whereCompraOr.push({
-      ubicacion_tecnica_id: { [Op.in]: ubicacionTecnicaIds },
-    });
-  }
-
-  const [solicitudesAlmacenRaw, solicitudesCompraRaw] = await Promise.all([
-    SolicitudAlmacen.findAll({
-      where: {
-        [Op.or]: whereAlmacenOr,
-      },
-      include: [
-        {
-          model: SolicitudAlmacenLinea,
-          as: "lineas",
-        },
+  const solicitudesAlmacenGenerales = await SolicitudAlmacen.findAll({
+    where: {
+      esGeneral: true,
+      [Op.or]: [
+        { ordenTrabajoId: ordenPlain.id },
+        ...(ordenPlain.tratamientoId
+          ? [{ tratamiento_id: ordenPlain.tratamientoId }]
+          : []),
       ],
-      order: [["createdAt", "ASC"]],
-    }),
-
-    SolicitudCompra.findAll({
-      where: {
-        [Op.or]: whereCompraOr,
+    },
+    include: [
+      {
+        model: SolicitudAlmacenLinea,
+        as: "lineas",
       },
-      include: [
-        {
-          model: SolicitudCompraLinea,
-          as: "lineas",
-        },
+    ],
+    order: [["createdAt", "ASC"]],
+  });
+
+  const solicitudesAlmacenEspecificas = await SolicitudAlmacen.findAll({
+    where: {
+      esGeneral: false,
+      [Op.or]: [
+        { ordenTrabajoId: ordenPlain.id },
+        ...(equipoIds.length > 0
+          ? [
+              {
+                equipo_id: {
+                  [Op.in]: equipoIds,
+                },
+              },
+            ]
+          : []),
+        ...(ubicacionTecnicaIds.length > 0
+          ? [
+              {
+                ubicacion_tecnica_id: {
+                  [Op.in]: ubicacionTecnicaIds,
+                },
+              },
+            ]
+          : []),
       ],
-      order: [["createdAt", "ASC"]],
+    },
+    include: [
+      {
+        model: SolicitudAlmacenLinea,
+        as: "lineas",
+      },
+    ],
+    order: [["createdAt", "ASC"]],
+  });
+
+  // =========================
+  // SOLICITUDES DE COMPRA
+  // =========================
+  // IMPORTANTE:
+  // Aquí asumimos que también usas snake_case:
+  // tratamiento_id, equipo_id, ubicacion_tecnica_id
+  // Si alguno en tu modelo real cambia, ajusta ese nombre.
+  // =========================
+
+  const solicitudesCompraGenerales = await SolicitudCompra.findAll({
+    where: {
+      esGeneral: true,
+      [Op.or]: [
+        { ordenTrabajoId: ordenPlain.id },
+        ...(ordenPlain.tratamientoId
+          ? [{ tratamiento_id: ordenPlain.tratamientoId }]
+          : []),
+      ],
+    },
+    include: [
+      {
+        model: SolicitudCompraLinea,
+        as: "lineas",
+      },
+    ],
+    order: [["createdAt", "ASC"]],
+  });
+
+  const solicitudesCompraEspecificas = await SolicitudCompra.findAll({
+    where: {
+      esGeneral: false,
+      [Op.or]: [
+        { ordenTrabajoId: ordenPlain.id },
+        ...(equipoIds.length > 0
+          ? [
+              {
+                equipo_id: {
+                  [Op.in]: equipoIds,
+                },
+              },
+            ]
+          : []),
+        ...(ubicacionTecnicaIds.length > 0
+          ? [
+              {
+                ubicacion_tecnica_id: {
+                  [Op.in]: ubicacionTecnicaIds,
+                },
+              },
+            ]
+          : []),
+      ],
+    },
+    include: [
+      {
+        model: SolicitudCompraLinea,
+        as: "lineas",
+      },
+    ],
+    order: [["createdAt", "ASC"]],
+  });
+
+  const solicitudesAlmacen = {
+    generales: solicitudesAlmacenGenerales.map((s) => ({
+      ...s.toJSON(),
+      vinculacion: "TRATAMIENTO_GENERAL",
+    })),
+    porEquipo: solicitudesAlmacenEspecificas.map((s) => {
+      const plain = s.toJSON();
+      return {
+        ...plain,
+        vinculacion: clasificarPorRelacion(
+          plain,
+          ordenPlain,
+          equipoIds,
+          ubicacionTecnicaIds
+        ),
+      };
     }),
-  ]);
+  };
 
-  const solicitudesAlmacen = separarSolicitudes(
-    solicitudesAlmacenRaw,
-    ordenPlain,
-    equipoIds,
-    ubicacionTecnicaIds
-  );
-
-  const solicitudesCompra = separarSolicitudes(
-    solicitudesCompraRaw,
-    ordenPlain,
-    equipoIds,
-    ubicacionTecnicaIds
-  );
+  const solicitudesCompra = {
+    generales: solicitudesCompraGenerales.map((s) => ({
+      ...s.toJSON(),
+      vinculacion: "TRATAMIENTO_GENERAL",
+    })),
+    porEquipo: solicitudesCompraEspecificas.map((s) => {
+      const plain = s.toJSON();
+      return {
+        ...plain,
+        vinculacion: clasificarPorRelacion(
+          plain,
+          ordenPlain,
+          equipoIds,
+          ubicacionTecnicaIds
+        ),
+      };
+    }),
+  };
 
   const lineasAlmacenAgrupadas = agruparLineas(
-    [...solicitudesAlmacen.generales, ...solicitudesAlmacen.porEquipo].flatMap((s) =>
-      (s.lineas || []).map((l) => ({
-        itemId: l.itemId,
-        itemCode: l.itemCode,
-        description: l.description,
-        quantity: l.quantity,
-        warehouseCode: l.warehouseCode,
-        costingCode: l.costingCode,
-        projectCode: l.projectCode,
-        rubroSapCode: l.rubroSapCode,
-        paqueteTrabajo: l.paqueteTrabajo,
-      }))
+    [...solicitudesAlmacen.generales, ...solicitudesAlmacen.porEquipo].flatMap(
+      (s) =>
+        (s.lineas || []).map((l) => ({
+          itemId: l.itemId,
+          itemCode: l.itemCode,
+          description: l.description,
+          quantity: l.quantity,
+          warehouseCode: l.warehouseCode,
+          costingCode: l.costingCode,
+          projectCode: l.projectCode,
+          rubroSapCode: l.rubroSapCode,
+          paqueteTrabajo: l.paqueteTrabajo,
+        }))
     )
   );
 
