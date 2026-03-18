@@ -144,8 +144,6 @@ const esSolicitudVacia = (solicitud) => {
   const requiredDateVacio =
     !solicitud.requiredDate || !String(solicitud.requiredDate).trim();
 
-  const emailVacio =
-    !solicitud.email || !String(solicitud.email).trim();
 
   const departmentVacio =
     !solicitud.department || !String(solicitud.department).trim();
@@ -160,7 +158,6 @@ const esSolicitudVacia = (solicitud) => {
 
   return (
     requiredDateVacio &&
-    emailVacio &&
     departmentVacio &&
     commentsVacio &&
     lineasVacias
