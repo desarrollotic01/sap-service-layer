@@ -1,4 +1,5 @@
 const ordenTrabajoController = require("../controllers/ordenTrabajoController");
+const {getDetalleTratamientoOrdenTrabajo} = require("../controllers/ordenTrabajoDetalleController");
 
 /* =========================
    CREAR OT
@@ -162,6 +163,24 @@ const liberarOrdenTrabajo = async (req, res) => {
     });
   }
 };
+const getDetalleTratamientoOrdenTrabajoHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const data = await getDetalleTratamientoOrdenTrabajo(id);
+
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("Error al obtener detalle de tratamiento de la OT:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Error interno del servidor",
+    });
+  }
+};
 
 /* =========================
    EXPORTS
@@ -173,4 +192,5 @@ module.exports = {
   actualizarOrdenTrabajoHandler,
   eliminarOrdenTrabajoHandler,
   liberarOrdenTrabajo,
+  getDetalleTratamientoOrdenTrabajoHandler
 };
