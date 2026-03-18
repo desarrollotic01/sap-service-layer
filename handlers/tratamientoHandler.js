@@ -98,14 +98,14 @@ const validarLineaSolicitud = (linea, index, nombreSolicitud) => {
 const esLineaVacia = (linea) => {
   if (!linea || typeof linea !== "object" || Array.isArray(linea)) return true;
 
+  const itemIdVacio =
+    !linea.itemId || !String(linea.itemId).trim();
+
   const itemCodeVacio =
     !linea.itemCode || !String(linea.itemCode).trim();
 
   const descriptionVacia =
     !linea.description || !String(linea.description).trim();
-
-  const warehouseCodeVacio =
-    !linea.warehouseCode || !String(linea.warehouseCode).trim();
 
   const costCenterVacio =
     !linea.costCenter || !String(linea.costCenter).trim();
@@ -124,18 +124,21 @@ const esLineaVacia = (linea) => {
   const paqueteTrabajoVacio =
     !linea.paqueteTrabajo || !String(linea.paqueteTrabajo).trim();
 
+  const rubroVacio =
+    !linea.rubro || !String(linea.rubro).trim();
+
   return (
+    itemIdVacio &&
     itemCodeVacio &&
     descriptionVacia &&
-    warehouseCodeVacio &&
     costCenterVacio &&
     costingCodeVacio &&
     projectCodeVacio &&
     rubroSapCodeVacio &&
-    paqueteTrabajoVacio
+    paqueteTrabajoVacio &&
+    rubroVacio
   );
 };
-
 const esSolicitudVacia = (solicitud) => {
   if (!solicitud || typeof solicitud !== "object" || Array.isArray(solicitud)) {
     return true;
@@ -144,9 +147,14 @@ const esSolicitudVacia = (solicitud) => {
   const requiredDateVacio =
     !solicitud.requiredDate || !String(solicitud.requiredDate).trim();
 
-
   const departmentVacio =
     !solicitud.department || !String(solicitud.department).trim();
+
+  const requesterVacio =
+    !solicitud.requester || !String(solicitud.requester).trim();
+
+  const emailVacio =
+    !solicitud.email || !String(solicitud.email).trim();
 
   const commentsVacio =
     !solicitud.comments || !String(solicitud.comments).trim();
@@ -159,6 +167,8 @@ const esSolicitudVacia = (solicitud) => {
   return (
     requiredDateVacio &&
     departmentVacio &&
+    requesterVacio &&
+    emailVacio &&
     commentsVacio &&
     lineasVacias
   );
