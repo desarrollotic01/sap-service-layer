@@ -13,54 +13,284 @@ async function crearOrdenTrabajoHandler(req, res) {
       avisoId,
       equipos,
       modo = "GRUPAL", // GRUPAL | INDIVIDUAL | MIXTO
-      grupalEquipoIds = [],
-      individualEquipoIds = [],
+      grupalTargetKeys = [],
+      individualTargetKeys = [],
       solicitudGeneralStrategy = "OT_GRUPAL", // NINGUNA | OT_GRUPAL | PRIMERA_OT | OT_ESPECIFICA
       otKeyGeneral = null,
+      tipoMantenimiento,
+      numeroOT,
+      descripcionGeneral,
+      estado,
+      supervisorId,
+      fechaProgramadaInicio,
+      fechaProgramadaFin,
+      fechaInicioReal,
+      fechaFinReal,
+      fechaCierre,
+      observaciones,
+      tratamientoId,
+      adjuntos,
     } = req.body || {};
 
-    // ✅ avisoId
-    if (!avisoId) errors.push("avisoId es requerido");
+    /* =========================
+       VALIDACIONES GENERALES
+    ========================= */
+    if (!avisoId) {
+      errors.push("avisoId es requerido");
+    }
 
-    // ✅ equipos
-    if (Array.isArray(equipos) && equipos.length === 0) errors.push("Debe incluir al menos un equipo");
+    if (!Array.isArray(equipos) || equipos.length === 0) {
+      errors.push("Debe incluir al menos un equipo o ubicación técnica");
+    }
 
-    // ✅ modo
     if (modo && !["GRUPAL", "INDIVIDUAL", "MIXTO"].includes(modo)) {
       errors.push("modo inválido. Use GRUPAL | INDIVIDUAL | MIXTO");
     }
 
-    // ✅ estrategia solicitud general
     if (
       solicitudGeneralStrategy &&
-      !["NINGUNA", "OT_GRUPAL", "PRIMERA_OT", "OT_ESPECIFICA"].includes(solicitudGeneralStrategy)
+      !["NINGUNA", "OT_GRUPAL", "PRIMERA_OT", "OT_ESPECIFICA"].includes(
+        solicitudGeneralStrategy
+      )
     ) {
-      errors.push("solicitudGeneralStrategy inválida. Use NINGUNA | OT_GRUPAL | PRIMERA_OT | OT_ESPECIFICA");
+      errors.push(
+        "solicitudGeneralStrategy inválida. Use NINGUNA | OT_GRUPAL | PRIMERA_OT | OT_ESPECIFICA"
+      );
     }
 
+    if (
+      tipoMantenimiento !== undefined &&
+      !["Preventivo", "Correctivo", "Mejora", "Predictivo"].includes(
+        tipoMantenimiento
+      )
+    ) {
+      errors.push("tipoMantenimiento no es válido");
+    }
+
+    if (
+      estado !== undefined &&
+      !["CREADO", "LIBERADO", "CIERRE_TECNICO", "CERRADO", "CANCELADO"].includes(
+        estado
+      )
+    ) {
+      errors.push("estado no es válido");
+    }
+
+    if (
+      numeroOT !== undefined &&
+      (typeof numeroOT !== "string" || !numeroOT.trim())
+    ) {
+      errors.push("numeroOT debe ser un texto válido");
+    }
+
+    if (
+      descripcionGeneral !== undefined &&
+      typeof descripcionGeneral !== "string"
+    ) {
+      errors.push("descripcionGeneral debe ser texto");
+    }
+
+    if (adjuntos !== undefined && !Array.isArray(adjuntos)) {
+      errors.push("adjuntos debe ser un array");
+    }
+
+    /* =========================
+       VALIDACIÓN OT GENERAL ESTRATEGIA
+    ========================= */
     if (solicitudGeneralStrategy === "OT_ESPECIFICA") {
       if (!otKeyGeneral) {
-        errors.push("otKeyGeneral es requerido cuando solicitudGeneralStrategy=OT_ESPECIFICA");
+        errors.push(
+          "otKeyGeneral es requerido cuando solicitudGeneralStrategy=OT_ESPECIFICA"
+        );
       } else {
-        // debe ser "GRUPAL" o "E:<id>"
-        const ok = otKeyGeneral === "GRUPAL" || /^E:\d+$/.test(String(otKeyGeneral));
-        if (!ok) errors.push('otKeyGeneral inválido. Use "GRUPAL" o "E:<equipoId>" (ej: E:15)');
+        const ok =
+          otKeyGeneral === "GRUPAL" ||
+          /^E:.+$/i.test(String(otKeyGeneral)) ||
+          /^U:.+$/i.test(String(otKeyGeneral));
+
+        if (!ok) {
+          errors.push(
+            'otKeyGeneral inválido. Use "GRUPAL", "E:<uuid>" o "U:<uuid>"'
+          );
+        }
       }
     }
 
-    // ✅ MIXTO: arreglos obligatorios y sin cruces (validación base)
+    /* =========================
+       VALIDACIÓN MODO MIXTO
+    ========================= */
     if (modo === "MIXTO") {
-      if (!Array.isArray(grupalEquipoIds) || grupalEquipoIds.length === 0) {
-        errors.push("En MIXTO debe enviar grupalEquipoIds (arreglo con ids)");
-      }
-      if (!Array.isArray(individualEquipoIds) || individualEquipoIds.length === 0) {
-        errors.push("En MIXTO debe enviar individualEquipoIds (arreglo con ids)");
+      if (!Array.isArray(grupalTargetKeys) || grupalTargetKeys.length === 0) {
+        errors.push("En MIXTO debe enviar grupalTargetKeys");
       }
 
-      if (Array.isArray(grupalEquipoIds) && Array.isArray(individualEquipoIds)) {
-        const set = new Set([...grupalEquipoIds, ...individualEquipoIds]);
-        if (set.size !== grupalEquipoIds.length + individualEquipoIds.length) {
-          errors.push("Un equipo no puede estar en grupal e individual a la vez");
+      if (
+        !Array.isArray(individualTargetKeys) ||
+        individualTargetKeys.length === 0
+      ) {
+        errors.push("En MIXTO debe enviar individualTargetKeys");
+      }
+
+      if (
+        Array.isArray(grupalTargetKeys) &&
+        Array.isArray(individualTargetKeys)
+      ) {
+        const set = new Set([...grupalTargetKeys, ...individualTargetKeys]);
+        if (set.size !== grupalTargetKeys.length + individualTargetKeys.length) {
+          errors.push("Un target no puede estar en grupal e individual a la vez");
+        }
+      }
+    }
+
+    /* =========================
+       VALIDACIÓN DE EQUIPOS
+    ========================= */
+    if (Array.isArray(equipos)) {
+      for (const [index, equipo] of equipos.entries()) {
+        const tieneEquipoId = !!equipo.equipoId;
+        const tieneUbicacionTecnicaId = !!equipo.ubicacionTecnicaId;
+
+        if (
+          (tieneEquipoId && tieneUbicacionTecnicaId) ||
+          (!tieneEquipoId && !tieneUbicacionTecnicaId)
+        ) {
+          errors.push(
+            `El equipo en la posición ${index} debe tener solo equipoId o solo ubicacionTecnicaId`
+          );
+        }
+
+        if (
+          equipo.prioridad !== undefined &&
+          !["BAJA", "MEDIA", "ALTA", "CRITICA"].includes(equipo.prioridad)
+        ) {
+          errors.push(`prioridad no válida en equipo posición ${index}`);
+        }
+
+        if (
+          equipo.estadoEquipo !== undefined &&
+          !["PENDIENTE", "EN_PROCESO", "FINALIZADO", "CANCELADO"].includes(
+            equipo.estadoEquipo
+          )
+        ) {
+          errors.push(`estadoEquipo no válido en equipo posición ${index}`);
+        }
+
+        if (
+          equipo.trabajadores !== undefined &&
+          !Array.isArray(equipo.trabajadores)
+        ) {
+          errors.push(`trabajadores debe ser array en equipo posición ${index}`);
+        }
+
+        if (
+          equipo.actividades !== undefined &&
+          !Array.isArray(equipo.actividades)
+        ) {
+          errors.push(`actividades debe ser array en equipo posición ${index}`);
+        }
+
+        if (equipo.adjuntos !== undefined && !Array.isArray(equipo.adjuntos)) {
+          errors.push(`adjuntos debe ser array en equipo posición ${index}`);
+        }
+
+        if (Array.isArray(equipo.trabajadores)) {
+          const encargados = equipo.trabajadores.filter(
+            (t) => t.esEncargado === true
+          );
+
+          if (encargados.length > 1) {
+            errors.push(
+              `Solo puede haber un encargado por equipo. Error en equipo posición ${index}`
+            );
+          }
+
+          for (const [tIndex, trabajador] of equipo.trabajadores.entries()) {
+            if (
+              !trabajador.trabajadorId ||
+              typeof trabajador.trabajadorId !== "string"
+            ) {
+              errors.push(
+                `trabajadorId es requerido en trabajador posición ${tIndex} del equipo ${index}`
+              );
+            }
+          }
+        }
+
+        if (Array.isArray(equipo.actividades)) {
+          for (const [aIndex, actividad] of equipo.actividades.entries()) {
+            if (!actividad.tarea || typeof actividad.tarea !== "string") {
+              errors.push(
+                `tarea es requerida en actividad posición ${aIndex} del equipo ${index}`
+              );
+            }
+
+            if (
+              actividad.tipoTrabajo !== undefined &&
+              ![
+                "TORQUEO_REGULACION",
+                "APLICACION",
+                "REVISION",
+                "INSPECCION",
+                "CAMBIO",
+                "LIMPIEZA",
+                "AJUSTE",
+                "LUBRICACION",
+                "REPARACION",
+              ].includes(actividad.tipoTrabajo)
+            ) {
+              errors.push(
+                `tipoTrabajo no válido en actividad posición ${aIndex} del equipo ${index}`
+              );
+            }
+
+            if (
+              actividad.estado !== undefined &&
+              !["PENDIENTE", "EN_PROCESO", "COMPLETADA", "OMITIDA"].includes(
+                actividad.estado
+              )
+            ) {
+              errors.push(
+                `estado no válido en actividad posición ${aIndex} del equipo ${index}`
+              );
+            }
+
+            if (
+              actividad.origen !== undefined &&
+              !["PLAN", "MANUAL", "TRATAMIENTO"].includes(actividad.origen)
+            ) {
+              errors.push(
+                `origen no válido en actividad posición ${aIndex} del equipo ${index}`
+              );
+            }
+
+            if (
+              actividad.unidadDuracion !== undefined &&
+              !["min", "h"].includes(actividad.unidadDuracion)
+            ) {
+              errors.push(
+                `unidadDuracion no válida en actividad posición ${aIndex} del equipo ${index}`
+              );
+            }
+
+            if (
+              actividad.unidadDuracionReal !== undefined &&
+              !["min", "h"].includes(actividad.unidadDuracionReal)
+            ) {
+              errors.push(
+                `unidadDuracionReal no válida en actividad posición ${aIndex} del equipo ${index}`
+              );
+            }
+
+            if (
+              actividad.cantidadTecnicos !== undefined &&
+              (isNaN(Number(actividad.cantidadTecnicos)) ||
+                Number(actividad.cantidadTecnicos) < 1)
+            ) {
+              errors.push(
+                `cantidadTecnicos no válida en actividad posición ${aIndex} del equipo ${index}`
+              );
+            }
+          }
         }
       }
     }
@@ -71,16 +301,20 @@ async function crearOrdenTrabajoHandler(req, res) {
 
     const ots = await ordenTrabajoController.crearOrdenTrabajo(req.body);
 
-    return res.status(201).json(ots);
+    return res.status(201).json({
+      success: true,
+      message: "Orden(es) de trabajo creada(s) correctamente",
+      data: ots,
+    });
   } catch (error) {
     console.error("ERROR CREAR OT:", error);
 
     return res.status(500).json({
-      errors: ["Error interno al crear la OT"],
+      success: false,
+      errors: [error.message || "Error interno al crear la OT"],
     });
   }
 }
-
 /* =========================
    GET TODOS
 ========================= */
