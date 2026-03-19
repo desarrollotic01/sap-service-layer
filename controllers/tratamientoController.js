@@ -521,6 +521,15 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       ? null
       : String(planActividadIdRaw).trim();
 
+      console.log("DEBUG VALIDACION PLAN:", {
+    targetKey,
+    index: i,
+    raw: planActividadIdRaw,
+    normalizado: planActividadId,
+    origen: edit?.origen,
+    idsPlan: Array.from(idsActividadesPlan),
+  });
+
   if (planActividadId && !idsActividadesPlan.has(planActividadId)) {
     throw new Error(
       `planMantenimientoActividadId inválido en tratamiento.actividadesPlanEditadas (${targetKey})[${i}]`
