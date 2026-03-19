@@ -58,7 +58,7 @@ const withDuracionValor = (plan) => {
       const unidad = a.unidadDuracion || "min";
       return {
         ...a,
-        duracionValor: toValorEditable(a.duracionMinutos, unidad),
+        duracionEstimadaValor: toValorEditable(a.duracionMinutos, unidad),
       };
     });
   }
