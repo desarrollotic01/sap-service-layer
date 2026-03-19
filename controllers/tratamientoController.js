@@ -508,23 +508,43 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
           (plan.actividades || []).map((a) => String(a.id))
         );
 
-        for (const edit of edits) {
-          if (edit?.planMantenimientoActividadId) {
-            const idEdit = String(edit.planMantenimientoActividadId);
-            if (!idsActividadesPlan.has(idEdit)) {
-              throw new Error(
-                `planMantenimientoActividadId inválido en tratamiento.actividadesPlanEditadas (${targetKey})`
-              );
-            }
-          }
-        }
+        for (let i = 0; i < edits.length; i++) {
+  const edit = edits[i];
+
+  const planActividadIdRaw = edit?.planMantenimientoActividadId;
+  const planActividadId =
+    planActividadIdRaw === null ||
+    planActividadIdRaw === undefined ||
+    String(planActividadIdRaw).trim() === "" ||
+    String(planActividadIdRaw).trim().toLowerCase() === "null" ||
+    String(planActividadIdRaw).trim().toLowerCase() === "undefined"
+      ? null
+      : String(planActividadIdRaw).trim();
+
+  if (planActividadId && !idsActividadesPlan.has(planActividadId)) {
+    throw new Error(
+      `planMantenimientoActividadId inválido en tratamiento.actividadesPlanEditadas (${targetKey})[${i}]`
+    );
+  }
+
+  edit.planMantenimientoActividadId = planActividadId;
+}
 
         for (const act of plan.actividades || []) {
-          const edit = edits.find(
-            (e) =>
-              e?.planMantenimientoActividadId &&
-              String(e.planMantenimientoActividadId) === String(act.id)
-          );
+          const edit = edits.find((e) => {
+  const raw = e?.planMantenimientoActividadId;
+
+  const normalizado =
+    raw === null ||
+    raw === undefined ||
+    String(raw).trim() === "" ||
+    String(raw).trim().toLowerCase() === "null" ||
+    String(raw).trim().toLowerCase() === "undefined"
+      ? null
+      : String(raw).trim();
+
+  return normalizado === String(act.id);
+});
 
           const unidadBase = act.unidadDuracion || "min";
           const minBase = act.duracionMinutos ?? null;
@@ -588,9 +608,20 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
           );
         }
 
-        const actividadesExtras = edits.filter(
-          (e) => !e?.planMantenimientoActividadId
-        );
+        const actividadesExtras = edits.filter((e) => {
+  const raw = e?.planMantenimientoActividadId;
+
+  const normalizado =
+    raw === null ||
+    raw === undefined ||
+    String(raw).trim() === "" ||
+    String(raw).trim().toLowerCase() === "null" ||
+    String(raw).trim().toLowerCase() === "undefined"
+      ? null
+      : String(raw).trim();
+
+  return !normalizado;
+});
 
         for (const act of actividadesExtras) {
           const normalizada = validarActividadPreventivaExtra(
@@ -1056,6 +1087,6 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
 
 module.exports = {
   crearTratamiento,
-  obtenerTratamientoPorAviso,
+  obtenerTratamientoPorAviso, 
   guardarCambiosTratamiento,
 };
