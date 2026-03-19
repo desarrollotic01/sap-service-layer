@@ -30,20 +30,6 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      tipoTrabajo: {
-        type: DataTypes.ENUM(
-          "TORQUEO_REGULACION",
-          "APLICACION",
-          "REVISION",
-          "INSPECCION",
-          "CAMBIO",
-          "LIMPIEZA",
-          "AJUSTE",
-          "LUBRICACION"
-        ),
-        allowNull: true,
-      },
-
       // ✅ NUEVO: duración estimada con unidad
       duracionEstimadaValor: {
         type: DataTypes.DECIMAL(10, 2),
@@ -83,11 +69,6 @@ module.exports = (sequelize) => {
         defaultValue: "PENDIENTE",
       },
 
-      origen: {
-        type: DataTypes.ENUM("PLAN", "MANUAL"),
-        allowNull: false,
-        defaultValue: "PLAN",
-      },
       tipoTrabajo: {
   type: DataTypes.ENUM(
     "TORQUEO_REGULACION",
