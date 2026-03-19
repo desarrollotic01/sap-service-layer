@@ -115,18 +115,285 @@ async function obtenerOrdenTrabajoPorIdHandler(req, res) {
 /* =========================
    UPDATE
 ========================= */
-async function actualizarOrdenTrabajoHandler(req, res) {
+async function actualizarOrdenTrabajoCompletaHandler(req, res) {
   try {
-    const ot = await ordenTrabajoController.actualizarOrdenTrabajo(req.params.id, req.body);
+    const { id } = req.params;
+    const data = req.body;
 
-    if (!ot) {
-      return res.status(404).json({ message: "OT no encontrada" });
+    if (!id || typeof id !== "string" || !id.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "El id de la orden de trabajo es requerido",
+      });
     }
 
-    res.json(ot);
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      return res.status(400).json({
+        success: false,
+        message: "El body debe ser un objeto válido",
+      });
+    }
+
+    const camposOTPermitidos = [
+      "numeroOT",
+      "tipoMantenimiento",
+      "descripcionGeneral",
+      "estado",
+      "supervisorId",
+      "fechaProgramadaInicio",
+      "fechaProgramadaFin",
+      "fechaInicioReal",
+      "fechaFinReal",
+      "fechaCierre",
+      "observaciones",
+      "avisoId",
+      "tratamientoId",
+      "equipos",
+      "adjuntos",
+    ];
+
+    const camposInvalidos = Object.keys(data).filter(
+      (campo) => !camposOTPermitidos.includes(campo)
+    );
+
+    if (camposInvalidos.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Se enviaron campos no permitidos",
+        camposInvalidos,
+      });
+    }
+
+    if (
+      data.numeroOT !== undefined &&
+      (typeof data.numeroOT !== "string" || !data.numeroOT.trim())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "numeroOT debe ser un texto no vacío",
+      });
+    }
+
+    if (
+      data.tipoMantenimiento !== undefined &&
+      !["Preventivo", "Correctivo", "Mejora", "Predictivo"].includes(
+        data.tipoMantenimiento
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "tipoMantenimiento no es válido",
+      });
+    }
+
+    if (
+      data.estado !== undefined &&
+      !["CREADO", "LIBERADO", "CIERRE_TECNICO", "CERRADO", "CANCELADO"].includes(
+        data.estado
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "estado no es válido",
+      });
+    }
+
+    if (data.equipos !== undefined && !Array.isArray(data.equipos)) {
+      return res.status(400).json({
+        success: false,
+        message: "equipos debe ser un array",
+      });
+    }
+
+    if (data.adjuntos !== undefined && !Array.isArray(data.adjuntos)) {
+      return res.status(400).json({
+        success: false,
+        message: "adjuntos debe ser un array",
+      });
+    }
+
+    if (Array.isArray(data.equipos)) {
+      for (const [index, equipo] of data.equipos.entries()) {
+        const tieneEquipoId = !!equipo.equipoId;
+        const tieneUbicacionTecnicaId = !!equipo.ubicacionTecnicaId;
+
+        if (
+          (tieneEquipoId && tieneUbicacionTecnicaId) ||
+          (!tieneEquipoId && !tieneUbicacionTecnicaId)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: `El equipo en la posición ${index} debe tener solo equipoId o solo ubicacionTecnicaId`,
+          });
+        }
+
+        if (
+          equipo.prioridad !== undefined &&
+          !["BAJA", "MEDIA", "ALTA", "CRITICA"].includes(equipo.prioridad)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: `prioridad no válida en equipo posición ${index}`,
+          });
+        }
+
+        if (
+          equipo.estadoEquipo !== undefined &&
+          !["PENDIENTE", "EN_PROCESO", "FINALIZADO", "CANCELADO"].includes(
+            equipo.estadoEquipo
+          )
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: `estadoEquipo no válido en equipo posición ${index}`,
+          });
+        }
+
+        if (
+          equipo.trabajadores !== undefined &&
+          !Array.isArray(equipo.trabajadores)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: `trabajadores debe ser array en equipo posición ${index}`,
+          });
+        }
+
+        if (
+          equipo.actividades !== undefined &&
+          !Array.isArray(equipo.actividades)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: `actividades debe ser array en equipo posición ${index}`,
+          });
+        }
+
+        if (equipo.adjuntos !== undefined && !Array.isArray(equipo.adjuntos)) {
+          return res.status(400).json({
+            success: false,
+            message: `adjuntos debe ser array en equipo posición ${index}`,
+          });
+        }
+
+        if (Array.isArray(equipo.trabajadores)) {
+          const encargados = equipo.trabajadores.filter((t) => t.esEncargado === true);
+
+          if (encargados.length > 1) {
+            return res.status(400).json({
+              success: false,
+              message: `Solo puede haber un encargado por equipo. Error en equipo posición ${index}`,
+            });
+          }
+
+          for (const [tIndex, trabajador] of equipo.trabajadores.entries()) {
+            if (!trabajador.trabajadorId || typeof trabajador.trabajadorId !== "string") {
+              return res.status(400).json({
+                success: false,
+                message: `trabajadorId es requerido en trabajador posición ${tIndex} del equipo ${index}`,
+              });
+            }
+          }
+        }
+
+        if (Array.isArray(equipo.actividades)) {
+          for (const [aIndex, actividad] of equipo.actividades.entries()) {
+            if (!actividad.tarea || typeof actividad.tarea !== "string") {
+              return res.status(400).json({
+                success: false,
+                message: `tarea es requerida en actividad posición ${aIndex} del equipo ${index}`,
+              });
+            }
+
+            if (
+              actividad.tipoTrabajo !== undefined &&
+              ![
+                "TORQUEO_REGULACION",
+                "APLICACION",
+                "REVISION",
+                "INSPECCION",
+                "CAMBIO",
+                "LIMPIEZA",
+                "AJUSTE",
+                "LUBRICACION",
+                "REPARACION",
+              ].includes(actividad.tipoTrabajo)
+            ) {
+              return res.status(400).json({
+                success: false,
+                message: `tipoTrabajo no válido en actividad posición ${aIndex} del equipo ${index}`,
+              });
+            }
+
+            if (
+              actividad.estado !== undefined &&
+              !["PENDIENTE", "EN_PROCESO", "COMPLETADA", "OMITIDA"].includes(
+                actividad.estado
+              )
+            ) {
+              return res.status(400).json({
+                success: false,
+                message: `estado no válido en actividad posición ${aIndex} del equipo ${index}`,
+              });
+            }
+
+            if (
+              actividad.origen !== undefined &&
+              !["PLAN", "MANUAL", "TRATAMIENTO"].includes(actividad.origen)
+            ) {
+              return res.status(400).json({
+                success: false,
+                message: `origen no válido en actividad posición ${aIndex} del equipo ${index}`,
+              });
+            }
+
+            if (
+              actividad.unidadDuracion !== undefined &&
+              !["min", "h"].includes(actividad.unidadDuracion)
+            ) {
+              return res.status(400).json({
+                success: false,
+                message: `unidadDuracion no válida en actividad posición ${aIndex} del equipo ${index}`,
+              });
+            }
+
+            if (
+              actividad.unidadDuracionReal !== undefined &&
+              !["min", "h"].includes(actividad.unidadDuracionReal)
+            ) {
+              return res.status(400).json({
+                success: false,
+                message: `unidadDuracionReal no válida en actividad posición ${aIndex} del equipo ${index}`,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    const otActualizada =
+      await ordenTrabajoController.actualizarOrdenTrabajoCompleta(id, data);
+
+    if (!otActualizada) {
+      return res.status(404).json({
+        success: false,
+        message: "Orden de trabajo no encontrada",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Orden de trabajo actualizada correctamente",
+      data: otActualizada,
+    });
   } catch (error) {
-    console.error("ERROR UPDATE OT:", error);
-    res.status(500).json({ message: "Error al actualizar OT" });
+    console.error("ERROR ACTUALIZAR ORDEN TRABAJO COMPLETA:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error al actualizar la orden de trabajo completa",
+      error: error.message,
+    });
   }
 }
 
@@ -199,7 +466,7 @@ module.exports = {
   crearOrdenTrabajoHandler,
   obtenerOrdenesTrabajoHandler,
   obtenerOrdenTrabajoPorIdHandler,
-  actualizarOrdenTrabajoHandler,
+  actualizarOrdenTrabajoCompletaHandler,
   eliminarOrdenTrabajoHandler,
   liberarOrdenTrabajo,
   getDetalleSolicitudesTratamientoPorOrdenTrabajoHandler

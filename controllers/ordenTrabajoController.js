@@ -35,26 +35,28 @@ const ensureValidTarget = (target) => {
 
   if ((tieneEquipo && tieneUbicacion) || (!tieneEquipo && !tieneUbicacion)) {
     throw new Error(
-      "Cada target debe tener solo equipoId o solo ubicacionTecnicaId"
+      "Cada registro debe tener solo equipoId o solo ubicacionTecnicaId"
     );
   }
 };
 
-const validarActividadesPayload = (targets = [], tipoMantenimiento = null) => {
-  for (const target of targets) {
-    const actividades = Array.isArray(target.actividades) ? target.actividades : [];
+const validarActividadesPayload = (equipos = [], tipoMantenimiento = null) => {
+  for (const equipo of equipos) {
+    const actividades = Array.isArray(equipo.actividades)
+      ? equipo.actividades
+      : [];
 
     if (tipoMantenimiento === "Correctivo") {
       if (!actividades.length) {
         throw new Error(
-          `El target ${getTargetLabel(target)} debe tener al menos una actividad`
+          `El registro ${getTargetLabel(equipo)} debe tener al menos una actividad`
         );
       }
 
       for (const act of actividades) {
         if (!act.tarea || !String(act.tarea).trim()) {
           throw new Error(
-            `Hay una actividad sin tarea en ${getTargetLabel(target)}`
+            `Hay una actividad sin tarea en ${getTargetLabel(equipo)}`
           );
         }
 
@@ -63,7 +65,7 @@ const validarActividadesPayload = (targets = [], tipoMantenimiento = null) => {
           !["REPARACION", "CAMBIO"].includes(act.tipoTrabajo)
         ) {
           throw new Error(
-            `Tipo de trabajo inválido en ${getTargetLabel(target)}. Solo REPARACION o CAMBIO`
+            `Tipo de trabajo inválido en ${getTargetLabel(equipo)}. Solo REPARACION o CAMBIO`
           );
         }
       }
@@ -145,8 +147,6 @@ async function asignarSolicitudesDeTratamientoAOT({
 
 /* =========================================================
    2) Copiar actividades a OT
-   - si vienen en payload, usa esas
-   - si no vienen, copia desde tratamiento
 ========================================================= */
 async function copiarActividadesATargetsOT({
   avisoId,
@@ -179,7 +179,6 @@ async function copiarActividadesATargetsOT({
         actividadesCrear.push({
           ordenTrabajoEquipoId: targetOT.id,
           planMantenimientoActividadId: act.planMantenimientoActividadId || null,
-          codigoActividad: act.codigoActividad || null,
           sistema: act.sistema || null,
           subsistema: act.subsistema || null,
           componente: act.componente || null,
@@ -191,9 +190,13 @@ async function copiarActividadesATargetsOT({
           duracionEstimadaValor: act.duracionEstimadaValor ?? null,
           unidadDuracion: act.unidadDuracion || "min",
           duracionEstimadaMin: act.duracionEstimadaMin ?? null,
+          duracionRealValor: act.duracionRealValor ?? null,
+          unidadDuracionReal: act.unidadDuracionReal || "min",
+          duracionRealMin: act.duracionRealMin ?? null,
           observaciones: act.observaciones || null,
           estado: act.estado || "PENDIENTE",
-          origen: act.origen || "OT",
+          origen: act.origen || "MANUAL",
+          tratamientoEquipoActividadId: act.tratamientoEquipoActividadId || null,
         });
       }
     } else {
@@ -253,7 +256,6 @@ async function copiarActividadesATargetsOT({
           actividadesCrear.push({
             ordenTrabajoEquipoId: targetOT.id,
             planMantenimientoActividadId: act.planMantenimientoActividadId || null,
-            codigoActividad: act.codigoActividad || null,
             sistema: act.sistema || null,
             subsistema: act.subsistema || null,
             componente: act.componente || null,
@@ -265,9 +267,13 @@ async function copiarActividadesATargetsOT({
             duracionEstimadaValor: act.duracionEstimadaValor ?? null,
             unidadDuracion: act.unidadDuracion || "min",
             duracionEstimadaMin: act.duracionEstimadaMin ?? null,
+            duracionRealValor: act.duracionRealValor ?? null,
+            unidadDuracionReal: act.unidadDuracionReal || "min",
+            duracionRealMin: act.duracionRealMin ?? null,
             observaciones: act.observaciones || null,
             estado: "PENDIENTE",
             origen: "TRATAMIENTO",
+            tratamientoEquipoActividadId: act.tratamientoEquipoActividadId || null,
           });
         }
       }
@@ -282,11 +288,11 @@ async function copiarActividadesATargetsOT({
 }
 
 /* =========================================================
-   3) Validar targets pertenezcan al aviso
+   3) Validar registros pertenezcan al aviso
 ========================================================= */
-async function validarTargetsDelAviso(avisoId, targets, t) {
-  if (!Array.isArray(targets) || targets.length === 0) {
-    throw new Error("Debe enviar al menos un target");
+async function validarTargetsDelAviso(avisoId, equipos, t) {
+  if (!Array.isArray(equipos) || equipos.length === 0) {
+    throw new Error("Debe enviar al menos un equipo o ubicación técnica");
   }
 
   const aviso = await Aviso.findByPk(avisoId, {
@@ -304,22 +310,24 @@ async function validarTargetsDelAviso(avisoId, targets, t) {
   );
 
   const ubicacionIdsAviso = new Set(
-    (aviso.ubicacionesRelacion || []).map((x) => String(x.ubicacionId))
+    (aviso.ubicacionesRelacion || []).map(
+      (x) => String(x.ubicacionTecnicaId || x.ubicacionId)
+    )
   );
 
-  for (const target of targets) {
-    ensureValidTarget(target);
+  for (const equipo of equipos) {
+    ensureValidTarget(equipo);
 
-    if (target.equipoId) {
-      if (!equipoIdsAviso.has(String(target.equipoId))) {
-        throw new Error(`El equipo ${target.equipoId} no pertenece al aviso`);
+    if (equipo.equipoId) {
+      if (!equipoIdsAviso.has(String(equipo.equipoId))) {
+        throw new Error(`El equipo ${equipo.equipoId} no pertenece al aviso`);
       }
     }
 
-    if (target.ubicacionTecnicaId) {
-      if (!ubicacionIdsAviso.has(String(target.ubicacionTecnicaId))) {
+    if (equipo.ubicacionTecnicaId) {
+      if (!ubicacionIdsAviso.has(String(equipo.ubicacionTecnicaId))) {
         throw new Error(
-          `La ubicación técnica ${target.ubicacionTecnicaId} no pertenece al aviso`
+          `La ubicación técnica ${equipo.ubicacionTecnicaId} no pertenece al aviso`
         );
       }
     }
@@ -330,7 +338,7 @@ async function validarTargetsDelAviso(avisoId, targets, t) {
    4) Crear una OT interna
 ========================================================= */
 async function crearOTInterna(
-  { aviso, otDataBase, targets, adjuntos, asignarSolicitudGeneral },
+  { aviso, otDataBase, equipos, adjuntos, asignarSolicitudGeneral },
   t
 ) {
   const countOT = await OrdenTrabajo.count({
@@ -349,7 +357,7 @@ async function crearOTInterna(
   const ot = await OrdenTrabajo.create(otData, { transaction: t });
 
   const targetsOT = await OrdenTrabajoEquipo.bulkCreate(
-    targets.map((x) => {
+    equipos.map((x) => {
       ensureValidTarget(x);
 
       return {
@@ -361,7 +369,11 @@ async function crearOTInterna(
         planMantenimientoId: x.planMantenimientoId || null,
         fechaInicioProgramada: x.fechaInicioProgramada || null,
         fechaFinProgramada: x.fechaFinProgramada || null,
+        fechaInicioReal: x.fechaInicioReal || null,
+        fechaFinReal: x.fechaFinReal || null,
         observacionesEquipo: x.observacionesEquipo || null,
+        estadoEquipo: x.estadoEquipo || "PENDIENTE",
+        observaciones: x.observaciones || null,
       };
     }),
     { transaction: t, returning: true }
@@ -378,14 +390,14 @@ async function crearOTInterna(
   await copiarActividadesATargetsOT({
     avisoId: aviso.id,
     targetsOT,
-    targetsPayload: targets,
+    targetsPayload: equipos,
     t,
   });
 
   const trabajadoresTarget = [];
 
   targetsOT.forEach((targetCreado, index) => {
-    const trabajadores = targets[index].trabajadores || [];
+    const trabajadores = equipos[index].trabajadores || [];
 
     trabajadores.forEach((trab) => {
       trabajadoresTarget.push({
@@ -407,16 +419,229 @@ async function crearOTInterna(
       adjuntos.map((a) => ({
         nombre: a.nombre,
         url: a.url,
-        tipo: a.tipo,
+        extension: a.extension || null,
+        categoria: a.categoria || null,
+        mostrarEnPortal: a.mostrarEnPortal ?? false,
+        tituloPortal: a.tituloPortal || null,
+        descripcionPortal: a.descripcionPortal || null,
+        ordenPortal: a.ordenPortal ?? 0,
         ordenTrabajoId: ot.id,
       })),
       { transaction: t }
     );
   }
 
+  for (let index = 0; index < targetsOT.length; index++) {
+    const equipoCreado = targetsOT[index];
+    const payloadEquipo = equipos[index];
+
+    if (Array.isArray(payloadEquipo.adjuntos) && payloadEquipo.adjuntos.length) {
+      await Adjunto.bulkCreate(
+        payloadEquipo.adjuntos.map((a) => ({
+          nombre: a.nombre,
+          url: a.url,
+          extension: a.extension || null,
+          categoria: a.categoria || null,
+          mostrarEnPortal: a.mostrarEnPortal ?? false,
+          tituloPortal: a.tituloPortal || null,
+          descripcionPortal: a.descripcionPortal || null,
+          ordenPortal: a.ordenPortal ?? 0,
+          ordenTrabajoEquipoId: equipoCreado.id,
+        })),
+        { transaction: t }
+      );
+    }
+  }
+
   return ot;
 }
 
+/* =========================================================
+   5) FUNCIÓN PRINCIPAL: crearOrdenTrabajo
+========================================================= */
+async function crearOrdenTrabajo(data) {
+  const t = await sequelize.transaction();
+
+  try {
+    const {
+      equipos = [],
+      adjuntos = [],
+      modo = "GRUPAL",
+      grupalTargetKeys = [],
+      individualTargetKeys = [],
+      solicitudGeneralStrategy = "OT_GRUPAL",
+      otKeyGeneral = null,
+      ...otData
+    } = data;
+
+    if (!otData.avisoId) throw new Error("avisoId es obligatorio");
+    if (!Array.isArray(equipos) || equipos.length === 0) {
+      throw new Error("Debe enviar al menos un equipo o ubicación técnica");
+    }
+
+    for (const equipo of equipos) {
+      ensureValidTarget(equipo);
+    }
+
+    const aviso = await Aviso.findByPk(otData.avisoId, { transaction: t });
+    if (!aviso) throw new Error("Aviso no encontrado");
+
+    if (aviso.tipoAviso === "mantenimiento") {
+      if (!aviso.tipoMantenimiento) {
+        throw new Error(
+          "El aviso de mantenimiento no tiene tipo de mantenimiento"
+        );
+      }
+      otData.tipoMantenimiento = aviso.tipoMantenimiento;
+    } else {
+      otData.tipoMantenimiento = null;
+    }
+
+    await validarTargetsDelAviso(aviso.id, equipos, t);
+    validarActividadesPayload(equipos, otData.tipoMantenimiento);
+
+    const shouldAssignGeneral = (key) => {
+      if (solicitudGeneralStrategy === "NINGUNA") return false;
+      if (solicitudGeneralStrategy === "OT_GRUPAL") return key === "GRUPAL";
+      if (solicitudGeneralStrategy === "PRIMERA_OT") return key === "PRIMERA";
+      if (solicitudGeneralStrategy === "OT_ESPECIFICA") return key === otKeyGeneral;
+      return false;
+    };
+
+    const otsCreadas = [];
+
+    if (!["GRUPAL", "INDIVIDUAL", "MIXTO"].includes(modo)) {
+      throw new Error("modo inválido. Use GRUPAL | INDIVIDUAL | MIXTO");
+    }
+
+    if (modo === "GRUPAL") {
+      const ot = await crearOTInterna(
+        {
+          aviso,
+          otDataBase: otData,
+          equipos,
+          adjuntos,
+          asignarSolicitudGeneral:
+            shouldAssignGeneral("GRUPAL") || shouldAssignGeneral("PRIMERA"),
+        },
+        t
+      );
+
+      otsCreadas.push(ot);
+    }
+
+    if (modo === "INDIVIDUAL") {
+      let primera = true;
+
+      for (const equipo of equipos) {
+        const key = getTargetKey(equipo);
+
+        const ot = await crearOTInterna(
+          {
+            aviso,
+            otDataBase: otData,
+            equipos: [equipo],
+            adjuntos,
+            asignarSolicitudGeneral:
+              (shouldAssignGeneral("PRIMERA") && primera)
+                ? true
+                : shouldAssignGeneral(key),
+          },
+          t
+        );
+
+        otsCreadas.push(ot);
+        primera = false;
+      }
+    }
+
+    if (modo === "MIXTO") {
+      if (!Array.isArray(grupalTargetKeys) || grupalTargetKeys.length === 0) {
+        throw new Error("En MIXTO debe enviar grupalTargetKeys");
+      }
+
+      if (!Array.isArray(individualTargetKeys) || individualTargetKeys.length === 0) {
+        throw new Error("En MIXTO debe enviar individualTargetKeys");
+      }
+
+      const set = new Set([...grupalTargetKeys, ...individualTargetKeys]);
+      if (set.size !== grupalTargetKeys.length + individualTargetKeys.length) {
+        throw new Error("Un target no puede estar en grupal e individual a la vez");
+      }
+
+      const equiposMap = new Map(equipos.map((x) => [getTargetKey(x), x]));
+
+      for (const key of [...grupalTargetKeys, ...individualTargetKeys]) {
+        if (!equiposMap.has(key)) {
+          throw new Error(`El target ${key} no fue enviado en el payload`);
+        }
+      }
+
+      const equiposGrupal = grupalTargetKeys.map((key) => equiposMap.get(key));
+      const equiposIndividual = individualTargetKeys.map((key) => equiposMap.get(key));
+
+      const otGrupal = await crearOTInterna(
+        {
+          aviso,
+          otDataBase: otData,
+          equipos: equiposGrupal,
+          adjuntos,
+          asignarSolicitudGeneral:
+            shouldAssignGeneral("GRUPAL") || shouldAssignGeneral("PRIMERA"),
+        },
+        t
+      );
+
+      otsCreadas.push(otGrupal);
+
+      for (const equipo of equiposIndividual) {
+        const key = getTargetKey(equipo);
+
+        const ot = await crearOTInterna(
+          {
+            aviso,
+            otDataBase: otData,
+            equipos: [equipo],
+            adjuntos,
+            asignarSolicitudGeneral: shouldAssignGeneral(key),
+          },
+          t
+        );
+
+        otsCreadas.push(ot);
+      }
+    }
+
+    await aviso.update({ estadoAviso: "con OT" }, { transaction: t });
+
+    await t.commit();
+
+    return await OrdenTrabajo.findAll({
+      where: {
+        id: { [Op.in]: otsCreadas.map((x) => x.id) },
+      },
+      include: [
+        {
+          association: "equipos",
+          include: [
+            { association: "equipo" },
+            { association: "ubicacionTecnica" },
+            { association: "planMantenimiento" },
+            { association: "adjuntos" },
+            { association: "actividades" },
+            { association: "trabajadores", include: ["trabajador"] },
+          ],
+        },
+        { association: "solicitudesCompra" },
+        { association: "adjuntos" },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+  } catch (error) {
+    await t.rollback();
+    throw error;
+  }
+}
 /* =========================================================
    5) FUNCIÓN PRINCIPAL: crearOrdenTrabajo
 ========================================================= */
@@ -643,17 +868,409 @@ async function obtenerOrdenTrabajoPorId(id) {
   });
 }
 
-async function actualizarOrdenTrabajo(id, data) {
-  const ot = await OrdenTrabajo.findByPk(id);
-  if (!ot) return null;
+async function actualizarOrdenTrabajoCompleta(id, data) {
+  const transaction = await sequelize.transaction();
 
-  await ot.update(data);
-  return ot;
+  try {
+    const ot = await OrdenTrabajo.findByPk(id, { transaction });
+
+    if (!ot) {
+      await transaction.rollback();
+      return null;
+    }
+
+    /* =========================
+       1. ACTUALIZAR OT PRINCIPAL
+    ========================= */
+    const camposOTPermitidos = [
+      "numeroOT",
+      "tipoMantenimiento",
+      "descripcionGeneral",
+      "estado",
+      "supervisorId",
+      "fechaProgramadaInicio",
+      "fechaProgramadaFin",
+      "fechaInicioReal",
+      "fechaFinReal",
+      "fechaCierre",
+      "observaciones",
+      "avisoId",
+      "tratamientoId",
+    ];
+
+    const dataOT = {};
+
+    for (const campo of camposOTPermitidos) {
+      if (data[campo] !== undefined) {
+        dataOT[campo] = data[campo];
+      }
+    }
+
+    await ot.update(dataOT, { transaction });
+
+    /* =========================
+       2. ADJUNTOS GENERALES OT
+    ========================= */
+    if (Array.isArray(data.adjuntos)) {
+      const adjuntosActualesOT = await Adjunto.findAll({
+        where: { ordenTrabajoId: id, ordenTrabajoEquipoId: null },
+        transaction,
+      });
+
+      const idsAdjuntosPayloadOT = data.adjuntos
+        .filter((a) => a.id)
+        .map((a) => a.id);
+
+      for (const adjuntoActual of adjuntosActualesOT) {
+        if (!idsAdjuntosPayloadOT.includes(adjuntoActual.id)) {
+          await adjuntoActual.destroy({ transaction });
+        }
+      }
+
+      for (const adjunto of data.adjuntos) {
+        const payloadAdjuntoOT = {
+          nombre: adjunto.nombre,
+          url: adjunto.url,
+          extension: adjunto.extension ?? null,
+          categoria: adjunto.categoria ?? null,
+          mostrarEnPortal: adjunto.mostrarEnPortal ?? false,
+          tituloPortal: adjunto.tituloPortal ?? null,
+          descripcionPortal: adjunto.descripcionPortal ?? null,
+          ordenPortal: adjunto.ordenPortal ?? 0,
+          ordenTrabajoId: id,
+          ordenTrabajoEquipoId: null,
+        };
+
+        if (adjunto.id) {
+          const existente = await Adjunto.findOne({
+            where: {
+              id: adjunto.id,
+              ordenTrabajoId: id,
+              ordenTrabajoEquipoId: null,
+            },
+            transaction,
+          });
+
+          if (existente) {
+            await existente.update(payloadAdjuntoOT, { transaction });
+          } else {
+            await Adjunto.create(
+              {
+                id: adjunto.id,
+                ...payloadAdjuntoOT,
+              },
+              { transaction }
+            );
+          }
+        } else {
+          await Adjunto.create(payloadAdjuntoOT, { transaction });
+        }
+      }
+    }
+
+    /* =========================
+       3. EQUIPOS
+    ========================= */
+    if (Array.isArray(data.equipos)) {
+      const equiposActuales = await OrdenTrabajoEquipo.findAll({
+        where: { ordenTrabajoId: id },
+        transaction,
+      });
+
+      const idsEquiposPayload = data.equipos.filter((e) => e.id).map((e) => e.id);
+
+      for (const equipoActual of equiposActuales) {
+        if (!idsEquiposPayload.includes(equipoActual.id)) {
+          await OrdenTrabajoEquipoTrabajador.destroy({
+            where: { ordenTrabajoEquipoId: equipoActual.id },
+            transaction,
+          });
+
+          await OrdenTrabajoEquipoActividad.destroy({
+            where: { ordenTrabajoEquipoId: equipoActual.id },
+            transaction,
+          });
+
+          await Adjunto.destroy({
+            where: { ordenTrabajoEquipoId: equipoActual.id },
+            transaction,
+          });
+
+          await equipoActual.destroy({ transaction });
+        }
+      }
+
+      for (const equipo of data.equipos) {
+        const payloadEquipo = {
+          ordenTrabajoId: id,
+          equipoId: equipo.equipoId ?? null,
+          ubicacionTecnicaId: equipo.ubicacionTecnicaId ?? null,
+          descripcionEquipo: equipo.descripcionEquipo ?? null,
+          planMantenimientoId: equipo.planMantenimientoId ?? null,
+          prioridad: equipo.prioridad ?? "MEDIA",
+          fechaInicioProgramada: equipo.fechaInicioProgramada ?? null,
+          fechaFinProgramada: equipo.fechaFinProgramada ?? null,
+          fechaInicioReal: equipo.fechaInicioReal ?? null,
+          fechaFinReal: equipo.fechaFinReal ?? null,
+          observacionesEquipo: equipo.observacionesEquipo ?? null,
+          estadoEquipo: equipo.estadoEquipo ?? "PENDIENTE",
+          observaciones: equipo.observaciones ?? null,
+        };
+
+        let equipoGuardado = null;
+
+        if (equipo.id) {
+          equipoGuardado = await OrdenTrabajoEquipo.findOne({
+            where: {
+              id: equipo.id,
+              ordenTrabajoId: id,
+            },
+            transaction,
+          });
+
+          if (equipoGuardado) {
+            await equipoGuardado.update(payloadEquipo, { transaction });
+          } else {
+            equipoGuardado = await OrdenTrabajoEquipo.create(
+              {
+                id: equipo.id,
+                ...payloadEquipo,
+              },
+              { transaction }
+            );
+          }
+        } else {
+          equipoGuardado = await OrdenTrabajoEquipo.create(payloadEquipo, {
+            transaction,
+          });
+        }
+
+        /* =========================
+           4. TRABAJADORES POR EQUIPO
+        ========================= */
+        if (Array.isArray(equipo.trabajadores)) {
+          const trabajadoresActuales = await OrdenTrabajoEquipoTrabajador.findAll({
+            where: { ordenTrabajoEquipoId: equipoGuardado.id },
+            transaction,
+          });
+
+          const idsTrabajadoresPayload = equipo.trabajadores
+            .filter((t) => t.id)
+            .map((t) => t.id);
+
+          for (const trabajadorActual of trabajadoresActuales) {
+            if (!idsTrabajadoresPayload.includes(trabajadorActual.id)) {
+              await trabajadorActual.destroy({ transaction });
+            }
+          }
+
+          for (const trabajador of equipo.trabajadores) {
+            const payloadTrabajador = {
+              ordenTrabajoEquipoId: equipoGuardado.id,
+              trabajadorId: trabajador.trabajadorId,
+              esEncargado: trabajador.esEncargado ?? false,
+            };
+
+            if (trabajador.id) {
+              const existente = await OrdenTrabajoEquipoTrabajador.findOne({
+                where: {
+                  id: trabajador.id,
+                  ordenTrabajoEquipoId: equipoGuardado.id,
+                },
+                transaction,
+              });
+
+              if (existente) {
+                await existente.update(payloadTrabajador, { transaction });
+              } else {
+                await OrdenTrabajoEquipoTrabajador.create(
+                  {
+                    id: trabajador.id,
+                    ...payloadTrabajador,
+                  },
+                  { transaction }
+                );
+              }
+            } else {
+              await OrdenTrabajoEquipoTrabajador.create(payloadTrabajador, {
+                transaction,
+              });
+            }
+          }
+        }
+
+        /* =========================
+           5. ACTIVIDADES POR EQUIPO
+        ========================= */
+        if (Array.isArray(equipo.actividades)) {
+          const actividadesActuales = await OrdenTrabajoEquipoActividad.findAll({
+            where: { ordenTrabajoEquipoId: equipoGuardado.id },
+            transaction,
+          });
+
+          const idsActividadesPayload = equipo.actividades
+            .filter((a) => a.id)
+            .map((a) => a.id);
+
+          for (const actividadActual of actividadesActuales) {
+            if (!idsActividadesPayload.includes(actividadActual.id)) {
+              await actividadActual.destroy({ transaction });
+            }
+          }
+
+          for (const actividad of equipo.actividades) {
+            const payloadActividad = {
+              ordenTrabajoEquipoId: equipoGuardado.id,
+              planMantenimientoActividadId:
+                actividad.planMantenimientoActividadId ?? null,
+              sistema: actividad.sistema ?? null,
+              subsistema: actividad.subsistema ?? null,
+              componente: actividad.componente ?? null,
+              tarea: actividad.tarea,
+              tipoTrabajo: actividad.tipoTrabajo ?? null,
+              duracionEstimadaValor: actividad.duracionEstimadaValor ?? null,
+              unidadDuracion: actividad.unidadDuracion ?? "min",
+              duracionEstimadaMin: actividad.duracionEstimadaMin ?? null,
+              duracionRealValor: actividad.duracionRealValor ?? null,
+              unidadDuracionReal: actividad.unidadDuracionReal ?? "min",
+              duracionRealMin: actividad.duracionRealMin ?? null,
+              estado: actividad.estado ?? "PENDIENTE",
+              origen: actividad.origen ?? "PLAN",
+              descripcion: actividad.descripcion ?? null,
+              tratamientoEquipoActividadId:
+                actividad.tratamientoEquipoActividadId ?? null,
+              observaciones: actividad.observaciones ?? null,
+            };
+
+            if (actividad.id) {
+              const existente = await OrdenTrabajoEquipoActividad.findOne({
+                where: {
+                  id: actividad.id,
+                  ordenTrabajoEquipoId: equipoGuardado.id,
+                },
+                transaction,
+              });
+
+              if (existente) {
+                await existente.update(payloadActividad, { transaction });
+              } else {
+                await OrdenTrabajoEquipoActividad.create(
+                  {
+                    id: actividad.id,
+                    ...payloadActividad,
+                  },
+                  { transaction }
+                );
+              }
+            } else {
+              await OrdenTrabajoEquipoActividad.create(payloadActividad, {
+                transaction,
+              });
+            }
+          }
+        }
+
+        /* =========================
+           6. ADJUNTOS POR EQUIPO
+        ========================= */
+        if (Array.isArray(equipo.adjuntos)) {
+          const adjuntosActualesEquipo = await Adjunto.findAll({
+            where: { ordenTrabajoEquipoId: equipoGuardado.id },
+            transaction,
+          });
+
+          const idsAdjuntosPayloadEquipo = equipo.adjuntos
+            .filter((a) => a.id)
+            .map((a) => a.id);
+
+          for (const adjuntoActual of adjuntosActualesEquipo) {
+            if (!idsAdjuntosPayloadEquipo.includes(adjuntoActual.id)) {
+              await adjuntoActual.destroy({ transaction });
+            }
+          }
+
+          for (const adjunto of equipo.adjuntos) {
+            const payloadAdjuntoEquipo = {
+              nombre: adjunto.nombre,
+              url: adjunto.url,
+              extension: adjunto.extension ?? null,
+              categoria: adjunto.categoria ?? null,
+              mostrarEnPortal: adjunto.mostrarEnPortal ?? false,
+              tituloPortal: adjunto.tituloPortal ?? null,
+              descripcionPortal: adjunto.descripcionPortal ?? null,
+              ordenPortal: adjunto.ordenPortal ?? 0,
+              ordenTrabajoId: null,
+              ordenTrabajoEquipoId: equipoGuardado.id,
+            };
+
+            if (adjunto.id) {
+              const existente = await Adjunto.findOne({
+                where: {
+                  id: adjunto.id,
+                  ordenTrabajoEquipoId: equipoGuardado.id,
+                },
+                transaction,
+              });
+
+              if (existente) {
+                await existente.update(payloadAdjuntoEquipo, { transaction });
+              } else {
+                await Adjunto.create(
+                  {
+                    id: adjunto.id,
+                    ...payloadAdjuntoEquipo,
+                  },
+                  { transaction }
+                );
+              }
+            } else {
+              await Adjunto.create(payloadAdjuntoEquipo, { transaction });
+            }
+          }
+        }
+      }
+    }
+
+    await transaction.commit();
+
+    const otActualizada = await OrdenTrabajo.findByPk(id, {
+      include: [
+        {
+          model: OrdenTrabajoEquipo,
+          as: "equipos",
+          include: [
+            {
+              model: OrdenTrabajoEquipoTrabajador,
+              as: "trabajadores",
+            },
+            {
+              model: OrdenTrabajoEquipoActividad,
+              as: "actividades",
+            },
+            {
+              model: Adjunto,
+              as: "adjuntos",
+            },
+          ],
+        },
+        {
+          model: Adjunto,
+          as: "adjuntos",
+        },
+      ],
+    });
+
+    return otActualizada;
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 }
+
 
 async function eliminarOrdenTrabajo(id) {
   const ot = await OrdenTrabajo.findByPk(id);
-  if (!ot) return null;
+  if (!ot) return null; 
 
   await Adjunto.destroy({ where: { ordenTrabajoId: id } });
   await OrdenTrabajoEquipo.destroy({ where: { ordenTrabajoId: id } });
@@ -742,7 +1359,7 @@ module.exports = {
   crearOrdenTrabajo,
   obtenerOrdenesTrabajo,
   obtenerOrdenTrabajoPorId,
-  actualizarOrdenTrabajo,
+  actualizarOrdenTrabajoCompleta,
   eliminarOrdenTrabajo,
   liberarOrdenTrabajo,
   actualizarOTACierreTecnicoSiCompleta,

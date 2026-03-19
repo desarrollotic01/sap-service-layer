@@ -8,7 +8,7 @@ router.post("/", auth, handler.crearOrdenTrabajoHandler);
 router.get("/", auth, handler.obtenerOrdenesTrabajoHandler);
 router.get("/:id/solicitudes-tratamiento", handler.getDetalleSolicitudesTratamientoPorOrdenTrabajoHandler);
 router.get("/:id", auth, handler.obtenerOrdenTrabajoPorIdHandler);
-router.put("/:id", auth, handler.actualizarOrdenTrabajoHandler);
+router.patch("/:id/completa", auth, handler.actualizarOrdenTrabajoCompletaHandler);
 router.delete("/:id", auth, handler.eliminarOrdenTrabajoHandler);
 router.patch("/:id/liberar", auth, handler.liberarOrdenTrabajo);
 

@@ -114,6 +114,23 @@ descripcion: { // ✅ agregar
   allowNull: true,
 },
 
+rolTecnico: {
+        type: DataTypes.ENUM(
+          "tecnico_electrico",
+          "operario_de_mantenimiento",
+          "tecnico_mecanico",
+          "supervisor"
+        ),
+        allowNull: true, // PLAN lo trae; MANUAL lo define usuario
+      },
+
+
+cantidadTecnicos: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+            },
+
+
 // (opcional recomendado)
 tratamientoEquipoActividadId: {
   type: DataTypes.UUID,
