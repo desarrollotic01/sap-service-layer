@@ -95,7 +95,7 @@ module.exports = (sequelize) => {
       },
 
       origen: {
-        type: DataTypes.ENUM("PLAN", "MANUAL"),
+        type: DataTypes.ENUM("PLAN", "MANUAL","MANUAL_EXTRA"),
         allowNull: false,
         defaultValue: "PLAN",
       },
