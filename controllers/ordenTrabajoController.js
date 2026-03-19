@@ -712,6 +712,7 @@ async function actualizarOrdenTrabajoCompleta(id, data) {
       "observaciones",
       "avisoId",
       "tratamientoId",
+      "id"
     ];
 
     const dataOT = {};
