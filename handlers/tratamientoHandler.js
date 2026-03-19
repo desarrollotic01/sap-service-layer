@@ -483,16 +483,6 @@ if (esObjetoPlano(tratamiento.actividadesPlanEditadas)) {
         });
       }
 
-      if (
-        !act.planMantenimientoActividadId ||
-        typeof act.planMantenimientoActividadId !== "string" ||
-        !esUUID(act.planMantenimientoActividadId)
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: `planMantenimientoActividadId inválido en tratamiento.actividadesPlanEditadas (${key})[${i}]`,
-        });
-      }
 
       if (
         act.cantidadTecnicos !== undefined &&
