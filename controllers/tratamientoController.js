@@ -13,6 +13,7 @@ const {
   Equipo,
   UbicacionTecnica,
 } = require("../db_connection");
+const { Op } = require("sequelize");
 
 const TIPOS_TRABAJO_CORRECTIVO = ["REPARACION", "CAMBIO"];
 
@@ -66,6 +67,89 @@ const normalizarDuracionActividad = (act) => {
     duracionEstimadaValor: Number.isFinite(valor) ? valor : null,
     duracionEstimadaMin: Number.isFinite(min) ? min : null,
   };
+};
+
+/* ===============================
+   HELPERS NUMERO SOLICITUD
+=============================== */
+const limpiarOV = (valor) => {
+  if (valor === undefined || valor === null) return null;
+  const ov = String(valor).trim();
+  return ov || null;
+};
+
+const obtenerOrdenVentaParaTarget = async ({
+  aviso,
+  equipoId = null,
+  ubicacionId = null,
+  transaction,
+}) => {
+  if (equipoId) {
+    const equipo = await Equipo.findByPk(equipoId, { transaction });
+
+    if (!equipo) {
+      throw new Error("No se encontró el equipo para generar la solicitud");
+    }
+
+    const ov = limpiarOV(
+      equipo.numeroOV || equipo.ordenVenta || equipo.ov || aviso?.numeroOV || aviso?.ordenVenta
+    );
+
+    if (!ov) {
+      throw new Error(`El equipo ${equipoId} no tiene número de OV asociado`);
+    }
+
+    return ov;
+  }
+
+  if (ubicacionId) {
+    const ubicacion = await UbicacionTecnica.findByPk(ubicacionId, { transaction });
+
+    if (!ubicacion) {
+      throw new Error("No se encontró la ubicación técnica para generar la solicitud");
+    }
+
+    const ov = limpiarOV(
+      ubicacion.numeroOV ||
+        ubicacion.ordenVenta ||
+        ubicacion.ov ||
+        aviso?.numeroOV ||
+        aviso?.ordenVenta
+    );
+
+    if (!ov) {
+      throw new Error(`La ubicación técnica ${ubicacionId} no tiene número de OV asociado`);
+    }
+
+    return ov;
+  }
+
+  const ovGeneral = limpiarOV(aviso?.numeroOV || aviso?.ordenVenta);
+
+  if (!ovGeneral) {
+    throw new Error("El aviso no tiene número de OV para generar la solicitud general");
+  }
+
+  return ovGeneral;
+};
+
+const generarNumeroSolicitud = async ({
+  modelo,
+  prefijo,
+  ordenVenta,
+  transaction,
+}) => {
+  const total = await modelo.count({
+    where: {
+      numeroSolicitud: {
+        [Op.like]: `${prefijo}-${ordenVenta}-%`,
+      },
+    },
+    transaction,
+  });
+
+  const correlativo = String(total + 1).padStart(3, "0");
+  return `${prefijo}-${ordenVenta}-${correlativo}`;
 };
 
 /* ===============================
@@ -242,6 +326,7 @@ const crearSolicitudCompra = async ({
   esGeneral,
   equipoId = null,
   ubicacionId = null,
+  aviso,
 }) => {
   const requester = String(data.requester || data.email || "").trim();
 
@@ -249,8 +334,23 @@ const crearSolicitudCompra = async ({
     throw new Error("Solicitud de compra: requester o email es obligatorio");
   }
 
+  const ordenVenta = await obtenerOrdenVentaParaTarget({
+    aviso,
+    equipoId,
+    ubicacionId,
+    transaction: t,
+  });
+
+  const numeroSolicitud = await generarNumeroSolicitud({
+    modelo: SolicitudCompra,
+    prefijo: "SC",
+    ordenVenta,
+    transaction: t,
+  });
+
   const solicitud = await SolicitudCompra.create(
     {
+      numeroSolicitud,
       tratamiento_id: tratamientoId,
       equipo_id: equipoId,
       ubicacion_tecnica_id: ubicacionId,
@@ -276,7 +376,7 @@ const crearSolicitudCompra = async ({
       warehouseCode: l.warehouseCode || "01",
       costingCode: l.costCenter || l.costingCode || null,
       projectCode: l.projectCode || null,
-      rubroSapCode: l.rubroSapCode || null,
+      rubroSapCode: l.rubroSapCode || l.rubro || null,
       paqueteTrabajo: l.paqueteTrabajo || null,
     })),
     { transaction: t }
@@ -296,6 +396,7 @@ const crearSolicitudAlmacen = async ({
   esGeneral,
   equipoId = null,
   ubicacionId = null,
+  aviso,
 }) => {
   const requester = String(data.requester || data.email || "").trim();
 
@@ -303,8 +404,23 @@ const crearSolicitudAlmacen = async ({
     throw new Error("Solicitud de almacén: requester o email es obligatorio");
   }
 
+  const ordenVenta = await obtenerOrdenVentaParaTarget({
+    aviso,
+    equipoId,
+    ubicacionId,
+    transaction: t,
+  });
+
+  const numeroSolicitud = await generarNumeroSolicitud({
+    modelo: SolicitudAlmacen,
+    prefijo: "SA",
+    ordenVenta,
+    transaction: t,
+  });
+
   const solicitud = await SolicitudAlmacen.create(
     {
+      numeroSolicitud,
       tratamiento_id: tratamientoId,
       equipo_id: equipoId,
       ubicacion_tecnica_id: ubicacionId,
@@ -330,7 +446,7 @@ const crearSolicitudAlmacen = async ({
       warehouseCode: l.warehouseCode || "01",
       costingCode: l.costCenter || l.costingCode || null,
       projectCode: l.projectCode || null,
-      rubroSapCode: l.rubroSapCode || null,
+      rubroSapCode: l.rubroSapCode || l.rubro || null,
       paqueteTrabajo: l.paqueteTrabajo || null,
     })),
     { transaction: t }
@@ -509,51 +625,42 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
         );
 
         for (let i = 0; i < edits.length; i++) {
-  const edit = edits[i];
+          const edit = edits[i];
 
-  const planActividadIdRaw = edit?.planMantenimientoActividadId;
-  const planActividadId =
-    planActividadIdRaw === null ||
-    planActividadIdRaw === undefined ||
-    String(planActividadIdRaw).trim() === "" ||
-    String(planActividadIdRaw).trim().toLowerCase() === "null" ||
-    String(planActividadIdRaw).trim().toLowerCase() === "undefined"
-      ? null
-      : String(planActividadIdRaw).trim();
+          const planActividadIdRaw = edit?.planMantenimientoActividadId;
+          const planActividadId =
+            planActividadIdRaw === null ||
+            planActividadIdRaw === undefined ||
+            String(planActividadIdRaw).trim() === "" ||
+            String(planActividadIdRaw).trim().toLowerCase() === "null" ||
+            String(planActividadIdRaw).trim().toLowerCase() === "undefined"
+              ? null
+              : String(planActividadIdRaw).trim();
 
-      console.log("DEBUG VALIDACION PLAN:", {
-    targetKey,
-    index: i,
-    raw: planActividadIdRaw,
-    normalizado: planActividadId,
-    origen: edit?.origen,
-    idsPlan: Array.from(idsActividadesPlan),
-  });
+          if (planActividadId && !idsActividadesPlan.has(planActividadId)) {
+            throw new Error(
+              `planMantenimientoActividadId inválido en tratamiento.actividadesPlanEditadas (${targetKey})[${i}]`
+            );
+          }
 
-  if (planActividadId && !idsActividadesPlan.has(planActividadId)) {
-    throw new Error(
-      `planMantenimientoActividadId inválido en tratamiento.actividadesPlanEditadas (${targetKey})[${i}]`
-    );
-  }
-
-  edit.planMantenimientoActividadId = planActividadId;
-}
+          edit.planMantenimientoActividadId = planActividadId;
+        }
 
         for (const act of plan.actividades || []) {
           const edit = edits.find((e) => {
-  const raw = e?.planMantenimientoActividadId;
+            const raw = e?.planMantenimientoActividadId;
 
-  const normalizado =
-    raw === null ||
-    raw === undefined ||
-    String(raw).trim() === "" ||
-    String(raw).trim().toLowerCase() === "null" ||
-    String(raw).trim().toLowerCase() === "undefined"
-      ? null
-      : String(raw).trim();
+            const normalizado =
+              raw === null ||
+              raw === undefined ||
+              String(raw).trim() === "" ||
+              String(raw).trim().toLowerCase() === "null" ||
+              String(raw).trim().toLowerCase() === "undefined"
+                ? null
+                : String(raw).trim();
 
-  return normalizado === String(act.id);
-});
+            return normalizado === String(act.id);
+          });
 
           const unidadBase = act.unidadDuracion || "min";
           const minBase = act.duracionMinutos ?? null;
@@ -618,19 +725,19 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
         }
 
         const actividadesExtras = edits.filter((e) => {
-  const raw = e?.planMantenimientoActividadId;
+          const raw = e?.planMantenimientoActividadId;
 
-  const normalizado =
-    raw === null ||
-    raw === undefined ||
-    String(raw).trim() === "" ||
-    String(raw).trim().toLowerCase() === "null" ||
-    String(raw).trim().toLowerCase() === "undefined"
-      ? null
-      : String(raw).trim();
+          const normalizado =
+            raw === null ||
+            raw === undefined ||
+            String(raw).trim() === "" ||
+            String(raw).trim().toLowerCase() === "null" ||
+            String(raw).trim().toLowerCase() === "undefined"
+              ? null
+              : String(raw).trim();
 
-  return !normalizado;
-});
+          return !normalizado;
+        });
 
         for (const act of actividadesExtras) {
           const normalizada = validarActividadPreventivaExtra(
@@ -771,6 +878,7 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
         usuarioId,
         t,
         esGeneral: true,
+        aviso,
       });
     }
 
@@ -788,6 +896,7 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
         esGeneral: false,
         equipoId: target.equipoId,
         ubicacionId: target.ubicacionId,
+        aviso,
       });
     }
 
@@ -798,6 +907,7 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
         usuarioId,
         t,
         esGeneral: true,
+        aviso,
       });
     }
 
@@ -815,6 +925,7 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
         esGeneral: false,
         equipoId: target.equipoId,
         ubicacionId: target.ubicacionId,
+        aviso,
       });
     }
 
@@ -917,6 +1028,7 @@ const upsertSolicitud = async ({
   data,
   usuarioId,
   t,
+  aviso,
 }) => {
   const where = {
     tratamiento_id: tratamientoId,
@@ -936,9 +1048,9 @@ const upsertSolicitud = async ({
   const header = {
     docDate: new Date(),
     requiredDate: data.requiredDate,
-    department: data.department,
+    department: data.department || null,
     requester,
-    comments: data.comments,
+    comments: data.comments || null,
     usuario_id: usuarioId,
     estado: "DRAFT",
     tratamiento_id: tratamientoId,
@@ -948,7 +1060,27 @@ const upsertSolicitud = async ({
   };
 
   if (!solicitud) {
-    solicitud = await SolicitudCompra.create(header, { transaction: t });
+    const ordenVenta = await obtenerOrdenVentaParaTarget({
+      aviso,
+      equipoId,
+      ubicacionId,
+      transaction: t,
+    });
+
+    const numeroSolicitud = await generarNumeroSolicitud({
+      modelo: SolicitudCompra,
+      prefijo: "SC",
+      ordenVenta,
+      transaction: t,
+    });
+
+    solicitud = await SolicitudCompra.create(
+      {
+        ...header,
+        numeroSolicitud,
+      },
+      { transaction: t }
+    );
   } else {
     await solicitud.update(header, { transaction: t });
 
@@ -961,13 +1093,14 @@ const upsertSolicitud = async ({
   await SolicitudCompraLinea.bulkCreate(
     (data.lineas || []).map((l) => ({
       solicitud_compra_id: solicitud.id,
+      itemId: l.itemId || null,
       itemCode: l.itemCode || null,
       description: l.description || null,
       quantity: Number(l.quantity),
       costingCode: l.costCenter || l.costingCode || null,
       projectCode: l.projectCode || null,
       warehouseCode: l.warehouseCode || "01",
-      rubro: l.rubro || null,
+      rubroSapCode: l.rubroSapCode || l.rubro || null,
       paqueteTrabajo: l.paqueteTrabajo || null,
     })),
     { transaction: t }
@@ -985,6 +1118,9 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
 
     const tratamiento = await Tratamiento.findByPk(tratamientoId, { transaction: t });
     if (!tratamiento) throw new Error("Tratamiento no encontrado");
+
+    const aviso = await Aviso.findByPk(tratamiento.aviso_id, { transaction: t });
+    if (!aviso) throw new Error("Aviso no encontrado");
 
     if (Array.isArray(actividades) && actividades.length > 0) {
       for (const a of actividades) {
@@ -1040,6 +1176,7 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
         data: solicitudGeneral,
         usuarioId,
         t,
+        aviso,
       });
     }
 
@@ -1083,6 +1220,7 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
         data: dataSol,
         usuarioId,
         t,
+        aviso,
       });
     }
 
@@ -1096,6 +1234,6 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
 
 module.exports = {
   crearTratamiento,
-  obtenerTratamientoPorAviso, 
+  obtenerTratamientoPorAviso,
   guardarCambiosTratamiento,
 };
