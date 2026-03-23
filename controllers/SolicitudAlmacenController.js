@@ -33,7 +33,9 @@ const normalizarLinea = (linea = {}, idx = 0) => ({
   costingCode: String(linea.costingCode || linea.costCenter || "").trim() || null,
   projectCode: String(linea.projectCode || "").trim() || null,
   rubroSapCode:
-    linea.rubroSapCode === "" || linea.rubroSapCode === null || linea.rubroSapCode === undefined
+    linea.rubroSapCode === "" ||
+    linea.rubroSapCode === null ||
+    linea.rubroSapCode === undefined
       ? null
       : Number(linea.rubroSapCode),
   paqueteTrabajo: String(linea.paqueteTrabajo || "").trim() || null,
@@ -131,6 +133,97 @@ const agruparLineas = (lineas = []) => {
   );
 };
 
+const limpiarCodigoOV = (valor) => {
+  const raw = String(valor || "").trim();
+  if (!raw) return null;
+
+  return raw
+    .replace(/\s+/g, "")
+    .replace(/[\/\\]/g, "-")
+    .replace(/[^a-zA-Z0-9\-_]/g, "");
+};
+
+const obtenerOVParaSolicitud = async ({ data, transaction }) => {
+  let ordenVenta = null;
+
+  if (data.ordenVenta) {
+    ordenVenta = limpiarCodigoOV(data.ordenVenta);
+  }
+
+  if (!ordenVenta && data.ordenTrabajoId && esUUID(data.ordenTrabajoId)) {
+    const ordenTrabajo = await OrdenTrabajo.findByPk(data.ordenTrabajoId, {
+      transaction,
+    });
+
+    if (ordenTrabajo) {
+      ordenVenta =
+        limpiarCodigoOV(ordenTrabajo.ordenVenta) ||
+        limpiarCodigoOV(ordenTrabajo.numeroOV) ||
+        limpiarCodigoOV(ordenTrabajo.numeroOT);
+    }
+  }
+
+  if (!ordenVenta && data.equipo_id) {
+    const equipo = await Equipo.findByPk(data.equipo_id, { transaction });
+
+    if (!equipo) {
+      throw new Error("El equipo indicado no existe");
+    }
+
+    ordenVenta =
+      limpiarCodigoOV(equipo.numeroOV) ||
+      limpiarCodigoOV(equipo.ordenVenta) ||
+      limpiarCodigoOV(equipo.ov);
+  }
+
+  if (!ordenVenta && data.ubicacion_tecnica_id) {
+    const ubicacion = await UbicacionTecnica.findByPk(data.ubicacion_tecnica_id, {
+      transaction,
+    });
+
+    if (!ubicacion) {
+      throw new Error("La ubicación técnica indicada no existe");
+    }
+
+    ordenVenta =
+      limpiarCodigoOV(ubicacion.numeroOV) ||
+      limpiarCodigoOV(ubicacion.ordenVenta) ||
+      limpiarCodigoOV(ubicacion.ov);
+  }
+
+  if (!ordenVenta) {
+    return "SINOV";
+  }
+
+  return ordenVenta;
+};
+
+const generarNumeroSolicitudAlmacen = async ({ ordenVenta, transaction }) => {
+  const ov = limpiarCodigoOV(ordenVenta) || "SINOV";
+
+  const ultimoRegistro = await SolicitudAlmacen.findOne({
+    where: {
+      numeroSolicitud: {
+        [Op.like]: `SA-${ov}-%`,
+      },
+    },
+    order: [["createdAt", "DESC"]],
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+
+  let siguiente = 1;
+
+  if (ultimoRegistro?.numeroSolicitud) {
+    const match = String(ultimoRegistro.numeroSolicitud).match(/-(\d{3,})$/);
+    if (match) {
+      siguiente = Number(match[1]) + 1;
+    }
+  }
+
+  return `SA-${ov}-${String(siguiente).padStart(3, "0")}`;
+};
+
 /* =========================================================
    GET BY ID
 ========================================================= */
@@ -169,18 +262,9 @@ const updateSolicitudAlmacen = async ({ id, data }) => {
 
   try {
     const solicitud = await SolicitudAlmacen.findByPk(id, {
-  transaction: t,
-  lock: t.LOCK.UPDATE,
-});
-
-if (!solicitud) {
-  throw new Error("Solicitud de almacén no encontrada");
-}
-
-const lineas = await SolicitudAlmacenLinea.findAll({
-  where: { solicitud_almacen_id: id },
-  transaction: t,
-});
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
 
     if (!solicitud) {
       throw new Error("Solicitud de almacén no encontrada");
@@ -316,6 +400,9 @@ const getSolicitudesAlmacenAgrupadasParaSap = async ({
   };
 };
 
+/* =========================================================
+   CREATE
+========================================================= */
 
 const createSolicitudAlmacen = async ({ usuarioId, data }) => {
   const t = await sequelize.transaction();
@@ -356,6 +443,7 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
 
     const tratamiento = await Tratamiento.findByPk(data.tratamiento_id, {
       transaction: t,
+      lock: t.LOCK.UPDATE,
     });
 
     if (!tratamiento) {
@@ -363,7 +451,10 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
     }
 
     if (data.equipo_id) {
-      const equipo = await Equipo.findByPk(data.equipo_id, { transaction: t });
+      const equipo = await Equipo.findByPk(data.equipo_id, {
+        transaction: t,
+      });
+
       if (!equipo) {
         throw new Error("El equipo indicado no existe");
       }
@@ -373,23 +464,10 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
       const ubicacion = await UbicacionTecnica.findByPk(data.ubicacion_tecnica_id, {
         transaction: t,
       });
+
       if (!ubicacion) {
         throw new Error("La ubicación técnica indicada no existe");
       }
-    }
-
-    const existente = await SolicitudAlmacen.findOne({
-      where: {
-        tratamiento_id: data.tratamiento_id,
-        esGeneral: !!data.esGeneral,
-        equipo_id: data.equipo_id || null,
-        ubicacion_tecnica_id: data.ubicacion_tecnica_id || null,
-      },
-      transaction: t,
-    });
-
-    if (existente) {
-      throw new Error("Ya existe una solicitud de almacén para ese tratamiento y objetivo");
     }
 
     const requester = String(data.requester || data.email || "").trim();
@@ -398,6 +476,16 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
     }
 
     const lineasNormalizadas = data.lineas.map(normalizarLinea);
+
+    const ordenVenta = await obtenerOVParaSolicitud({
+      data,
+      transaction: t,
+    });
+
+    const numeroSolicitud = await generarNumeroSolicitudAlmacen({
+      ordenVenta,
+      transaction: t,
+    });
 
     const solicitud = await SolicitudAlmacen.create(
       {
@@ -413,6 +501,7 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
         requester,
         comments: data.comments || null,
         estado: data.estado || "DRAFT",
+        numeroSolicitud,
       },
       { transaction: t }
     );
@@ -434,7 +523,11 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
     );
 
     const creada = await SolicitudAlmacen.findByPk(solicitud.id, {
-      include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+      include: [
+        { model: SolicitudAlmacenLinea, as: "lineas" },
+        { model: Tratamiento, as: "tratamiento" },
+        { model: OrdenTrabajo, as: "ordenTrabajo" },
+      ],
       transaction: t,
     });
 
@@ -446,10 +539,9 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
   }
 };
 
-
 module.exports = {
   getSolicitudAlmacenById,
   updateSolicitudAlmacen,
   getSolicitudesAlmacenAgrupadasParaSap,
-  createSolicitudAlmacen
+  createSolicitudAlmacen,
 };
