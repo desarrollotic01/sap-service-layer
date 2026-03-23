@@ -132,7 +132,6 @@ SolicitudAlmacen.belongsTo(db.UbicacionTecnica, {
   foreignKey: "ubicacion_tecnica_id",
   as: "ubicacionTecnica",
 });
-S
     
   };
 
