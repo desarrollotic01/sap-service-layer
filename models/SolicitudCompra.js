@@ -10,6 +10,11 @@ module.exports = (sequelize) => {
         defaultValue: DataTypes.UUIDV4,
       },
 
+      numeroSolicitud: {
+  type: DataTypes.STRING,
+  allowNull: false,
+},
+
       // === CABECERA SAP ===
       docDate: {
         type: DataTypes.DATEONLY,
@@ -114,6 +119,18 @@ ordenTrabajoId: {
 
   SolicitudCompra.belongsTo(db.OrdenTrabajo,
      { foreignKey: "ordenTrabajoId", as: "ordenTrabajo" });
+
+     SolicitudCompra.belongsTo(db.Equipo, {
+  foreignKey: "equipo_id",
+  as: "equipo",
+});
+
+SolicitudCompra.belongsTo(db.UbicacionTecnica, {
+  foreignKey: "ubicacion_tecnica_id",
+  as: "ubicacionTecnica",
+});
+
+
 
   };
 

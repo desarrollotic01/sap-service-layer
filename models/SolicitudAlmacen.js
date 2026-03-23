@@ -4,11 +4,18 @@ module.exports = (sequelize) => {
   const SolicitudAlmacen = sequelize.define(
     "SolicitudAlmacen",
     {
+      
       id: {
         type: DataTypes.UUID,
         primaryKey: true,
         defaultValue: DataTypes.UUIDV4,
       },
+
+
+      numeroSolicitud: {
+  type: DataTypes.STRING,
+  allowNull: false,
+},
 
       // === CABECERA SAP ===
       docDate: {
@@ -115,6 +122,18 @@ module.exports = (sequelize) => {
       foreignKey: "ordenTrabajoId",
       as: "ordenTrabajo",
     });
+
+    SolicitudAlmacen.belongsTo(db.Equipo, {
+  foreignKey: "equipo_id",
+  as: "equipo",
+});
+
+SolicitudAlmacen.belongsTo(db.UbicacionTecnica, {
+  foreignKey: "ubicacion_tecnica_id",
+  as: "ubicacionTecnica",
+});
+S
+    
   };
 
   return SolicitudAlmacen;
