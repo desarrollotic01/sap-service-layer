@@ -253,12 +253,6 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
         });
       }
 
-      if (!producto || typeof producto !== "string" || !PRODUCTOS_VALIDOS.has(producto)) {
-        return res.status(400).json({
-          error: "producto es obligatorio si no envías equipoId y debe ser válido.",
-        });
-      }
-
       if (!ordenVenta || typeof ordenVenta !== "string" || !ordenVenta.trim()) {
         return res.status(400).json({
           error: "ordenVenta es obligatoria si no envías equipoId.",
@@ -276,7 +270,6 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
       let ordenVentaFinal = ordenVenta ? String(ordenVenta).trim() : null;
       let paisIdFinal = paisId || null;
       let creticidadFinal = creticidad || null;
-      let productoFinal = producto ? String(producto).trim() : null;
 
       if (hasEquipo) {
         const equipo = await Equipo.findByPk(equipoId, { transaction: t });
@@ -287,11 +280,9 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
         if (!ordenVentaFinal) ordenVentaFinal = equipo.numeroOV;
         if (!paisIdFinal) paisIdFinal = equipo.paisId;
         creticidadFinal = equipo.creticidad;
-        productoFinal = equipo.producto || equipo.nombre;
 
         if (!ordenVentaFinal) throw new Error("El equipo no tiene numeroOV.");
         if (!paisIdFinal) throw new Error("El equipo no tiene paisId.");
-        if (!productoFinal) throw new Error("El equipo no tiene producto o nombre.");
       }
 
       if (hasUbic) {
@@ -329,7 +320,7 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
           creticidad: creticidadFinal,
           fechaInicioAlerta: fechaInicioDate,
           solicitanteId,
-          producto: productoFinal,
+          producto,
           descripcion: descripcion.trim(),
           descripcionDetallada: descripcionDetallada ?? null,
           alertaActiva: alertaActivaFinal,
