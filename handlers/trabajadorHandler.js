@@ -39,7 +39,7 @@ const actualizarTrabajador = async (req, res) => {
     res.json(trabajador);
   } catch (error) {
     res.status(400).json({ message: error.message });
-  }
+  }w
 };
 
 const desactivarTrabajador = async (req, res) => {
