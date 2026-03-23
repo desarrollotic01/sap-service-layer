@@ -1,5 +1,10 @@
 const { Trabajador } = require("../db_connection");
 
+// 1. SOLUCIÓN AL ERROR 400: Creamos la función isUUID para que Node.js no colapse
+const isUUID = (id) => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
 
 const crear = async (data) => {
   if (!data.nombre || !data.apellido || !data.dni || !data.rol) {
@@ -54,10 +59,16 @@ const actualizar = async (id, data) => {
     throw new Error("Trabajador no encontrado");
   }
 
+  // 2. SOLUCIÓN DE EDICIÓN: Agregamos todos los campos para que realmente se actualicen
   await trabajador.update({
     nombre: data.nombre ?? trabajador.nombre,
+    apellido: data.apellido ?? trabajador.apellido,
+    dni: data.dni ?? trabajador.dni,
+    fechaNacimiento: data.fechaNacimiento !== undefined ? data.fechaNacimiento : trabajador.fechaNacimiento,
+    zona: data.zona !== undefined ? data.zona : trabajador.zona,
+    direccion: data.direccion !== undefined ? data.direccion : trabajador.direccion,
     rol: data.rol ?? trabajador.rol,
-    empresa: data.empresa ?? trabajador.empresa,
+    empresa: data.empresa !== undefined ? data.empresa : trabajador.empresa,
     activo: data.activo ?? trabajador.activo,
   });
 
