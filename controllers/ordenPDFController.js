@@ -3,7 +3,7 @@ const { generarOrdenTrabajoPDF } = require("../services/OrdenTrabajoPdf");
 const {
   OrdenTrabajo,
   OrdenTrabajoEquipo,
-  OrdenTrabajoActividad,
+  OrdenTrabajoEquipoActividad,
   OrdenTrabajoEquipoTrabajador,
   Equipo,
   Trabajador
@@ -25,7 +25,7 @@ const generarOT = async (req, res) => {
               as: "equipo",
             },
             {
-              model: OrdenTrabajoActividad,
+              model: OrdenTrabajoEquipoActividad,
               as: "actividades",
             },
             {
