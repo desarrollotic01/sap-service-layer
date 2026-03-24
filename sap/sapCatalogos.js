@@ -20,13 +20,11 @@ async function obtenerValoresUDF(nombreCampo) {
     const cookies = await loginSAP();
 
     const response = await sapAxios.get(
-      `/UserFieldsMD?$filter=Name eq '${nombreCampo}'`,
-      {
-        headers: {
-          Cookie: cookies,
-        },
-      }
-    );
+  `/UserFieldsMD?$filter=Name eq '${nombreCampo}' and TableName eq 'PRQ1'`,
+  {
+    headers: { Cookie: cookies },
+  }
+);
 
     const data = response.data.value[0];
 
@@ -61,14 +59,14 @@ async function obtenerValoresUDF(nombreCampo) {
  * 📦 Paquetes de trabajo
  */
 async function obtenerPaquetesTrabajo() {
-  return await obtenerValoresUDF("U_ALS_PAQTRAB");
+  return await obtenerValoresUDF("ALS_PAQTRAB");
 }
 
 /**
  * 🧱 Rubros
  */
 async function obtenerRubros() {
-  return await obtenerValoresUDF("U_ALS_RUBRO");
+  return await obtenerValoresUDF("ALS_RUBRO");
 }
 
 module.exports = {
