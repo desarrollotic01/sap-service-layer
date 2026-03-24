@@ -51,7 +51,7 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
-      paqueteTrabajoid: {
+      paqueteTrabajoId: {
         type: DataTypes.UUID,
         allowNull: true,
       },
