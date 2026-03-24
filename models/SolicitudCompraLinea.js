@@ -48,12 +48,12 @@ module.exports = (sequelize) => {
 
       rubroId: {
         type: DataTypes.UUID,
-        allowNull: true,
+        allowNull: false,
       },
 
       paqueteTrabajoId: {
         type: DataTypes.UUID,
-        allowNull: true,
+        allowNull: false,
       },
     },
     {
