@@ -7,10 +7,14 @@ const {
   OrdenTrabajoEquipoTrabajador,
   OrdenTrabajoEquipoActividad,
   SolicitudCompra,
+  SolicitudCompraLinea,
   Tratamiento,
   TratamientoEquipo,
   Notificacion,
 } = require("../db_connection");
+
+
+const { enviarSolicitudCompra } = require("../sap/sapSolicitudCompra");
 
 const { Op } = require("sequelize");
 
@@ -1100,13 +1104,58 @@ async function liberarOrdenTrabajo(id) {
   const ot = await OrdenTrabajo.findByPk(id);
 
   if (!ot) throw new Error("Orden de Trabajo no encontrada");
+
   if (ot.estado !== "CREADO") {
     throw new Error("Solo se puede liberar una OT en estado CREADO");
   }
 
+  // 🔥 1. Traer solicitudes asociadas
+  const solicitudes = await SolicitudCompra.findAll({
+    where: {
+      ordenTrabajoId: id,
+    },
+    include: [
+      {
+        model: SolicitudCompraLinea,
+        as: "lineas",
+      },
+    ],
+  });
+
+  // 🔥 2. Enviar cada solicitud a SAP
+  for (const solicitud of solicitudes) {
+    // Solo enviar las que no se enviaron
+    if (solicitud.estado === "SENT") continue;
+
+    try {
+      const resultado = await enviarSolicitudCompra(solicitud);
+
+      if (resultado.success) {
+        await solicitud.update({
+          estado: "SENT",
+          sapDocNum: resultado.data.DocNum,
+        });
+      } else {
+        await solicitud.update({
+          estado: "ERROR",
+        });
+      }
+
+    } catch (error) {
+      console.error("Error enviando solicitud:", error.message);
+
+      await solicitud.update({
+        estado: "ERROR",
+      });
+    }
+  }
+
+  // 🔥 3. Liberar OT
   await ot.update({ estado: "LIBERADO" });
+
   return ot;
 }
+
 
 /* =========================================================
    6) CAMBIAR A CIERRE_TECNICO SI TODAS TIENEN NOTIFICACION
