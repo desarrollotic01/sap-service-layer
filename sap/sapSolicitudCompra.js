@@ -22,13 +22,12 @@ async function enviarSolicitudCompra(solicitud) {
         ItemCode: linea.itemCode,
         ItemDescription: linea.description || "",
         Quantity: Number(linea.quantity),
-        WarehouseCode: linea.warehouseCode,
 
         CostingCode: linea.costingCode || undefined,
         ProjectCode: linea.projectCode || undefined,
 
-       U_ALS_PAQTRAB: linea.paqueteTrabajo?.codigo,
-U_ALS_RUBRO: linea.rubro?.codigo,
+       U_ALS_PAQTRAB: linea.paqueteTrabajoId?.codigo,
+U_ALS_RUBRO: linea.rubroId?.codigo,
       })),
     };
 
