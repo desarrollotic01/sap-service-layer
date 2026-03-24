@@ -46,13 +46,13 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
-      rubroSapCode: {
-        type: DataTypes.INTEGER,
+      rubroId: {
+        type: DataTypes.UUID,
         allowNull: true,
       },
 
-      paqueteTrabajo: {
-        type: DataTypes.STRING,
+      paqueteTrabajoId: {
+        type: DataTypes.UUID,
         allowNull: true,
       },
     },
@@ -73,11 +73,15 @@ module.exports = (sequelize) => {
       as: "item",
     });
 
-    SolicitudAlmacenLinea.belongsTo(db.Rubro, {
-      foreignKey: "rubroSapCode",
-      targetKey: "sapCode",
-      as: "rubro",
-    });
+   SolicitudAlmacenLinea.belongsTo(db.SapPaqueteTrabajo, {
+  foreignKey: "paqueteTrabajoId",
+  as: "paqueteTrabajo",
+});
+
+SolicitudAlmacenLinea.belongsTo(db.SapRubro, {
+  foreignKey: "rubroId",
+  as: "rubro",
+});
   };
 
   return SolicitudAlmacenLinea;
