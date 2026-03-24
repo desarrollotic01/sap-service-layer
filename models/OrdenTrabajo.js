@@ -28,6 +28,7 @@ module.exports = (sequelize) => {
 
 
   descripcionGeneral: DataTypes.TEXT,
+  descripcionDetallada: DataTypes.TEXT,
 
   estado: {
     type: DataTypes.ENUM(
