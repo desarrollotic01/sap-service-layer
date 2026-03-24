@@ -376,8 +376,8 @@ const crearSolicitudCompra = async ({
       warehouseCode: l.warehouseCode || "01",
       costingCode: l.costCenter || l.costingCode || null,
       projectCode: l.projectCode || null,
-      rubroSapCode: l.rubroSapCode || l.rubro || null,
-      paqueteTrabajo: l.paqueteTrabajo || null,
+      rubroId: l.rubroId || null,
+      paqueteTrabajoId: l.paqueteTrabajoId || null,
     })),
     { transaction: t }
   );
@@ -446,8 +446,8 @@ const crearSolicitudAlmacen = async ({
       warehouseCode: l.warehouseCode || "01",
       costingCode: l.costCenter || l.costingCode || null,
       projectCode: l.projectCode || null,
-      rubroSapCode: l.rubroSapCode || l.rubro || null,
-      paqueteTrabajo: l.paqueteTrabajo || null,
+       rubroId: l.rubroId || null,
+    paqueteTrabajoId: l.paqueteTrabajoId || null,
     })),
     { transaction: t }
   );
@@ -1100,8 +1100,8 @@ const upsertSolicitud = async ({
       costingCode: l.costCenter || l.costingCode || null,
       projectCode: l.projectCode || null,
       warehouseCode: l.warehouseCode || "01",
-      rubroSapCode: l.rubroSapCode || l.rubro || null,
-      paqueteTrabajo: l.paqueteTrabajo || null,
+      rubroId: l.rubroId || null,
+paqueteTrabajoId: l.paqueteTrabajoId || null,
     })),
     { transaction: t }
   );

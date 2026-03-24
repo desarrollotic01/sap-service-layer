@@ -25,6 +25,9 @@ const itemRouter = require("./itemRouter")
 const rubroRouter = require("./rubroRouter")
 const sedeRouter = require("./sedeRouter")
 const solicitudAlmacenRouter = require("./solicitudAlmacenRouter")
+const sapCatalogoRouter = require("./sapCatalogoRouter")
+
+router.use("/sap", sapCatalogoRouter);
 
 router.use("/solicitudalmacen", solicitudAlmacenRouter);
 router.use("/rubros", rubroRouter);
@@ -51,7 +54,6 @@ router.use("/equipo", equipoRouter);
 router.use("/ubicacion-tecnica", ubicacionTecnicaRouter);  
 router.use("/contacto", contactoRouter); 
 router.use("/sede", sedeRouter);
-
 
 
 
