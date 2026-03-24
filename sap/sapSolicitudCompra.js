@@ -27,8 +27,8 @@ async function enviarSolicitudCompra(solicitud) {
         CostingCode: linea.costingCode || undefined,
         ProjectCode: linea.projectCode || undefined,
 
-        U_ALS_RUBRO: linea.rubroSapCode || null,
-        U_ALS_PAQTRAB: linea.paqueteTrabajo || "",
+       U_ALS_PAQTRAB: linea.paqueteTrabajo?.codigo,
+U_ALS_RUBRO: linea.rubro?.codigo,
       })),
     };
 

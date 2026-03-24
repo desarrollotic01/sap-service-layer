@@ -5,6 +5,7 @@ const { getClientesSAP } = require("../sap/sapClientes");
 const { getItemsSAP } = require("../sap/sapItems");
 const { getRubrosSAP } = require("../sap/sapRubros");
 const { getContactosSAP } = require("../sap/sapContactos");
+const {obtenerPaquetesTrabajo , obtenerRubros} = require("../sap/sapCatalogos");
 
 async function syncRubros() {
   const rubrosSAP = await getRubrosSAP();
@@ -232,8 +233,41 @@ async function syncContactos() {
   console.log(`✅ Contactos sincronizados procesados: ${contactosSAP.length}`);
 }
 
+async function sincronizarCatalogosSAP() {
+  try {
+    const [paquetes, rubros] = await Promise.all([
+      obtenerPaquetesTrabajo(),
+      obtenerRubros(),
+    ]);
+
+    // 🔄 Paquetes
+    for (const p of paquetes) {
+      await SapPaqueteTrabajo.upsert({
+        codigo: p.value,
+        descripcion: p.label,
+        activo: true,
+      });
+    }
+
+    // 🔄 Rubros
+    for (const r of rubros) {
+      await SapRubro.upsert({
+        codigo: r.value,
+        descripcion: r.label,
+        activo: true,
+      });
+    }
+
+    console.log("✅ Catálogos SAP sincronizados");
+
+  } catch (error) {
+    console.error("❌ Error sincronizando SAP:", error.message);
+  }
+}
+
 async function main() {
   try {
+    await sincronizarCatalogosSAP();
     await syncRubros();
     await syncClientes();
     await syncContactos();
@@ -248,5 +282,8 @@ async function main() {
     process.exit(1);
   }
 }
+
+
+
 
 main();
