@@ -1,16 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
-  AlignmentType,
-} = require("docx");
+const puppeteer = require("puppeteer");
 
 async function generarOrdenTrabajoPDF(orden) {
   try {
@@ -20,165 +10,190 @@ async function generarOrdenTrabajoPDF(orden) {
       fs.mkdirSync(carpeta);
     }
 
-    const filePath = path.join(carpeta, `${orden.numeroOT}.docx`);
+    const filePath = path.join(carpeta, `${orden.numeroOT}.pdf`);
 
     // 🧹 eliminar anterior
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
 
-    const sections = [];
+    // 🎨 HTML PROFESIONAL
+    const html = `
+    <html>
+    <head>
+      <meta charset="UTF-8" />
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          font-size: 12px;
+          color: #333;
+          padding: 30px;
+        }
 
-    // 🟩 HEADER
-    sections.push(
-      new Paragraph({
-        text: "ORDEN DE TRABAJO",
-        heading: "Heading1",
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({
-        text: `N°: ${orden.numeroOT}`,
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({
-        text: `Estado: ${orden.estado}`,
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph("")
-    );
+        h1, h2, h3 {
+          margin-bottom: 5px;
+        }
 
-    // 🟦 INFO GENERAL
-    sections.push(
-      new Paragraph({ text: "INFORMACIÓN GENERAL", heading: "Heading2" }),
-      new Paragraph(`Tipo: ${orden.tipoMantenimiento}`),
-      new Paragraph(`Inicio: ${orden.fechaProgramadaInicio}`),
-      new Paragraph(`Fin: ${orden.fechaProgramadaFin}`),
-      new Paragraph(`Descripción: ${orden.descripcionGeneral || "-"}`),
-      new Paragraph("")
-    );
+        .center {
+          text-align: center;
+        }
 
-    // 🔁 POR CADA EQUIPO
-    orden.equipos.forEach((eq, index) => {
-      const equipo = eq.equipo;
+        .section {
+          margin-top: 20px;
+        }
 
-      // 🟨 EQUIPO
-      sections.push(
-        new Paragraph({
-          text: `EQUIPO ${index + 1}`,
-          heading: "Heading2",
-        }),
-        new Paragraph(`Código: ${equipo.codigo}`),
-        new Paragraph(`Nombre: ${equipo.nombre}`),
-        new Paragraph(`Serie: ${equipo.serie}`),
-        new Paragraph(`Marca: ${equipo.marca}`),
-        new Paragraph(`Estado: ${equipo.estado}`),
-        new Paragraph("")
-      );
+        .box {
+          border: 1px solid #ddd;
+          padding: 10px;
+          border-radius: 6px;
+          margin-top: 10px;
+        }
 
-      // 🟧 PERSONAL
-      sections.push(
-        new Paragraph({ text: "PERSONAL ASIGNADO", heading: "Heading3" })
-      );
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 10px;
+        }
 
-      eq.trabajadores.forEach((t) => {
-        sections.push(
-          new Paragraph(
-            `${t.trabajador.nombre} ${t.trabajador.apellido} ${
-              t.esEncargado ? "(Encargado)" : ""
-            }`
-          )
-        );
-      });
+        th, td {
+          border: 1px solid #ccc;
+          padding: 6px;
+          text-align: left;
+        }
 
-      sections.push(new Paragraph(""));
+        th {
+          background-color: #f5f5f5;
+        }
 
-      // 🟥 ACTIVIDADES (TABLA)
-      const rows = [];
+        .firma {
+          margin-top: 40px;
+        }
+      </style>
+    </head>
 
-      // HEADER
-      rows.push(
-        new TableRow({
-          children: [
-            "N°",
-            "Tarea",
-            "Sistema",
-            "Tipo",
-            "Rol",
-            "Cant",
-            "Duración",
-            "Estado",
-          ].map(
-            (h) =>
-              new TableCell({
-                children: [new Paragraph({ text: h, bold: true })],
-              })
-          ),
+    <body>
+
+      <h1 class="center">ORDEN DE TRABAJO</h1>
+      <p class="center"><strong>N°:</strong> ${orden.numeroOT}</p>
+      <p class="center"><strong>Estado:</strong> ${orden.estado}</p>
+
+      <div class="section box">
+        <h2>INFORMACIÓN GENERAL</h2>
+        <p><strong>Tipo:</strong> ${orden.tipoMantenimiento}</p>
+        <p><strong>Inicio:</strong> ${orden.fechaProgramadaInicio}</p>
+        <p><strong>Fin:</strong> ${orden.fechaProgramadaFin}</p>
+        <p><strong>Descripción:</strong> ${orden.descripcionGeneral || "-"}</p>
+      </div>
+
+      ${orden.equipos
+        .map((eq, index) => {
+          const esEquipo = !!eq.equipo;
+const data = esEquipo ? eq.equipo : eq.ubicacionTecnica;
+
+const tipoLabel = esEquipo ? "EQUIPO" : "UBICACIÓN TÉCNICA";
+
+          return `
+          <div class="section box">
+            <h2>${tipoLabel} ${index + 1}</h2>
+
+<p><strong>Código:</strong> ${data?.codigo || "-"}</p>
+<p><strong>Nombre:</strong> ${data?.nombre || "-"}</p>
+<p><strong>Serie:</strong> ${data?.serie || "-"}</p>
+<p><strong>Marca:</strong> ${data?.marca || "-"}</p>
+<p><strong>Estado:</strong> ${data?.estado || "-"}</p>
+            <h3>PERSONAL</h3>
+            <ul>
+              ${eq.trabajadores
+                .map(
+                  (t) => `
+                <li>
+                  ${t.trabajador.nombre} ${t.trabajador.apellido}
+                  ${t.esEncargado ? "(Encargado)" : ""}
+                </li>`
+                )
+                .join("")}
+            </ul>
+
+            <h3>ACTIVIDADES</h3>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Tarea</th>
+                  <th>Sistema</th>
+                  <th>Tipo</th>
+                  <th>Rol</th>
+                  <th>Cant</th>
+                  <th>Duración</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${eq.actividades
+                  .map(
+                    (act, i) => `
+                  <tr>
+                    <td>${i + 1}</td>
+                    <td>${act.tarea || "-"}</td>
+                    <td>${act.sistema}/${act.subsistema}/${act.componente}</td>
+                    <td>${act.tipoTrabajo || "-"}</td>
+                    <td>${act.rolTecnico || "-"}</td>
+                    <td>${act.cantidadTecnicos || "-"}</td>
+                    <td>${act.duracionEstimadaValor || "-"} ${
+                      act.unidadDuracion || ""
+                    }</td>
+                    <td>${act.estado || "-"}</td>
+                  </tr>
+                `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+          `;
         })
-      );
+        .join("")}
 
-      // DATA
-      eq.actividades.forEach((act, i) => {
-        rows.push(
-          new TableRow({
-            children: [
-              i + 1,
-              act.tarea,
-              `${act.sistema}/${act.subsistema}/${act.componente}`,
-              act.tipoTrabajo,
-              act.rolTecnico,
-              act.cantidadTecnicos,
-              `${act.duracionEstimadaValor} ${act.unidadDuracion}`,
-              act.estado,
-            ].map(
-              (val) =>
-                new TableCell({
-                  children: [new Paragraph(String(val || "-"))],
-                })
-            ),
-          })
-        );
-      });
+      <div class="firma">
+        <h2>FIRMAS</h2>
 
-      sections.push(
-        new Paragraph({
-          text: "ACTIVIDADES",
-          heading: "Heading3",
-        }),
-        new Table({
-          rows,
-          width: {
-            size: 100,
-            type: WidthType.PERCENTAGE,
-          },
-        }),
-        new Paragraph("")
-      );
+        <p>________________________</p>
+        <p>Técnico</p>
+
+        <br/>
+
+        <p>________________________</p>
+        <p>Supervisor</p>
+      </div>
+
+    </body>
+    </html>
+    `;
+
+    // 🚀 GENERAR PDF
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
-    // 🟫 FIRMAS
-    sections.push(
-      new Paragraph({ text: "FIRMAS", heading: "Heading2" }),
-      new Paragraph("________________________"),
-      new Paragraph("Técnico"),
-      new Paragraph(""),
-      new Paragraph("________________________"),
-      new Paragraph("Supervisor")
-    );
+    const page = await browser.newPage();
 
-    const doc = new Document({
-      sections: [{ children: sections }],
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    await page.pdf({
+      path: filePath,
+      format: "A4",
+      printBackground: true,
     });
 
-    const buffer = await Packer.toBuffer(doc);
-
-    fs.writeFileSync(filePath, buffer);
+    await browser.close();
 
     console.log("✅ PDF generado:", filePath);
 
     return filePath;
-
   } catch (error) {
-    console.error("❌ Error generando OT:", error);
+    console.error("❌ Error generando PDF:", error);
     throw error;
   }
 }

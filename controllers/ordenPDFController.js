@@ -1,21 +1,40 @@
+const path = require("path");
 const { generarOrdenTrabajoPDF } = require("../services/OrdenTrabajoPdf");
-const { OrdenTrabajo } = require("../db_connection"); // ajusta según tu modelo
+const {
+  OrdenTrabajo,
+  OrdenTrabajoEquipo,
+  OrdenTrabajoActividad,
+  OrdenTrabajoTrabajador,
+  Equipo,
+} = require("../db_connection");
 
 const generarOT = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 🔥 Traer orden COMPLETA (igual que ya haces)
+    // 🔥 Traer OT completa con relaciones
     const orden = await OrdenTrabajo.findByPk(id, {
       include: [
         {
-          association: "equipos",
+          model: OrdenTrabajoEquipo,
+          as: "equipos",
           include: [
-            { association: "equipo" },
-            { association: "actividades" },
             {
-              association: "trabajadores",
-              include: [{ association: "trabajador" }],
+              model: Equipo,
+              as: "equipo",
+            },
+            {
+              model: OrdenTrabajoActividad,
+              as: "actividades",
+            },
+            {
+              model: OrdenTrabajoTrabajador,
+              as: "trabajadores",
+              include: [
+                {
+                  association: "trabajador",
+                },
+              ],
             },
           ],
         },
@@ -23,20 +42,28 @@ const generarOT = async (req, res) => {
     });
 
     if (!orden) {
-      return res.status(404).json({ error: "Orden no encontrada" });
+      return res.status(404).json({ message: "Orden no encontrada" });
     }
 
-    // 🚀 Generar archivo
+    // 🔥 Generar PDF
     const filePath = await generarOrdenTrabajoPDF(orden);
 
-    return res.json({
-      success: true,
-      file: filePath,
-    });
+    // 🔥 Enviar PDF
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${orden.numeroOT}.pdf"`
+    );
+
+    return res.sendFile(path.resolve(filePath));
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error generando OT" });
+    console.error("❌ Error generando PDF:", error);
+
+    return res.status(500).json({
+      message: "Error generando PDF",
+      error: error.message,
+    });
   }
 };
 
