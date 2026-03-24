@@ -2,11 +2,111 @@ const sapAxios = require("./sapClient");
 const { loginSAP } = require("./sapAuth");
 
 /**
- * Envía una solicitud de compra a SAP
+ * Cache simple (opcional pero recomendado)
+ */
+let cache = {
+  costCenters: null,
+  projects: null,
+  lastLoad: null,
+};
+
+const CACHE_TTL = 1000 * 60 * 10; // 10 min
+
+async function getCatalogosSAP() {
+  const now = Date.now();
+
+  if (
+    cache.costCenters &&
+    cache.projects &&
+    cache.lastLoad &&
+    now - cache.lastLoad < CACHE_TTL
+  ) {
+    return cache;
+  }
+
+  console.log("🔄 Cargando catálogos desde SAP...");
+
+  const [costCentersRes, projectsRes] = await Promise.all([
+    sapAxios.get("/ProfitCenters"), // ⚠️ ajustar si usas CostCenters
+    sapAxios.get("/Projects"),
+  ]);
+
+  cache = {
+    costCenters: new Set(
+      costCentersRes.data.value.map((c) => c.Code)
+    ),
+    projects: new Set(
+      projectsRes.data.value.map((p) => p.Code)
+    ),
+    lastLoad: now,
+  };
+
+  return cache;
+}
+
+/**
+ * Construye líneas VALIDADAS para SAP
+ */
+function buildDocumentLines(lineas, catalogos) {
+  return lineas.map((linea, index) => {
+    const line = {
+      ItemCode: linea.itemCode,
+      ItemDescription: linea.description || "",
+      Quantity: Number(linea.quantity),
+    };
+
+    // ✅ VALIDAR COST CENTER
+    if (linea.costingCode) {
+      if (catalogos.costCenters.has(linea.costingCode)) {
+        line.CostingCode = linea.costingCode;
+      } else {
+        console.warn(
+          `❌ Línea ${index + 1}: CostingCode inválido →`,
+          linea.costingCode
+        );
+      }
+    }
+
+    // ✅ VALIDAR PROJECT
+    if (linea.projectCode) {
+      if (catalogos.projects.has(linea.projectCode)) {
+        line.ProjectCode = linea.projectCode;
+      } else {
+        console.warn(
+          `❌ Línea ${index + 1}: ProjectCode inválido →`,
+          linea.projectCode
+        );
+      }
+    }
+
+    // ✅ CAMPOS UDF (IMPORTANTE)
+    if (linea.paqueteTrabajoId) {
+      line.U_ALS_PAQTRAB = linea.paqueteTrabajoId;
+    }
+
+    if (linea.rubroId) {
+      line.U_ALS_RUBRO = linea.rubroId;
+    }
+
+    return line;
+  });
+}
+
+/**
+ * Enviar solicitud de compra a SAP
  */
 async function enviarSolicitudCompra(solicitud) {
   try {
     const cookies = await loginSAP();
+
+    // 🔥 Obtener catálogos válidos
+    const catalogos = await getCatalogosSAP();
+
+    // 🔥 Construir líneas seguras
+    const documentLines = buildDocumentLines(
+      solicitud.lineas,
+      catalogos
+    );
 
     const payload = {
       DocDate: solicitud.docDate,
@@ -16,19 +116,11 @@ async function enviarSolicitudCompra(solicitud) {
       DocCurrency: solicitud.docCurrency || "PEN",
       DocRate: solicitud.docRate || 1,
 
-      BPL_IDAssignedToInvoice: solicitud.branchId || undefined,
+      ...(solicitud.branchId && {
+        BPL_IDAssignedToInvoice: solicitud.branchId,
+      }),
 
-      DocumentLines: solicitud.lineas.map((linea) => ({
-        ItemCode: linea.itemCode,
-        ItemDescription: linea.description || "",
-        Quantity: Number(linea.quantity),
-
-        CostingCode: linea.costingCode || undefined,
-        ProjectCode: linea.projectCode || undefined,
-
-       U_ALS_PAQTRAB: linea.paqueteTrabajoId?.codigo,
-U_ALS_RUBRO: linea.rubroId?.codigo,
-      })),
+      DocumentLines: documentLines,
     };
 
     console.log("📦 Payload SAP:");
@@ -57,6 +149,17 @@ U_ALS_RUBRO: linea.rubroId?.codigo,
 
     if (error.response) {
       console.error(JSON.stringify(error.response.data, null, 2));
+
+      // 🔥 MANEJO ESPECÍFICO SAP
+      if (error.response.data?.error?.code === -2028) {
+        console.error("💥 SAP ERROR -2028: Datos maestros inválidos");
+
+        console.error("👉 Verifica:");
+        console.error("- CostingCode");
+        console.error("- ProjectCode");
+        console.error("- Dimensiones activas");
+      }
+
     } else {
       console.error(error.message);
     }
