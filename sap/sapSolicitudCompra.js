@@ -12,7 +12,7 @@ let cache = {
 
 const CACHE_TTL = 1000 * 60 * 10; // 10 min
 
-async function getCatalogosSAP() {
+async function getCatalogosSAP(cookies) {
   const now = Date.now();
 
   if (
@@ -26,9 +26,15 @@ async function getCatalogosSAP() {
 
   console.log("🔄 Cargando catálogos desde SAP...");
 
+  const config = {
+    headers: {
+      Cookie: cookies,
+    },
+  };
+
   const [costCentersRes, projectsRes] = await Promise.all([
-    sapAxios.get("/ProfitCenters"), // ⚠️ ajustar si usas CostCenters
-    sapAxios.get("/Projects"),
+    sapAxios.get("/ProfitCenters", config),
+    sapAxios.get("/Projects", config),
   ]);
 
   cache = {
