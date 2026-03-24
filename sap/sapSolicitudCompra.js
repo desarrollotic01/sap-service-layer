@@ -2,117 +2,46 @@ const sapAxios = require("./sapClient");
 const { loginSAP } = require("./sapAuth");
 
 /**
- * Cache simple (opcional pero recomendado)
- */
-let cache = {
-  costCenters: null,
-  projects: null,
-  lastLoad: null,
-};
-
-const CACHE_TTL = 1000 * 60 * 10; // 10 min
-
-async function getCatalogosSAP(cookies) {
-  const now = Date.now();
-
-  if (
-    cache.costCenters &&
-    cache.projects &&
-    cache.lastLoad &&
-    now - cache.lastLoad < CACHE_TTL
-  ) {
-    return cache;
-  }
-
-  console.log("🔄 Cargando catálogos desde SAP...");
-
-  const config = {
-    headers: {
-      Cookie: cookies,
-    },
-  };
-
-  const [costCentersRes, projectsRes] = await Promise.all([
-    sapAxios.get("/ProfitCenters", config),
-    sapAxios.get("/Projects", config),
-  ]);
-
-  cache = {
-    costCenters: new Set(
-      costCentersRes.data.value.map((c) => c.Code)
-    ),
-    projects: new Set(
-      projectsRes.data.value.map((p) => p.Code)
-    ),
-    lastLoad: now,
-  };
-
-  return cache;
-}
-
-/**
- * Construye líneas VALIDADAS para SAP
- */
-function buildDocumentLines(lineas, catalogos) {
-  return lineas.map((linea, index) => {
-    const line = {
-      ItemCode: linea.itemCode,
-      ItemDescription: linea.description || "",
-      Quantity: Number(linea.quantity),
-    };
-
-    // ✅ VALIDAR COST CENTER
-    if (linea.costingCode) {
-      if (catalogos.costCenters.has(linea.costingCode)) {
-        line.CostingCode = linea.costingCode;
-      } else {
-        console.warn(
-          `❌ Línea ${index + 1}: CostingCode inválido →`,
-          linea.costingCode
-        );
-      }
-    }
-
-    // ✅ VALIDAR PROJECT
-    if (linea.projectCode) {
-      if (catalogos.projects.has(linea.projectCode)) {
-        line.ProjectCode = linea.projectCode;
-      } else {
-        console.warn(
-          `❌ Línea ${index + 1}: ProjectCode inválido →`,
-          linea.projectCode
-        );
-      }
-    }
-
-    // ✅ CAMPOS UDF (IMPORTANTE)
-    if (linea.paqueteTrabajoId) {
-      line.U_ALS_PAQTRAB = linea.paqueteTrabajoId;
-    }
-
-    if (linea.rubroId) {
-      line.U_ALS_RUBRO = linea.rubroId;
-    }
-
-    return line;
-  });
-}
-
-/**
  * Enviar solicitud de compra a SAP
  */
 async function enviarSolicitudCompra(solicitud) {
   try {
     const cookies = await loginSAP();
 
-    // 🔥 Obtener catálogos válidos
-    const catalogos = await getCatalogosSAP();
+    const config = {
+      headers: {
+        Cookie: cookies,
+      },
+    };
 
-    // 🔥 Construir líneas seguras
-    const documentLines = buildDocumentLines(
-      solicitud.lineas,
-      catalogos
-    );
+    // 🔹 Construir líneas LIMPIAS
+    const documentLines = solicitud.lineas.map((linea) => {
+      const line = {
+        ItemCode: linea.itemCode,
+        ItemDescription: linea.description || "",
+        Quantity: Number(linea.quantity),
+      };
+
+      // ✅ SOLO enviar si existen (evita -2028)
+      if (linea.costingCode) {
+        line.CostingCode = linea.costingCode;
+      }
+
+      if (linea.projectCode) {
+        line.ProjectCode = linea.projectCode;
+      }
+
+      // ✅ UDFs (sin .codigo porque ya es ID)
+      if (linea.paqueteTrabajoId) {
+        line.U_ALS_PAQTRAB = linea.paqueteTrabajoId;
+      }
+
+      if (linea.rubroId) {
+        line.U_ALS_RUBRO = linea.rubroId;
+      }
+
+      return line;
+    });
 
     const payload = {
       DocDate: solicitud.docDate,
@@ -136,11 +65,7 @@ async function enviarSolicitudCompra(solicitud) {
     const response = await sapAxios.post(
       "/PurchaseRequests",
       payload,
-      {
-        headers: {
-          Cookie: cookies,
-        },
-      }
+      config
     );
 
     console.log("✅ Respuesta SAP:", response.data);
@@ -156,14 +81,12 @@ async function enviarSolicitudCompra(solicitud) {
     if (error.response) {
       console.error(JSON.stringify(error.response.data, null, 2));
 
-      // 🔥 MANEJO ESPECÍFICO SAP
       if (error.response.data?.error?.code === -2028) {
-        console.error("💥 SAP ERROR -2028: Datos maestros inválidos");
-
-        console.error("👉 Verifica:");
+        console.error("💥 ERROR SAP -2028:");
+        console.error("👉 Algún dato no existe en SAP:");
         console.error("- CostingCode");
         console.error("- ProjectCode");
-        console.error("- Dimensiones activas");
+        console.error("- WarehouseCode (si lo agregas luego)");
       }
 
     } else {

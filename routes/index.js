@@ -26,7 +26,10 @@ const rubroRouter = require("./rubroRouter")
 const sedeRouter = require("./sedeRouter")
 const solicitudAlmacenRouter = require("./solicitudAlmacenRouter")
 const sapCatalogoRouter = require("./sapCatalogoRouter")
+const ordenPDFRouter = require("./ordenPDFRouter")
 
+
+router.use("/orden-pdf", ordenPDFRouter);
 router.use("/sap", sapCatalogoRouter);
 
 router.use("/solicitudalmacen", solicitudAlmacenRouter);
