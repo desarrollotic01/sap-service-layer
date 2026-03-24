@@ -1,5 +1,5 @@
 // 👉 IMPORTANTE: Agregamos PlanMantenimiento a la importación
-const { UbicacionTecnica, PlanMantenimiento } = require("../db_connection");
+const { UbicacionTecnica, PlanMantenimiento, Cliente, Pais, Sede } = require("../db_connection");
 
 const crear = async (data) => {
   if (!data.codigo || !data.nombre) {
