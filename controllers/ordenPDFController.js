@@ -4,8 +4,9 @@ const {
   OrdenTrabajo,
   OrdenTrabajoEquipo,
   OrdenTrabajoActividad,
-  OrdenTrabajoTrabajador,
+  OrdenTrabajoEquipoTrabajador,
   Equipo,
+  Trabajador
 } = require("../db_connection");
 
 const generarOT = async (req, res) => {
@@ -28,11 +29,12 @@ const generarOT = async (req, res) => {
               as: "actividades",
             },
             {
-              model: OrdenTrabajoTrabajador,
+              model: OrdenTrabajoEquipoTrabajador,
               as: "trabajadores",
               include: [
                 {
-                  association: "trabajador",
+                 model: Trabajador,
+  as: "trabajador",
                 },
               ],
             },
