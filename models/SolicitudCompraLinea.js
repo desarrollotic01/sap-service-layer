@@ -47,12 +47,12 @@ module.exports = (sequelize) => {
       },
 
       rubroId: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: true,
       },
 
       paqueteTrabajoid: {
-        type: DataTypes.STRING,
+        type: DataTypes.UUID,
         allowNull: true,
       },
     },
