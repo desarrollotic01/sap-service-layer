@@ -75,10 +75,36 @@ const eliminar = async (id) => {
   await ubicacion.destroy();
 };
 
+const GetUbicacionesTecnicasByClienteId = async (clienteId) => {
+  return await UbicacionTecnica.findAll({
+    where: { clienteId },
+    include: [
+      {
+        model: Cliente,
+        as: "cliente",
+        attributes: ["id", "razonSocial", "ruc"],
+      },
+      {
+        model: Pais,
+        as: "pais",
+        attributes: ["id", "codigo", "nombre"],
+      },
+      {
+        model: Sede,
+        as: "sedeRelacion",
+        required: false,
+        attributes: ["id", "nombre", "direccion"],
+      },
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+};
+
 module.exports = {
   crear,
   listar,
   obtener,
   actualizar,
   eliminar,
+  GetUbicacionesTecnicasByClienteId
 };
