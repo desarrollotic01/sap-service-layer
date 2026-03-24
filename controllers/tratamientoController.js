@@ -1099,7 +1099,7 @@ const upsertSolicitud = async ({
       quantity: Number(l.quantity),
       costingCode: l.costCenter || l.costingCode || null,
       projectCode: l.projectCode || null,
-      warehouseCode: l.warehouseCode || "01",
+      warehouseCode: l.warehouseCode,
       rubroId: l.rubroId || null,
 paqueteTrabajoId: l.paqueteTrabajoId || null,
     })),
