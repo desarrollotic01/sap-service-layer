@@ -1,6 +1,6 @@
 require("dotenv").config();
 
-const { Cliente, Contacto, Item, Rubro } = require("../db_connection");
+const { Cliente, Contacto, Item, Rubro,SapPaqueteTrabajo,SapRubro } = require("../db_connection");
 const { getClientesSAP } = require("../sap/sapClientes");
 const { getItemsSAP } = require("../sap/sapItems");
 const { getRubrosSAP } = require("../sap/sapRubros");
