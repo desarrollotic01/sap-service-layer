@@ -23,21 +23,21 @@ async function enviarSolicitudCompra(solicitud) {
     RequiredDate: solicitud.requiredDate,
   };
 
-  if (linea.costingCode) {
-    line.CostingCode = linea.costingCode;
-  }
+  // if (linea.costingCode) {
+  //   line.CostingCode = linea.costingCode;
+  // }
 
-  if (linea.projectCode) {
-    line.ProjectCode = linea.projectCode;
-  }
+  // if (linea.projectCode) {
+  //   line.ProjectCode = linea.projectCode;
+  // }
 
-  if (linea.paqueteTrabajoId) {
-    line.U_ALS_PAQTRAB = linea.paqueteTrabajoId;
-  }
+  // if (linea.paqueteTrabajoId) {
+  //   line.U_ALS_PAQTRAB = linea.paqueteTrabajoId;
+  // }
 
-  if (linea.rubroId) {
-    line.U_ALS_RUBRO = linea.rubroId;
-  }
+  // if (linea.rubroId) {
+  //   line.U_ALS_RUBRO = linea.rubroId;
+  // }
 
   return line;
 });
