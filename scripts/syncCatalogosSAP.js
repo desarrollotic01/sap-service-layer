@@ -104,10 +104,23 @@ async function syncItems() {
       } else {
         itemsSinRubro++;
         console.warn(
-          `⚠️ El item ${sapCode} (${nombre}) tiene ItemsGroupCode=${grupoCode}, pero ese rubro no existe en tabla Rubros`
+          `⚠️ El item ${sapCode} (${nombre}) tiene ItemsGroupCode=${grupoCode}, pero ese rubro no existe`
         );
       }
     }
+
+    // 🔥 NUEVO: obtener warehouses
+    const warehouses = Array.isArray(item.ItemWarehouseInfoCollection)
+      ? item.ItemWarehouseInfoCollection
+      : [];
+
+    // ✅ opción simple: primer warehouse válido
+    const defaultWarehouse =
+      warehouses.length > 0 ? warehouses[0].WarehouseCode : null;
+
+    // (opcional pro: filtrar con stock)
+    // const defaultWarehouse =
+    //   warehouses.find(w => w.InStock > 0)?.WarehouseCode || null;
 
     await Item.upsert({
       sapCode,
@@ -118,12 +131,13 @@ async function syncItems() {
       unidadInventario: item.InventoryUOM || null,
       unidadVenta: item.SalesUnit || null,
       activoSAP: item.Valid === "tYES",
+      warehouseDefault: defaultWarehouse, // 🔥 CLAVE
     });
   }
 
   console.log(`✅ Items sincronizados: ${itemsSAP.length}`);
   if (itemsSinRubro > 0) {
-    console.log(`⚠️ Items guardados sin rubro relacionado: ${itemsSinRubro}`);
+    console.log(`⚠️ Items sin rubro: ${itemsSinRubro}`);
   }
 }
 
