@@ -19,13 +19,11 @@ async function getItemsSAP() {
 
   let items = [];
   let nextUrl =
-    "/Items?$select=ItemCode,ItemName,ItemsGroupCode,PurchaseUnit,InventoryUOM,SalesUnit,Valid&$expand=ItemWarehouseInfoCollection&$filter=Valid eq 'tYES'";
+    "/Items?$select=ItemCode,ItemName,ItemsGroupCode,PurchaseUnit,InventoryUOM,SalesUnit,Valid&$filter=Valid eq 'tYES'";
 
   while (nextUrl) {
     const response = await sapAxios.get(nextUrl, {
-      headers: {
-        Cookie: cookie,
-      },
+      headers: { Cookie: cookie },
     });
 
     const data = response.data || {};
@@ -39,6 +37,21 @@ async function getItemsSAP() {
   return items;
 }
 
+// 🔥 NUEVA FUNCIÓN: traer warehouses por item
+async function getItemWarehouses(itemCode, cookie) {
+  try {
+    const response = await sapAxios.get(`/Items('${itemCode}')`, {
+      headers: { Cookie: cookie },
+    });
+
+    return response.data?.ItemWarehouseInfoCollection || [];
+  } catch (error) {
+    console.error(`❌ Error obteniendo warehouses de ${itemCode}`);
+    return [];
+  }
+}
+
 module.exports = {
   getItemsSAP,
+  getItemWarehouses,
 };

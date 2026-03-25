@@ -19,7 +19,10 @@ async function enviarSolicitudCompra(solicitud) {
     ItemCode: linea.itemCode,
     ItemDescription: linea.description || "",
     Quantity: Number(linea.quantity),
-    WarehouseCode: linea.warehouseCode || "01",
+    WarehouseCode:
+    linea.warehouseCode ||
+    linea.warehouseDefault ||
+    "01",
     RequiredDate: solicitud.requiredDate,
   };
 

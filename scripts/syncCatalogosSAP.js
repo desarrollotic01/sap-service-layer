@@ -2,10 +2,11 @@ require("dotenv").config();
 
 const { Cliente, Contacto, Item, Rubro,SapPaqueteTrabajo,SapRubro } = require("../db_connection");
 const { getClientesSAP } = require("../sap/sapClientes");
-const { getItemsSAP } = require("../sap/sapItems");
+const { getItemsSAP , getItemWarehouses } = require("../sap/sapItems");
 const { getRubrosSAP } = require("../sap/sapRubros");
 const { getContactosSAP } = require("../sap/sapContactos");
 const {obtenerPaquetesTrabajo , obtenerRubros} = require("../sap/sapCatalogos");
+const { loginSAP } = require("../sap/sapAuth");
 
 async function syncRubros() {
   const rubrosSAP = await getRubrosSAP();
@@ -68,6 +69,7 @@ async function syncClientes() {
 }
 
 async function syncItems() {
+  const cookie = await loginSAP();
   const itemsSAP = await getItemsSAP();
 
   const rubrosDB = await Rubro.findAll({
@@ -104,23 +106,22 @@ async function syncItems() {
       } else {
         itemsSinRubro++;
         console.warn(
-          `⚠️ El item ${sapCode} (${nombre}) tiene ItemsGroupCode=${grupoCode}, pero ese rubro no existe`
+          `⚠️ Item ${sapCode} sin rubro válido (${grupoCode})`
         );
       }
     }
 
-    // 🔥 NUEVO: obtener warehouses
-    const warehouses = Array.isArray(item.ItemWarehouseInfoCollection)
-      ? item.ItemWarehouseInfoCollection
-      : [];
+    // 🔥 NUEVO: obtener warehouses desde SAP
+    const warehouses = await getItemWarehouses(sapCode, cookie);
 
-    // ✅ opción simple: primer warehouse válido
     const defaultWarehouse =
-      warehouses.length > 0 ? warehouses[0].WarehouseCode : null;
+      warehouses.find((w) => w.InStock > 0)?.WarehouseCode ||
+      warehouses[0]?.WarehouseCode ||
+      null;
 
-    // (opcional pro: filtrar con stock)
-    // const defaultWarehouse =
-    //   warehouses.find(w => w.InStock > 0)?.WarehouseCode || null;
+    if (!defaultWarehouse) {
+      console.warn(`⚠️ Item ${sapCode} sin warehouse válido`);
+    }
 
     await Item.upsert({
       sapCode,
