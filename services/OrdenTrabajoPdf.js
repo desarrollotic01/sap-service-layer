@@ -73,7 +73,6 @@ async function generarOrdenTrabajoPDF(orden) {
     const filePath = path.join(carpeta, `${orden.numeroOT}.pdf`);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-    // ── Logo en base64: busca con múltiples extensiones ─────────────────────
     const assetsDir = path.join(__dirname, "../assets");
     const posibles = [
       "logo-Alsud.png", "logo-Alsud.jpg", "logo-Alsud.jpeg",
@@ -106,32 +105,37 @@ async function generarOrdenTrabajoPDF(orden) {
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --green:       #22C55E;
-      --green-dark:  #16A34A;
-      --green-deep:  #14532D;
-      --green-dim:   #dcfce7;
-      --green-faint: #f0fdf4;
-      --black:       #080808;
-      --gray-1:      #1A1A1A;
-      --gray-2:      #2D2D2D;
-      --gray-3:      #4B4B4B;
-      --gray-4:      #6B7280;
-      --gray-5:      #9CA3AF;
-      --gray-6:      #D1D5DB;
-      --gray-7:      #E5E7EB;
-      --gray-8:      #F9FAFB;
-      --white:       #FFFFFF;
+      --green:        #16A34A;
+      --green-dark:   #15803D;
+      --green-deep:   #166534;
+      --green-dim:    #bbf7d0;
+      --green-faint:  #f0fdf4;
+      --header-bg:    #1E2A23;
+      --header-alt:   #243028;
+      --black:        #111827;
+      --gray-1:       #1F2937;
+      --gray-2:       #374151;
+      --gray-3:       #4B5563;
+      --gray-4:       #6B7280;
+      --gray-5:       #9CA3AF;
+      --gray-6:       #D1D5DB;
+      --gray-7:       #E5E7EB;
+      --gray-8:       #F3F4F6;
+      --page-bg:      #EAECE8;
+      --white:        #FFFFFF;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
+    /* Fondo de página ligeramente grisáceo para dar sensación de borde */
+    html, body {
+      background: var(--page-bg);
       font-family: 'DM Sans', Arial, sans-serif;
       font-size: 10.5px;
       color: var(--black);
-      background: var(--white);
     }
 
+    /* ══ MARCA DE AGUA ══ */
     .watermark {
       position: fixed;
       top: 0; left: 0;
@@ -143,29 +147,34 @@ async function generarOrdenTrabajoPDF(orden) {
       z-index: 0;
     }
     .watermark img {
-      width: 420px;
-      opacity: 0.055;
+      width: 400px;
+      opacity: 0.05;
       transform: rotate(-28deg);
-      /* Convierte el logo a negro puro para que el watermark sea neutro */
       filter: grayscale(1) brightness(0);
     }
 
-    /* ══ Todo el contenido encima del watermark ══ */
+    /* ══ HOJA CENTRADA con borde visual ══ */
     .page-content {
       position: relative;
       z-index: 1;
+      background: var(--white);
+      margin: 18px 22px;
+      border-radius: 6px;
+      border: 1px solid #C8CEC9;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.10);
+      overflow: hidden;
     }
 
     /* ══ FRANJA TOP ══ */
     .top-stripe {
       height: 5px;
-      background: linear-gradient(90deg, var(--green-dark), var(--green) 60%, var(--green-dark));
+      background: linear-gradient(90deg, var(--green-deep), var(--green) 55%, var(--green-deep));
     }
 
-    /* ══ ENCABEZADO ══ */
+    /* ══ ENCABEZADO — verde oscuro en vez de negro puro ══ */
     .header {
-      background: var(--black);
-      padding: 16px 32px;
+      background: var(--header-bg);
+      padding: 16px 28px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -177,48 +186,46 @@ async function generarOrdenTrabajoPDF(orden) {
       gap: 16px;
     }
 
-    /* Logo en blanco (invertido) sobre fondo negro */
     .logo-box img {
-      height: 38px;
+      height: 36px;
       object-fit: contain;
       display: block;
-      /* Fuerza el logo a blanco puro sobre fondo negro */
       filter: brightness(0) invert(1);
     }
 
     .header-sep {
       width: 1px;
-      height: 34px;
-      background: var(--gray-2);
+      height: 32px;
+      background: #2E3D35;
     }
 
     .header-texts h1 {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 800;
       color: var(--white);
-      letter-spacing: -0.4px;
+      letter-spacing: -0.3px;
       line-height: 1;
     }
     .header-texts p {
       font-size: 9px;
-      color: var(--gray-5);
+      color: #7BAF8E;
       margin-top: 3px;
     }
 
     .header-right { text-align: right; }
 
     .ot-label {
-      font-size: 8px;
+      font-size: 7.5px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 1.5px;
-      color: var(--gray-5);
+      color: #7BAF8E;
       margin-bottom: 3px;
     }
 
     .ot-num {
       font-family: 'DM Mono', monospace;
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 500;
       color: var(--green);
       letter-spacing: 1px;
@@ -229,35 +236,36 @@ async function generarOrdenTrabajoPDF(orden) {
       display: inline-block;
       margin-top: 6px;
       padding: 3px 11px;
-      background: var(--green);
-      color: var(--black);
-      font-size: 8px;
+      background: var(--green-deep);
+      color: #D1FAE5;
+      font-size: 7.5px;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 1.4px;
       border-radius: 20px;
+      border: 1px solid var(--green-dark);
     }
 
     /* Línea verde degradada bajo header */
     .header-line {
       height: 3px;
-      background: linear-gradient(90deg, var(--green) 0%, transparent 80%);
+      background: linear-gradient(90deg, var(--green-dark) 0%, transparent 75%);
     }
 
     /* ══ CUERPO ══ */
-    .body { padding: 20px 32px 24px; }
+    .body { padding: 20px 28px 24px; }
 
     /* ══ SECCIÓN ══ */
     .section { margin-bottom: 16px; }
 
     .section-title {
-      font-size: 8.5px;
+      font-size: 8px;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 1.6px;
-      color: var(--gray-4);
+      color: var(--green-deep);
       padding-bottom: 5px;
-      border-bottom: 1.5px solid var(--gray-7);
+      border-bottom: 1.5px solid var(--green-dim);
       margin-bottom: 10px;
       display: flex;
       align-items: center;
@@ -267,8 +275,8 @@ async function generarOrdenTrabajoPDF(orden) {
       content: '';
       display: inline-block;
       width: 3px;
-      height: 13px;
-      background: var(--green);
+      height: 12px;
+      background: var(--green-dark);
       border-radius: 2px;
       flex-shrink: 0;
     }
@@ -279,7 +287,7 @@ async function generarOrdenTrabajoPDF(orden) {
 
     .field label {
       display: block;
-      font-size: 7.5px;
+      font-size: 7px;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.7px;
@@ -288,22 +296,22 @@ async function generarOrdenTrabajoPDF(orden) {
     }
     .field span {
       font-size: 10.5px;
-      color: var(--black);
+      color: var(--gray-1);
       font-weight: 500;
     }
 
     /* ══ EQUIPO CARD ══ */
     .equipo-card {
-      border: 1px solid var(--gray-7);
-      border-top: 3px solid var(--green);
+      border: 1px solid var(--green-dim);
+      border-top: 3px solid var(--green-dark);
       border-radius: 6px;
       margin-bottom: 14px;
       overflow: hidden;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+      box-shadow: 0 1px 8px rgba(21,128,61,0.07);
     }
 
     .equipo-header {
-      background: var(--gray-1);
+      background: var(--header-bg);
       padding: 8px 14px;
       color: var(--white);
       font-size: 10.5px;
@@ -323,11 +331,11 @@ async function generarOrdenTrabajoPDF(orden) {
 
     /* ══ SUBTÍTULO ══ */
     .sub-title {
-      font-size: 8px;
+      font-size: 7.5px;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 1.1px;
-      color: var(--green-dark);
+      color: var(--green-deep);
       margin: 13px 0 6px;
       padding-bottom: 4px;
       border-bottom: 1px dashed var(--green-dim);
@@ -339,11 +347,11 @@ async function generarOrdenTrabajoPDF(orden) {
       border-collapse: collapse;
       margin-top: 6px;
       font-size: 9.5px;
-      border: 1px solid var(--gray-7);
+      border: 1px solid var(--green-dim);
       border-radius: 4px;
       overflow: hidden;
     }
-    thead tr { background: var(--black); color: var(--white); }
+    thead tr { background: var(--header-bg); color: var(--white); }
     thead th {
       padding: 6px 8px;
       text-align: left;
@@ -353,7 +361,7 @@ async function generarOrdenTrabajoPDF(orden) {
       font-weight: 700;
     }
     thead th:first-child { color: var(--green); }
-    tbody tr:nth-child(even) { background: var(--gray-8); }
+    tbody tr:nth-child(even) { background: var(--green-faint); }
     tbody tr:nth-child(odd)  { background: var(--white); }
     tbody td {
       padding: 5px 8px;
@@ -372,15 +380,15 @@ async function generarOrdenTrabajoPDF(orden) {
     }
     .personal-item {
       padding: 7px 10px;
-      border: 1px solid var(--gray-7);
-      border-left: 3px solid var(--green);
+      border: 1px solid var(--green-dim);
+      border-left: 3px solid var(--green-dark);
       border-radius: 4px;
-      background: var(--gray-8);
+      background: var(--green-faint);
     }
     .personal-item .nombre {
       font-weight: 700;
       font-size: 10.5px;
-      color: var(--black);
+      color: var(--gray-1);
       display: flex;
       align-items: center;
       gap: 6px;
@@ -393,8 +401,8 @@ async function generarOrdenTrabajoPDF(orden) {
     .encargado-tag {
       font-size: 7px;
       font-weight: 800;
-      color: var(--black);
-      background: var(--green);
+      color: #fff;
+      background: var(--green-deep);
       padding: 1px 6px;
       border-radius: 20px;
       text-transform: uppercase;
@@ -404,7 +412,7 @@ async function generarOrdenTrabajoPDF(orden) {
     /* ══ OBS BOX ══ */
     .obs-box {
       border: 1px solid var(--green-dim);
-      border-left: 3px solid var(--green);
+      border-left: 3px solid var(--green-dark);
       border-radius: 4px;
       padding: 7px 11px;
       background: var(--green-faint);
@@ -423,7 +431,7 @@ async function generarOrdenTrabajoPDF(orden) {
     .firma-item { text-align: center; }
     .firma-espacio {
       height: 52px;
-      border-bottom: 1.5px solid var(--black);
+      border-bottom: 1.5px solid var(--gray-3);
       margin-bottom: 5px;
     }
     .firma-label {
@@ -431,6 +439,7 @@ async function generarOrdenTrabajoPDF(orden) {
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.8px;
+      color: var(--gray-2);
     }
     .firma-sub {
       font-size: 8.5px;
@@ -440,25 +449,25 @@ async function generarOrdenTrabajoPDF(orden) {
 
     /* ══ PIE ══ */
     .footer {
-      background: var(--black);
-      padding: 9px 32px;
+      background: var(--header-bg);
+      padding: 9px 28px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-top: 28px;
     }
-    .footer-item { font-size: 8.5px; color: var(--gray-5); }
+    .footer-item { font-size: 8.5px; color: #7BAF8E; }
     .footer-item strong { color: var(--green); font-weight: 700; }
     .footer-dot {
       width: 3px; height: 3px;
-      background: var(--gray-3);
+      background: #2E3D35;
       border-radius: 50%;
     }
   </style>
 </head>
 <body>
 
-  <!-- ══ MARCA DE AGUA (siempre, si hay logo) ══ -->
+  <!-- ══ MARCA DE AGUA ══ -->
   ${logoSrc ? `
   <div class="watermark">
     <img src="${logoSrc}" alt="" />
@@ -469,7 +478,7 @@ async function generarOrdenTrabajoPDF(orden) {
     <!-- FRANJA VERDE TOP -->
     <div class="top-stripe"></div>
 
-    <!-- ENCABEZADO NEGRO -->
+    <!-- ENCABEZADO -->
     <div class="header">
       <div class="header-left">
         ${logoSrc ? `
@@ -608,12 +617,12 @@ async function generarOrdenTrabajoPDF(orden) {
                 <tbody>
                   ${eq.actividades.map((act, i) => `
                     <tr>
-                      <td style="font-family:'DM Mono',monospace;color:var(--green-dark);font-weight:700;font-size:9px">${String(i + 1).padStart(2, "0")}</td>
+                      <td style="font-family:'DM Mono',monospace;color:var(--green-deep);font-weight:700;font-size:9px">${String(i + 1).padStart(2, "0")}</td>
                       <td>${val(act.tarea)}</td>
                       <td style="color:var(--gray-3)">${val(act.sistema)} / ${val(act.subsistema)} / ${val(act.componente)}</td>
                       <td>${labelTipoTrabajo(act.tipoTrabajo)}</td>
                       <td>${labelRol(act.rolTecnico)}</td>
-                      <td style="text-align:center;font-weight:700;color:var(--green-dark)">${val(act.cantidadTecnicos)}</td>
+                      <td style="text-align:center;font-weight:700;color:var(--green-deep)">${val(act.cantidadTecnicos)}</td>
                       <td style="font-family:'DM Mono',monospace;font-size:9px">${val(act.duracionEstimadaValor)} ${val(act.unidadDuracion)}</td>
                       <td>${val(act.origen)}</td>
                     </tr>
@@ -647,7 +656,7 @@ async function generarOrdenTrabajoPDF(orden) {
 
     </div><!-- /body -->
 
-    <!-- PIE NEGRO -->
+    <!-- PIE -->
     <div class="footer">
       <div class="footer-item">OT: <strong>${val(orden.numeroOT)}</strong></div>
       <div class="footer-dot"></div>
@@ -673,7 +682,8 @@ async function generarOrdenTrabajoPDF(orden) {
       path: filePath,
       format: "A4",
       printBackground: true,
-      margin: { top: "0mm", bottom: "0mm", left: "0mm", right: "0mm" },
+      // Margen para que el fondo gris de página sea visible como borde
+      margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
     });
 
     await browser.close();
