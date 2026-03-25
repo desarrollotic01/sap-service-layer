@@ -17,7 +17,6 @@ async function enviarSolicitudCompra(solicitud) {
     const documentLines = solicitud.lineas.map((linea) => {
   const line = {
     ItemCode: linea.itemCode,
-    ItemDescription: linea.description || "",
     Quantity: Number(linea.quantity),
     RequiredDate: solicitud.requiredDate,
   };
@@ -44,10 +43,6 @@ async function enviarSolicitudCompra(solicitud) {
     const payload = {
       DocDate: solicitud.docDate,
       RequriedDate: solicitud.requiredDate,
-      Requester: solicitud.requester,
-      Comments: solicitud.comments || "",
-      DocCurrency: solicitud.docCurrency || "PEN",
-      DocRate: solicitud.docRate || 1,
 
       ...(solicitud.branchId && {
         BPL_IDAssignedToInvoice: solicitud.branchId,
