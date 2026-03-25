@@ -14,34 +14,33 @@ async function enviarSolicitudCompra(solicitud) {
       },
     };
 
-    // 🔹 Construir líneas LIMPIAS
     const documentLines = solicitud.lineas.map((linea) => {
-      const line = {
-        ItemCode: linea.itemCode,
-        ItemDescription: linea.description || "",
-        Quantity: Number(linea.quantity),
-      };
+  const line = {
+    ItemCode: linea.itemCode,
+    ItemDescription: linea.description || "",
+    Quantity: Number(linea.quantity),
+    WarehouseCode: linea.warehouseCode || "01",
+    RequiredDate: solicitud.requiredDate,
+  };
 
-      // ✅ SOLO enviar si existen (evita -2028)
-      if (linea.costingCode) {
-        line.CostingCode = linea.costingCode;
-      }
+  if (linea.costingCode) {
+    line.CostingCode = linea.costingCode;
+  }
 
-      if (linea.projectCode) {
-        line.ProjectCode = linea.projectCode;
-      }
+  if (linea.projectCode) {
+    line.ProjectCode = linea.projectCode;
+  }
 
-      // ✅ UDFs (sin .codigo porque ya es ID)
-      if (linea.paqueteTrabajoId) {
-        line.U_ALS_PAQTRAB = linea.paqueteTrabajoId;
-      }
+  if (linea.paqueteTrabajoId) {
+    line.U_ALS_PAQTRAB = linea.paqueteTrabajoId;
+  }
 
-      if (linea.rubroId) {
-        line.U_ALS_RUBRO = linea.rubroId;
-      }
+  if (linea.rubroId) {
+    line.U_ALS_RUBRO = linea.rubroId;
+  }
 
-      return line;
-    });
+  return line;
+});
 
     const payload = {
       DocDate: solicitud.docDate,
