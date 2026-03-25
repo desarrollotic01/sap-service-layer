@@ -51,10 +51,7 @@ module.exports = (sequelize) => {
         defaultValue: true,
       },
 
-      warehouseDefault: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
+    
     },
     {
       tableName: "Items",

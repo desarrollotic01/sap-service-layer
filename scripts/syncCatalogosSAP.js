@@ -2,11 +2,11 @@ require("dotenv").config();
 
 const { Cliente, Contacto, Item, Rubro,SapPaqueteTrabajo,SapRubro } = require("../db_connection");
 const { getClientesSAP } = require("../sap/sapClientes");
-const { getItemsSAP , getItemWarehouses } = require("../sap/sapItems");
+const { getItemsSAP  } = require("../sap/sapItems");
 const { getRubrosSAP } = require("../sap/sapRubros");
 const { getContactosSAP } = require("../sap/sapContactos");
 const {obtenerPaquetesTrabajo , obtenerRubros} = require("../sap/sapCatalogos");
-const { loginSAP } = require("../sap/sapAuth");
+
 
 async function syncRubros() {
   const rubrosSAP = await getRubrosSAP();
@@ -69,7 +69,6 @@ async function syncClientes() {
 }
 
 async function syncItems() {
-  const cookie = await loginSAP();
   const itemsSAP = await getItemsSAP();
 
   const rubrosDB = await Rubro.findAll({
@@ -82,12 +81,14 @@ async function syncItems() {
 
   let itemsSinRubro = 0;
 
+  const itemsToUpsert = [];
+
   for (const item of itemsSAP) {
     const sapCode = String(item.ItemCode || "").trim();
     const nombre = String(item.ItemName || "").trim();
 
     if (!sapCode) {
-      console.warn("⚠️ Item omitido por ItemCode vacío:", item);
+      console.warn("⚠️ Item omitido:", item);
       continue;
     }
 
@@ -99,31 +100,14 @@ async function syncItems() {
     let rubroSapCode = null;
     let rubroNombre = null;
 
-    if (grupoCode !== null && !Number.isNaN(grupoCode)) {
-      if (rubrosMap.has(grupoCode)) {
-        rubroSapCode = grupoCode;
-        rubroNombre = rubrosMap.get(grupoCode) || null;
-      } else {
-        itemsSinRubro++;
-        console.warn(
-          `⚠️ Item ${sapCode} sin rubro válido (${grupoCode})`
-        );
-      }
+    if (grupoCode !== null && rubrosMap.has(grupoCode)) {
+      rubroSapCode = grupoCode;
+      rubroNombre = rubrosMap.get(grupoCode);
+    } else {
+      itemsSinRubro++;
     }
 
-    // 🔥 NUEVO: obtener warehouses desde SAP
-    const warehouses = await getItemWarehouses(sapCode, cookie);
-
-    const defaultWarehouse =
-      warehouses.find((w) => w.InStock > 0)?.WarehouseCode ||
-      warehouses[0]?.WarehouseCode ||
-      null;
-
-    if (!defaultWarehouse) {
-      console.warn(`⚠️ Item ${sapCode} sin warehouse válido`);
-    }
-
-    await Item.upsert({
+    itemsToUpsert.push({
       sapCode,
       nombre: nombre || sapCode,
       rubroSapCode,
@@ -132,14 +116,27 @@ async function syncItems() {
       unidadInventario: item.InventoryUOM || null,
       unidadVenta: item.SalesUnit || null,
       activoSAP: item.Valid === "tYES",
-      warehouseDefault: defaultWarehouse, // 🔥 CLAVE
+
+      // 🔥 IMPORTANTE: NO warehouse aquí
+      warehouseDefault: null,
     });
   }
 
+  // 🚀 BULK UPSERT (MUY RÁPIDO)
+  await Item.bulkCreate(itemsToUpsert, {
+    updateOnDuplicate: [
+      "nombre",
+      "rubroSapCode",
+      "rubroNombre",
+      "unidadCompra",
+      "unidadInventario",
+      "unidadVenta",
+      "activoSAP",
+    ],
+  });
+
   console.log(`✅ Items sincronizados: ${itemsSAP.length}`);
-  if (itemsSinRubro > 0) {
-    console.log(`⚠️ Items sin rubro: ${itemsSinRubro}`);
-  }
+  console.log(`⚠️ Items sin rubro: ${itemsSinRubro}`);
 }
 
 async function syncContactos() {

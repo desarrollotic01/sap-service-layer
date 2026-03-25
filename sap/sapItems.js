@@ -14,6 +14,9 @@ function normalizarNextLink(nextLink) {
   return nextLink;
 }
 
+/**
+ * 🔥 Obtener TODOS los items activos (MASIVO y RÁPIDO)
+ */
 async function getItemsSAP() {
   const cookie = await loginSAP();
 
@@ -27,7 +30,11 @@ async function getItemsSAP() {
     });
 
     const data = response.data || {};
-    items = items.concat(Array.isArray(data.value) ? data.value : []);
+    const batch = Array.isArray(data.value) ? data.value : [];
+
+    items = items.concat(batch);
+
+    console.log(`📦 Items acumulados: ${items.length}`);
 
     nextUrl = normalizarNextLink(
       data["@odata.nextLink"] || data["odata.nextLink"] || null
@@ -37,9 +44,13 @@ async function getItemsSAP() {
   return items;
 }
 
-// 🔥 NUEVA FUNCIÓN: traer warehouses por item
-async function getItemWarehouses(itemCode, cookie) {
+/**
+ * 🔥 Obtener warehouses de UN item (SOLO cuando se necesite)
+ */
+async function getItemWarehouses(itemCode) {
   try {
+    const cookie = await loginSAP();
+
     const response = await sapAxios.get(`/Items('${itemCode}')`, {
       headers: { Cookie: cookie },
     });
@@ -51,7 +62,17 @@ async function getItemWarehouses(itemCode, cookie) {
   }
 }
 
+/**
+ * 🔥 OPCIONAL PRO: traer SOLO warehouses con stock
+ */
+async function getWarehousesWithStock(itemCode) {
+  const warehouses = await getItemWarehouses(itemCode);
+
+  return warehouses.filter((w) => w.InStock > 0);
+}
+
 module.exports = {
   getItemsSAP,
   getItemWarehouses,
+  getWarehousesWithStock, // opcional
 };
