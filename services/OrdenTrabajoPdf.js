@@ -73,7 +73,7 @@ async function generarOrdenTrabajoPDF(orden) {
     const filePath = path.join(carpeta, `${orden.numeroOT}.pdf`);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-    const logoPath = path.join(__dirname, "../assets/logo-alsud.png");
+    const logoPath = path.join(__dirname, "../assets/logo-Alsud.png");
 const logoBase64 = fs.readFileSync(logoPath, { encoding: "base64" });
 
     const html = `
