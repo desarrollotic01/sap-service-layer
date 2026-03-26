@@ -127,7 +127,6 @@ async function generarOrdenTrabajoPDF(orden) {
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* Fondo de página ligeramente grisáceo para dar sensación de borde */
     html, body {
       background: var(--page-bg);
       font-family: 'DM Sans', Arial, sans-serif;
@@ -153,7 +152,7 @@ async function generarOrdenTrabajoPDF(orden) {
       filter: grayscale(1) brightness(0);
     }
 
-    /* ══ HOJA CENTRADA con borde visual ══ */
+    /* ══ HOJA ══ */
     .page-content {
       position: relative;
       z-index: 1;
@@ -171,7 +170,7 @@ async function generarOrdenTrabajoPDF(orden) {
       background: linear-gradient(90deg, var(--green-deep), var(--green) 55%, var(--green-deep));
     }
 
-    /* ══ ENCABEZADO — verde oscuro en vez de negro puro ══ */
+    /* ══ ENCABEZADO ══ */
     .header {
       background: var(--header-bg);
       padding: 16px 28px;
@@ -246,7 +245,6 @@ async function generarOrdenTrabajoPDF(orden) {
       border: 1px solid var(--green-dark);
     }
 
-    /* Línea verde degradada bajo header */
     .header-line {
       height: 3px;
       background: linear-gradient(90deg, var(--green-dark) 0%, transparent 75%);
@@ -300,7 +298,7 @@ async function generarOrdenTrabajoPDF(orden) {
       font-weight: 500;
     }
 
-    /* ══ EQUIPO CARD ══ */
+    /* ══ EQUIPO CARD — sin cortes internos ══ */
     .equipo-card {
       border: 1px solid var(--green-dim);
       border-top: 3px solid var(--green-dark);
@@ -308,6 +306,9 @@ async function generarOrdenTrabajoPDF(orden) {
       margin-bottom: 14px;
       overflow: hidden;
       box-shadow: 0 1px 8px rgba(21,128,61,0.07);
+      /* Evita que la card se corte: si no entra completa, salta de página */
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
 
     .equipo-header {
@@ -371,7 +372,7 @@ async function generarOrdenTrabajoPDF(orden) {
       line-height: 1.4;
     }
 
-    /* ══ PERSONAL ══ */
+    /* ══ PERSONAL — no cortar tarjeta a la mitad ══ */
     .personal-list {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -384,6 +385,8 @@ async function generarOrdenTrabajoPDF(orden) {
       border-left: 3px solid var(--green-dark);
       border-radius: 4px;
       background: var(--green-faint);
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
     .personal-item .nombre {
       font-weight: 700;
@@ -409,24 +412,21 @@ async function generarOrdenTrabajoPDF(orden) {
       letter-spacing: 0.4px;
     }
 
-    /* ══ OBS BOX ══ */
-    .obs-box {
-      border: 1px solid var(--green-dim);
-      border-left: 3px solid var(--green-dark);
-      border-radius: 4px;
-      padding: 7px 11px;
-      background: var(--green-faint);
+    /* ══ OBS / DESC — como texto inline, sin caja especial ══ */
+    .inline-text {
       font-size: 10.5px;
       line-height: 1.55;
-      color: var(--gray-1);
+      color: var(--gray-2);
     }
 
-    /* ══ FIRMAS ══ */
+    /* ══ FIRMAS — siempre juntas, nunca cortadas ══ */
     .firmas {
       margin-top: 36px;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 28px;
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
     .firma-item { text-align: center; }
     .firma-espacio {
@@ -514,19 +514,19 @@ async function generarOrdenTrabajoPDF(orden) {
           <div class="field"><label>Fecha Fin Real</label><span>${formatearFecha(orden.fechaFinReal)}</span></div>
           <div class="field"><label>Fecha Cierre</label><span>${formatearFecha(orden.fechaCierre)}</span></div>
         </div>
+
+        ${orden.observaciones ? `
+        <div style="margin-top:10px">
+          <div class="field" style="margin-bottom:3px"><label>Observaciones</label></div>
+          <div class="inline-text">${val(orden.observaciones)}</div>
+        </div>` : ""}
+
+        ${orden.descripcionGeneral ? `
+        <div style="margin-top:10px">
+          <div class="field" style="margin-bottom:3px"><label>Descripción General</label></div>
+          <div class="inline-text">${val(orden.descripcionGeneral)}</div>
+        </div>` : ""}
       </div>
-
-      ${orden.observaciones ? `
-      <div class="section">
-        <div class="section-title">Observaciones Generales</div>
-        <div class="obs-box">${val(orden.observaciones)}</div>
-      </div>` : ""}
-
-      ${orden.descripcionGeneral ? `
-      <div class="section">
-        <div class="section-title">Descripción General</div>
-        <div class="obs-box">${val(orden.descripcionGeneral)}</div>
-      </div>` : ""}
 
       <!-- EQUIPOS -->
       ${orden.equipos.map((eq, index) => {
@@ -543,50 +543,28 @@ async function generarOrdenTrabajoPDF(orden) {
             </div>
             <div class="equipo-body">
 
+              <!-- SUB 1: Información del equipo -->
+              <div class="sub-title">Información del Equipo</div>
               <div class="grid">
                 <div class="field"><label>Código</label><span>${val(data?.codigo)}</span></div>
                 <div class="field"><label>Nombre</label><span>${val(data?.nombre)}</span></div>
-                <div class="field"><label>Serie</label><span>${val(data?.serie)}</span></div>
                 <div class="field"><label>Marca</label><span>${val(data?.marca)}</span></div>
                 <div class="field"><label>Modelo</label><span>${val(data?.modelo)}</span></div>
-                <div class="field"><label>Estado</label><span>${val(data?.estado)}</span></div>
-                <div class="field"><label>Tipo de Equipo</label><span>${val(data?.tipoEquipo)}</span></div>
-                <div class="field"><label>Línea</label><span>${val(data?.linea)}</span></div>
-                <div class="field"><label>Criticidad</label><span>${val(data?.creticidad)}</span></div>
-                <div class="field"><label>ID de Placa</label><span>${val(data?.idPlaca)}</span></div>
-                <div class="field"><label>ID Cliente</label><span>${val(data?.id_cliente)}</span></div>
-                <div class="field"><label>Almacén</label><span>${val(data?.almacen)}</span></div>
-                <div class="field"><label>Sede</label><span>${val(data?.sede)}</span></div>
-                <div class="field"><label>N° Orden de Venta</label><span>${val(data?.numeroOV)}</span></div>
-                <div class="field"><label>N° Orden Cliente</label><span>${val(data?.numeroOrdenCliente)}</span></div>
-                <div class="field"><label>Operador Logístico</label><span>${val(data?.operadorLogistico)}</span></div>
-                <div class="field"><label>Tipo Propiedad</label><span>${val(data?.tipoEquipoPropiedad)}</span></div>
-                <div class="field"><label>Status</label><span>${val(data?.status)}</span></div>
-                <div class="field"><label>Fin de Garantía</label><span>${formatearFechaSolo(data?.finGarantia)}</span></div>
-                <div class="field"><label>Fecha Entrega Prevista</label><span>${formatearFechaSolo(data?.fechaEntregaPrevista)}</span></div>
-                <div class="field"><label>Fecha Entrega Real</label><span>${formatearFechaSolo(data?.fechaEntregaReal)}</span></div>
-                <div class="field"><label>Fecha OV</label><span>${formatearFechaSolo(data?.fechaOV)}</span></div>
+                <div class="field"><label>Serie</label><span>${val(data?.serie)}</span></div>
               </div>
 
-              <div class="sub-title">Datos de Asignación en OT</div>
-              <div class="grid">
-                <div class="field"><label>Prioridad</label><span>${val(eq.prioridad)}</span></div>
-                <div class="field"><label>Estado en OT</label><span>${labelEstado(eq.estadoEquipo)}</span></div>
-                <div class="field"><label>Inicio Programado</label><span>${formatearFecha(eq.fechaInicioProgramada)}</span></div>
-                <div class="field"><label>Fin Programado</label><span>${formatearFecha(eq.fechaFinProgramada)}</span></div>
-                <div class="field"><label>Inicio Real</label><span>${formatearFecha(eq.fechaInicioReal)}</span></div>
-                <div class="field"><label>Fin Real</label><span>${formatearFecha(eq.fechaFinReal)}</span></div>
-              </div>
+              ${eq.descripcionEquipo || eq.observaciones ? `
+              <div style="margin-top:10px">
+                ${eq.descripcionEquipo ? `
+                <div class="field" style="margin-bottom:2px"><label>Descripción del trabajo</label></div>
+                <div class="inline-text">${val(eq.descripcionEquipo)}</div>` : ""}
+                ${eq.observaciones ? `
+                <div class="field" style="margin-top:7px;margin-bottom:2px"><label>Observaciones</label></div>
+                <div class="inline-text">${val(eq.observaciones)}</div>` : ""}
+              </div>` : ""}
 
-              ${eq.descripcionEquipo ? `
-              <div class="sub-title">Descripción del Equipo</div>
-              <div class="obs-box">${val(eq.descripcionEquipo)}</div>` : ""}
-
-              ${eq.observaciones ? `
-              <div class="sub-title">Observaciones del Equipo</div>
-              <div class="obs-box">${val(eq.observaciones)}</div>` : ""}
-
-              <div class="sub-title">Personal Asignado</div>
+              <!-- SUB 2: Personal -->
+              <div class="sub-title">Personal</div>
               <div class="personal-list">
                 ${eq.trabajadores.map(t => `
                   <div class="personal-item">
@@ -600,7 +578,8 @@ async function generarOrdenTrabajoPDF(orden) {
                 `).join("")}
               </div>
 
-              <div class="sub-title">Actividades</div>
+              <!-- SUB 3: Detalle de Actividades -->
+              <div class="sub-title">Detalle de Actividades</div>
               <table>
                 <thead>
                   <tr>
@@ -639,7 +618,7 @@ async function generarOrdenTrabajoPDF(orden) {
       <div class="firmas">
         <div class="firma-item">
           <div class="firma-espacio"></div>
-          <div class="firma-label">Técnico</div>
+          <div class="firma-label">Técnico Responsable</div>
           <div class="firma-sub">Nombre y firma</div>
         </div>
         <div class="firma-item">
@@ -649,7 +628,7 @@ async function generarOrdenTrabajoPDF(orden) {
         </div>
         <div class="firma-item">
           <div class="firma-espacio"></div>
-          <div class="firma-label">Responsable</div>
+          <div class="firma-label">Cliente</div>
           <div class="firma-sub">Nombre y firma</div>
         </div>
       </div>
@@ -682,7 +661,6 @@ async function generarOrdenTrabajoPDF(orden) {
       path: filePath,
       format: "A4",
       printBackground: true,
-      // Margen para que el fondo gris de página sea visible como borde
       margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
     });
 
