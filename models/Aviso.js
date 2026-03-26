@@ -105,7 +105,7 @@ module.exports = (sequelize) => {
       /* =====================
          CLIENTE
       ===================== */
-     cliente: {
+     clienteId: {
   type: DataTypes.UUID,
   allowNull: true,
 },
