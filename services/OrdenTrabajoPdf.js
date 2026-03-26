@@ -514,9 +514,6 @@ async function generarOrdenTrabajoPDF(orden) {
           <div class="field"><label>Tipo de Mantenimiento</label><span>${val(orden.tipoMantenimiento)}</span></div>
           <div class="field"><label>Fecha Inicio Programada</label><span>${formatearFecha(orden.fechaProgramadaInicio)}</span></div>
           <div class="field"><label>Fecha Fin Programada</label><span>${formatearFecha(orden.fechaProgramadaFin)}</span></div>
-          <div class="field"><label>Fecha Inicio Real</label><span>${formatearFecha(orden.fechaInicioReal)}</span></div>
-          <div class="field"><label>Fecha Fin Real</label><span>${formatearFecha(orden.fechaFinReal)}</span></div>
-          <div class="field"><label>Fecha Cierre</label><span>${formatearFecha(orden.fechaCierre)}</span></div>
         </div>
 
         ${orden.observaciones ? `
