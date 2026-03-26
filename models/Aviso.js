@@ -105,9 +105,10 @@ module.exports = (sequelize) => {
       /* =====================
          CLIENTE
       ===================== */
-      cliente: {
-        type: DataTypes.STRING,
-      },
+     cliente: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
 
       ordenCliente: {
         type: DataTypes.STRING,
