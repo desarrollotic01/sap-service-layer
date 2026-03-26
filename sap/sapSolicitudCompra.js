@@ -1,11 +1,121 @@
+// services/sapSolicitudCompra.js
+
 const sapAxios = require("./sapClient");
 const { loginSAP } = require("./sapAuth");
 
-/**
- * Enviar solicitud de compra a SAP
- */
-async function enviarSolicitudCompra(solicitud) {
+const {
+  SolicitudCompra,
+  SolicitudCompraLinea,
+  SapRubro,
+  SapPaqueteTrabajo,
+} = require("../db_connection");
+
+/* =========================
+   FORMATEAR FECHA SAP
+========================= */
+const formatDate = (date) => {
+  if (!date) return null;
+  return new Date(date).toISOString().split("T")[0];
+};
+
+/* =========================
+   OBTENER SOLICITUD COMPLETA
+========================= */
+const obtenerSolicitudCompleta = async (solicitudId) => {
+  const solicitud = await SolicitudCompra.findByPk(solicitudId, {
+    include: [
+      {
+        model: SolicitudCompraLinea,
+        as: "lineas",
+        include: [
+          {
+            model: SapRubro,
+            as: "rubro",
+          },
+          {
+            model: SapPaqueteTrabajo,
+            as: "paqueteTrabajo",
+          },
+        ],
+      },
+    ],
+  });
+
+  if (!solicitud) {
+    throw new Error("Solicitud no encontrada");
+  }
+
+  return solicitud;
+};
+
+/* =========================
+   MAPEAR A JSON SAP
+========================= */
+const mapearSolicitudASAP = (solicitud) => {
+  if (!solicitud.lineas || solicitud.lineas.length === 0) {
+    throw new Error("La solicitud no tiene líneas");
+  }
+
+  const documentLines = solicitud.lineas.map((linea, index) => {
+    // 🔴 VALIDACIONES
+    if (!linea.itemCode) {
+      throw new Error(`Línea ${index + 1}: itemCode es obligatorio`);
+    }
+
+    if (!linea.quantity || Number(linea.quantity) <= 0) {
+      throw new Error(`Línea ${index + 1}: quantity inválido`);
+    }
+
+    if (!linea.rubro || !linea.rubro.codigo) {
+      throw new Error(`Línea ${index + 1}: rubro sin código SAP`);
+    }
+
+    if (!linea.paqueteTrabajo || !linea.paqueteTrabajo.codigo) {
+      throw new Error(`Línea ${index + 1}: paqueteTrabajo sin código SAP`);
+    }
+
+    return {
+      ItemCode: linea.itemCode,
+      Quantity: Number(linea.quantity),
+      RequiredDate: formatDate(solicitud.requiredDate),
+
+      ...(linea.warehouseCode && {
+        WarehouseCode: linea.warehouseCode,
+      }),
+
+      ...(linea.costingCode && {
+        CostingCode: linea.costingCode,
+      }),
+
+      ...(linea.projectCode && {
+        ProjectCode: linea.projectCode,
+      }),
+
+      // 🔥 LO IMPORTANTE
+      U_ALS_PAQTRAB: linea.paqueteTrabajo.codigo,
+      U_ALS_RUBRO: linea.rubro.codigo,
+    };
+  });
+
+  return {
+    DocDate: formatDate(solicitud.docDate),
+    RequriedDate: formatDate(solicitud.requiredDate),
+    DocumentLines: documentLines,
+  };
+};
+
+/* =========================
+   ENVIAR A SAP
+========================= */
+const enviarSolicitudCompraASAP = async (solicitudId) => {
   try {
+    // 1. traer solicitud completa
+    const solicitud = await obtenerSolicitudCompleta(solicitudId);
+
+    // 2. mapear a formato SAP
+    const payload = mapearSolicitudASAP(solicitud);
+
+    // 3. login SAP
     const cookies = await loginSAP();
 
     const config = {
@@ -14,47 +124,10 @@ async function enviarSolicitudCompra(solicitud) {
       },
     };
 
-    const documentLines = solicitud.lineas.map((linea) => {
-  const line = {
-    ItemCode: linea.itemCode,
-    Quantity: Number(linea.quantity),
-    RequiredDate: solicitud.requiredDate,
-  };
-
-  // if (linea.costingCode) {
-  //   line.CostingCode = linea.costingCode;
-  // }
-
-  // if (linea.projectCode) {
-  //   line.ProjectCode = linea.projectCode;
-  // }
-
-  // if (linea.paqueteTrabajoId) {
-  //   line.U_ALS_PAQTRAB = linea.paqueteTrabajoId;
-  // }
-
-  // if (linea.rubroId) {
-  //   line.U_ALS_RUBRO = linea.rubroId;
-  // }
-
-  return line;
-});
-
-    const payload = {
-      DocDate: solicitud.docDate,
-      RequriedDate: solicitud.requiredDate,
-
-      ...(solicitud.branchId && {
-        BPL_IDAssignedToInvoice: solicitud.branchId,
-      }),
-
-      DocumentLines: documentLines,
-    };
-
     console.log("📦 Payload SAP:");
     console.log(JSON.stringify(payload, null, 2));
 
-    // 🚀 Enviar a SAP
+    // 4. enviar
     const response = await sapAxios.post(
       "/PurchaseRequests",
       payload,
@@ -76,10 +149,12 @@ async function enviarSolicitudCompra(solicitud) {
 
       if (error.response.data?.error?.code === -2028) {
         console.error("💥 ERROR SAP -2028:");
-        console.error("👉 Algún dato no existe en SAP:");
+        console.error("👉 Algún código no existe en SAP:");
         console.error("- CostingCode");
         console.error("- ProjectCode");
-        console.error("- WarehouseCode (si lo agregas luego)");
+        console.error("- WarehouseCode");
+        console.error("- U_ALS_RUBRO");
+        console.error("- U_ALS_PAQTRAB");
       }
 
     } else {
@@ -91,8 +166,8 @@ async function enviarSolicitudCompra(solicitud) {
       error: error.response?.data || error.message,
     };
   }
-}
+};
 
 module.exports = {
-  enviarSolicitudCompra,
+  enviarSolicitudCompraASAP,
 };

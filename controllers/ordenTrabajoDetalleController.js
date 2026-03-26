@@ -5,8 +5,11 @@ const {
   SolicitudAlmacenLinea,
   SolicitudCompra,
   SolicitudCompraLinea,
-} = require("../db_connection"); // ajusta la ruta real
+} = require("../db_connection");
 
+/* =========================
+   HELPERS
+========================= */
 function agruparLineas(lineas = []) {
   const mapa = new Map();
 
@@ -46,6 +49,9 @@ function uniqueIds(arr = []) {
   return [...new Set(arr.filter(Boolean))];
 }
 
+/* =========================
+   SERVICE PRINCIPAL
+========================= */
 async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
   if (!ordenTrabajoId) {
     throw new Error("ordenTrabajoId es requerido");
@@ -53,7 +59,14 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
 
   const orden = await OrdenTrabajo.findByPk(ordenTrabajoId, {
     include: [
-      { association: "tratamiento" },
+      {
+        association: "tratamiento",
+        include: [
+          {
+            association: "aviso", // 🔥 NUEVO
+          },
+        ],
+      },
       {
         association: "equipos",
         attributes: ["id", "equipoId", "ubicacionTecnicaId"],
@@ -73,12 +86,32 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
     throw new Error("Orden de trabajo no encontrada");
   }
 
-  const ordenPlain = typeof orden.toJSON === "function" ? orden.toJSON() : orden;
+  const ordenPlain =
+    typeof orden.toJSON === "function" ? orden.toJSON() : orden;
+
+  /* =========================
+     EXTRAER INFO AVISO 🔥
+  ========================= */
+  const aviso = ordenPlain?.tratamiento?.aviso || null;
+
+  const infoAviso = aviso
+    ? {
+        cliente: aviso.cliente || null,
+        direccion: aviso.direccionAtencion || null,
+        numeroOV: aviso.ordenVenta || null,
+        contacto: {
+          nombre: aviso.nombreContacto || null,
+          correo: aviso.correoContacto || null,
+          telefono: aviso.numeroContacto || null,
+        },
+      }
+    : null;
 
   if (!ordenPlain.tratamientoId) {
     return {
       ordenTrabajo: ordenPlain,
       tratamiento: null,
+      aviso: infoAviso, // 🔥 NUEVO
       resumen: {
         tratamientoId: null,
         equipoIds: [],
@@ -108,9 +141,9 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
     )
   );
 
-  // =========================
-  // COMPRA GENERAL
-  // =========================
+  /* =========================
+     COMPRA GENERAL
+  ========================= */
   const solicitudesCompraGenerales = await SolicitudCompra.findAll({
     where: {
       tratamiento_id: ordenPlain.tratamientoId,
@@ -125,9 +158,9 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
     order: [["createdAt", "ASC"]],
   });
 
-  // =========================
-  // COMPRA ESPECIFICA SOLO DE ESTA OT
-  // =========================
+  /* =========================
+     COMPRA ESPECIFICA
+  ========================= */
   const compraSpecificOr = [];
 
   if (ordenPlain.id) {
@@ -136,17 +169,13 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
 
   if (equipoIds.length > 0) {
     compraSpecificOr.push({
-      equipo_id: {
-        [Op.in]: equipoIds,
-      },
+      equipo_id: { [Op.in]: equipoIds },
     });
   }
 
   if (ubicacionTecnicaIds.length > 0) {
     compraSpecificOr.push({
-      ubicacion_tecnica_id: {
-        [Op.in]: ubicacionTecnicaIds,
-      },
+      ubicacion_tecnica_id: { [Op.in]: ubicacionTecnicaIds },
     });
   }
 
@@ -167,9 +196,9 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
       })
     : [];
 
-  // =========================
-  // ALMACEN GENERAL
-  // =========================
+  /* =========================
+     ALMACEN GENERAL
+  ========================= */
   const solicitudesAlmacenGenerales = await SolicitudAlmacen.findAll({
     where: {
       tratamiento_id: ordenPlain.tratamientoId,
@@ -184,9 +213,9 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
     order: [["createdAt", "ASC"]],
   });
 
-  // =========================
-  // ALMACEN ESPECIFICA SOLO DE ESTA OT
-  // =========================
+  /* =========================
+     ALMACEN ESPECIFICA
+  ========================= */
   const almacenSpecificOr = [];
 
   if (ordenPlain.id) {
@@ -195,17 +224,13 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
 
   if (equipoIds.length > 0) {
     almacenSpecificOr.push({
-      equipo_id: {
-        [Op.in]: equipoIds,
-      },
+      equipo_id: { [Op.in]: equipoIds },
     });
   }
 
   if (ubicacionTecnicaIds.length > 0) {
     almacenSpecificOr.push({
-      ubicacion_tecnica_id: {
-        [Op.in]: ubicacionTecnicaIds,
-      },
+      ubicacion_tecnica_id: { [Op.in]: ubicacionTecnicaIds },
     });
   }
 
@@ -226,6 +251,9 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
       })
     : [];
 
+  /* =========================
+     MAPEO FINAL
+  ========================= */
   const compraGenerales = solicitudesCompraGenerales.map((s) => ({
     ...s.toJSON(),
     origenVista: "GENERAL",
@@ -265,22 +293,29 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
   return {
     ordenTrabajo: ordenPlain,
     tratamiento: ordenPlain.tratamiento || null,
+
+    aviso: infoAviso, // 🔥 AQUÍ SALE TODO
+
     resumen: {
       tratamientoId: ordenPlain.tratamientoId,
       equipoIds,
       ubicacionTecnicaIds,
-      totalSolicitudesCompra: compraGenerales.length + compraEspecificas.length,
-      totalSolicitudesAlmacen: almacenGenerales.length + almacenEspecificas.length,
+      totalSolicitudesCompra:
+        compraGenerales.length + compraEspecificas.length,
+      totalSolicitudesAlmacen:
+        almacenGenerales.length + almacenEspecificas.length,
     },
+
     solicitudesCompra: {
       generales: compraGenerales,
       especificas: compraEspecificas,
     },
+
     solicitudesAlmacen: {
-  generales: almacenGenerales,
-  especificas: almacenEspecificas,
-  lineasAgrupadasSap: lineasAlmacenAgrupadasSap,
-},
+      generales: almacenGenerales,
+      especificas: almacenEspecificas,
+      lineasAgrupadasSap: lineasAlmacenAgrupadasSap,
+    },
   };
 }
 
