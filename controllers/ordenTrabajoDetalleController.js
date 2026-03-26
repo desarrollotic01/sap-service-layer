@@ -62,10 +62,15 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
       {
         association: "tratamiento",
         include: [
-          {
-            association: "aviso", // 🔥 NUEVO
-          },
-        ],
+  {
+    association: "aviso",
+    include: [
+      {
+        association: "clienteData", 
+      },
+    ],
+  },
+],
       },
       {
         association: "equipos",
@@ -96,7 +101,7 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
 
   const infoAviso = aviso
     ? {
-        cliente: aviso.cliente || null,
+        cliente: aviso.clienteData?.nombre || null,
         direccion: aviso.direccionAtencion || null,
         numeroOV: aviso.ordenVenta || null,
         contacto: {

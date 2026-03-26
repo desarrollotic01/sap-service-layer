@@ -256,6 +256,11 @@ Aviso.belongsTo(db.GuiaMantenimientoProgramacion, {
   as: "programacionGuia",
 });
 
+Aviso.belongsTo(db.Cliente, {
+  foreignKey: "cliente",
+  as: "clienteData",
+});
+
 
 };
 
