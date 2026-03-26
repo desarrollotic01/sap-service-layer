@@ -258,7 +258,7 @@ Aviso.belongsTo(db.GuiaMantenimientoProgramacion, {
 });
 
 Aviso.belongsTo(db.Cliente, {
-  foreignKey: "cliente",
+  foreignKey: "clienteId",
   as: "clienteData",
 });
 
