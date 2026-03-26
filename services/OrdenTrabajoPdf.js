@@ -298,7 +298,7 @@ async function generarOrdenTrabajoPDF(orden) {
       font-weight: 500;
     }
 
-    /* ══ EQUIPO CARD — sin cortes internos ══ */
+    /* ══ EQUIPO CARD — permite corte entre secciones ══ */
     .equipo-card {
       border: 1px solid var(--green-dim);
       border-top: 3px solid var(--green-dark);
@@ -306,10 +306,10 @@ async function generarOrdenTrabajoPDF(orden) {
       margin-bottom: 14px;
       overflow: hidden;
       box-shadow: 0 1px 8px rgba(21,128,61,0.07);
-      /* Evita que la card se corte: si no entra completa, salta de página */
-      break-inside: avoid;
-      page-break-inside: avoid;
+      /* SIN break-inside: la card puede cortarse entre páginas normalmente */
     }
+
+    /* El header del equipo nunca queda huérfano: ya está en .equipo-header */
 
     .equipo-header {
       background: var(--header-bg);
@@ -320,6 +320,8 @@ async function generarOrdenTrabajoPDF(orden) {
       display: flex;
       align-items: center;
       gap: 8px;
+      break-after: avoid;
+      page-break-after: avoid;
     }
     .eq-dot {
       width: 7px; height: 7px;
@@ -340,6 +342,8 @@ async function generarOrdenTrabajoPDF(orden) {
       margin: 13px 0 6px;
       padding-bottom: 4px;
       border-bottom: 1px dashed var(--green-dim);
+      break-after: avoid;
+      page-break-after: avoid;
     }
 
     /* ══ TABLA ══ */
