@@ -194,8 +194,8 @@ const enviarSolicitudCompraASAPDesdeObjeto = async (solicitudFusionada) => {
     for (let i = 0; i < solicitudFusionada.lineas.length; i++) {
       const linea = solicitudFusionada.lineas[i];
 
-      const rubro = rubroMap.get(linea.rubroId);
-      const paquete = paqueteMap.get(linea.paqueteTrabajoId);
+      const rubro = rubroMap.get(Number(linea.rubroId));
+const paquete = paqueteMap.get(Number(linea.paqueteTrabajoId));
 
       if (!rubro?.codigo) {
         throw new Error(`Línea ${i + 1}: rubro sin código SAP`);
