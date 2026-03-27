@@ -41,8 +41,8 @@ const normalizarLineaCompra = (linea = {}, idx = 0) => ({
   warehouseCode: String(linea.warehouseCode || "").trim(),
   costingCode: String(linea.costingCode || "").trim() || null,
   projectCode: String(linea.projectCode || "").trim() || null,
-  rubro: String(linea.rubro || "").trim() || null,
-  paqueteTrabajo: String(linea.paqueteTrabajo || "").trim() || null,
+  rubroId: String(linea.rubro || "").trim() || null,
+  paqueteTrabajoId: String(linea.paqueteTrabajo || "").trim() || null,
   _idx: idx,
 });
 
@@ -278,8 +278,8 @@ const createSolicitudCompra = async (usuarioId, data) => {
         warehouseCode: l.warehouseCode,
         costingCode: l.costingCode,
         projectCode: l.projectCode,
-        rubro: l.rubro,
-        paqueteTrabajo: l.paqueteTrabajo,
+        rubroId: l.rubro,
+        paqueteTrabajoId: l.paqueteTrabajo,
       })),
       { transaction: t }
     );
