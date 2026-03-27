@@ -14,7 +14,7 @@ const {
 } = require("../db_connection");
 
 
-const { enviarSolicitudCompra } = require("../sap/sapSolicitudCompra");
+const { enviarSolicitudCompraASAP,enviarSolicitudCompraASAPDesdeObjeto } = require("../sap/sapSolicitudCompra");
 const {
   fusionarSolicitudesParaSap } = require("../controllers/ordenTrabajoDetalleController");
 const { Op } = require("sequelize");
