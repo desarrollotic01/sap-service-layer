@@ -1144,9 +1144,18 @@ async function liberarOrdenTrabajo(id) {
     pendientes.map((s) => s.toJSON())
   );
 
-  if (!solicitudFusionada?.lineas?.length) {
-    throw new Error("No hay líneas válidas");
-  }
+  let data = null;
+
+if (!solicitudFusionada?.lineas?.length) {
+  data = {
+    success: false,
+    message: "No hay líneas válidas para enviar",
+  };
+} else {
+  data = await enviarSolicitudCompraASAPDesdeObjeto(
+    solicitudFusionada
+  );
+}
 
   /* =========================
      🔥 3. ENVIAR A SAP
@@ -1168,9 +1177,7 @@ async function liberarOrdenTrabajo(id) {
   /* =========================
      🔥 5. LIBERAR OT
   ========================= */
-  if (resultado.success) {
-    await ot.update({ estado: "LIBERADO" });
-  }
+ await ot.update({ estado: "LIBERADO" });
 
   return {
     ot,
@@ -1242,6 +1249,64 @@ async function actualizarOTACierreTecnicoSiCompleta(ordenTrabajoId, transaction)
   };
 }
 
+
+async function syncSolicitudesCompraOT(id) {
+  const ot = await OrdenTrabajo.findByPk(id);
+
+  if (!ot) throw new Error("OT no encontrada");
+
+  /* =========================
+     🔥 TRAER SOLICITUDES
+  ========================= */
+  const solicitudes = await SolicitudCompra.findAll({
+    where: { ordenTrabajoId: id },
+    include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+  });
+
+  const pendientes = solicitudes.filter(
+    (s) => s.estado === "DRAFT" || s.estado === "ERROR"
+  );
+
+  if (!pendientes.length) {
+    throw new Error("No hay solicitudes pendientes para sync");
+  }
+
+  /* =========================
+     🔥 FUSIONAR
+  ========================= */
+  const solicitudFusionada = fusionarSolicitudesParaSap(
+    pendientes.map((s) => s.toJSON())
+  );
+
+  let resultado;
+
+  if (!solicitudFusionada?.lineas?.length) {
+    resultado = {
+      success: false,
+      message: "Sin líneas válidas",
+    };
+  } else {
+    resultado = await enviarSolicitudCompraASAPDesdeObjeto(
+      solicitudFusionada
+    );
+  }
+
+  /* =========================
+     🔥 ACTUALIZAR SOLICITUDES
+  ========================= */
+  for (const solicitud of pendientes) {
+    await solicitud.update({
+      estado: resultado.success ? "SENT" : "ERROR",
+      sapDocNum: resultado.success ? resultado.data?.DocNum : null,
+    });
+  }
+
+  return {
+    success: resultado.success,
+    procesadas: pendientes.length,
+  };
+}
+
 module.exports = {
   crearOrdenTrabajo,
   obtenerOrdenesTrabajo,
@@ -1250,4 +1315,5 @@ module.exports = {
   eliminarOrdenTrabajo,
   liberarOrdenTrabajo,
   actualizarOTACierreTecnicoSiCompleta,
+  syncSolicitudesCompraOT
 };
