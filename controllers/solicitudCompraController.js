@@ -403,8 +403,8 @@ const updateSolicitudCompra = async (solicitudId, data) => {
         warehouseCode: l.warehouseCode,
         costingCode: l.costingCode,
         projectCode: l.projectCode,
-        rubro: l.rubro,
-        paqueteTrabajo: l.paqueteTrabajo,
+         rubroId: l.rubroId,                
+    paqueteTrabajoId: l.paqueteTrabajoId, 
       })),
       { transaction: t }
     );
