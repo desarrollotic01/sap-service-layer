@@ -9,7 +9,7 @@ const {
 
 const {
   enviarSolicitudCompraASAPDesdeObjeto,
-} = require("./sapSolicitudCompra");
+} = require("../sap/sapSolicitudCompra");
 
 /* =========================
    HELPERS
