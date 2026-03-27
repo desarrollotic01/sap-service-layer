@@ -15,7 +15,8 @@ const {
 
 
 const { enviarSolicitudCompra } = require("../sap/sapSolicitudCompra");
-
+const {
+  fusionarSolicitudesParaSap } = require("../controllers/ordenTrabajoDetalleController");
 const { Op } = require("sequelize");
 
 /* =========================================================
@@ -1109,7 +1110,9 @@ async function liberarOrdenTrabajo(id) {
     throw new Error("Solo se puede liberar una OT en estado CREADO");
   }
 
-  // 🔥 1. Traer solicitudes asociadas
+  /* =========================
+     🔥 1. TRAER SOLICITUDES
+  ========================= */
   const solicitudes = await SolicitudCompra.findAll({
     where: {
       ordenTrabajoId: id,
@@ -1118,44 +1121,62 @@ async function liberarOrdenTrabajo(id) {
       {
         model: SolicitudCompraLinea,
         as: "lineas",
+        include: [
+          { association: "rubro" },
+          { association: "paqueteTrabajo" },
+        ],
       },
     ],
   });
 
-  // 🔥 2. Enviar cada solicitud a SAP
-  for (const solicitud of solicitudes) {
-    // Solo enviar las que no se enviaron
-    if (solicitud.estado === "SENT") continue;
+  const pendientes = solicitudes.filter(
+    (s) => s.estado !== "SENT"
+  );
 
-    try {
-      const resultado = await enviarSolicitudCompra(solicitud);
-
-      if (resultado.success) {
-        await solicitud.update({
-          estado: "SENT",
-          sapDocNum: resultado.data.DocNum,
-        });
-      } else {
-        await solicitud.update({
-          estado: "ERROR",
-        });
-      }
-
-    } catch (error) {
-      console.error("Error enviando solicitud:", error.message);
-
-      await solicitud.update({
-        estado: "ERROR",
-      });
-    }
+  if (!pendientes.length) {
+    throw new Error("No hay solicitudes pendientes");
   }
 
-  // 🔥 3. Liberar OT
-  await ot.update({ estado: "LIBERADO" });
+  /* =========================
+     🔥 2. FUSIONAR
+  ========================= */
+  const solicitudFusionada = fusionarSolicitudesParaSap(
+    pendientes.map((s) => s.toJSON())
+  );
 
-  return ot;
+  if (!solicitudFusionada?.lineas?.length) {
+    throw new Error("No hay líneas válidas");
+  }
+
+  /* =========================
+     🔥 3. ENVIAR A SAP
+  ========================= */
+  const resultado = await enviarSolicitudCompraASAPDesdeObjeto(
+    solicitudFusionada
+  );
+
+  /* =========================
+     🔥 4. ACTUALIZAR
+  ========================= */
+  for (const solicitud of pendientes) {
+    await solicitud.update({
+      estado: resultado.success ? "SENT" : "ERROR",
+      sapDocNum: resultado.success ? resultado.data.DocNum : null,
+    });
+  }
+
+  /* =========================
+     🔥 5. LIBERAR OT
+  ========================= */
+  if (resultado.success) {
+    await ot.update({ estado: "LIBERADO" });
+  }
+
+  return {
+    ot,
+    resultadoSAP: resultado,
+  };
 }
-
 
 /* =========================================================
    6) CAMBIAR A CIERRE_TECNICO SI TODAS TIENEN NOTIFICACION

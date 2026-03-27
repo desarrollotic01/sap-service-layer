@@ -168,6 +168,101 @@ const enviarSolicitudCompraASAP = async (solicitudId) => {
   }
 };
 
+
+/* =========================
+   🔥 NUEVO: ENVIAR DESDE OBJETO (FUSIONADO)
+========================= */
+const enviarSolicitudCompraASAPDesdeObjeto = async (solicitudFusionada) => {
+  try {
+    if (!solicitudFusionada.lineas?.length) {
+      throw new Error("No hay líneas para enviar a SAP");
+    }
+
+    const documentLines = [];
+
+    for (let i = 0; i < solicitudFusionada.lineas.length; i++) {
+      const linea = solicitudFusionada.lineas[i];
+
+
+      const rubroIds = [...new Set(solicitudFusionada.lineas.map(l => l.rubroId))];
+const paqueteIds = [...new Set(solicitudFusionada.lineas.map(l => l.paqueteTrabajoId))];
+
+const rubros = await SapRubro.findAll({
+  where: { id: rubroIds }
+});
+
+const paquetes = await SapPaqueteTrabajo.findAll({
+  where: { id: paqueteIds }
+});
+
+// mapas rápidos
+const rubroMap = new Map(rubros.map(r => [r.id, r]));
+const paqueteMap = new Map(paquetes.map(p => [p.id, p]));
+
+      const rubro = rubroMap.get(linea.rubroId);
+const paquete = paqueteMap.get(linea.paqueteTrabajoId);
+
+      if (!rubro?.codigo) {
+        throw new Error(`Línea ${i + 1}: rubro sin código SAP`);
+      }
+
+      if (!paquete?.codigo) {
+        throw new Error(`Línea ${i + 1}: paquete sin código SAP`);
+      }
+
+      documentLines.push({
+        ItemCode: linea.itemCode,
+        Quantity: Number(linea.quantity),
+        RequiredDate: formatDate(new Date()),
+
+        ...(linea.warehouseCode && {
+          WarehouseCode: linea.warehouseCode,
+        }),
+
+        ...(linea.costingCode && {
+          CostingCode: linea.costingCode,
+        }),
+
+        ...(linea.projectCode && {
+          ProjectCode: linea.projectCode,
+        }),
+
+        U_ALS_PAQTRAB: paquete.codigo,
+        U_ALS_RUBRO: rubro.codigo,
+      });
+    }
+
+    const payload = {
+      DocDate: formatDate(new Date()),
+      RequriedDate: formatDate(new Date()),
+      DocumentLines: documentLines,
+    };
+
+    const cookies = await loginSAP();
+
+    const response = await sapAxios.post(
+      "/PurchaseRequests",
+      payload,
+      {
+        headers: { Cookie: cookies },
+      }
+    );
+
+    return {
+      success: true,
+      data: response.data,
+    };
+  } catch (error) {
+    console.error(error.response?.data || error.message);
+
+    return {
+      success: false,
+      error: error.response?.data || error.message,
+    };
+  }
+};
+
 module.exports = {
   enviarSolicitudCompraASAP,
+  enviarSolicitudCompraASAPDesdeObjeto
 };

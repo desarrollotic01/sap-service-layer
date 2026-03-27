@@ -7,6 +7,10 @@ const {
   SolicitudCompraLinea,
 } = require("../db_connection");
 
+const {
+  enviarSolicitudCompraASAPDesdeObjeto,
+} = require("./sapSolicitudCompra");
+
 /* =========================
    HELPERS
 ========================= */
@@ -47,6 +51,44 @@ function agruparLineas(lineas = []) {
 
 function uniqueIds(arr = []) {
   return [...new Set(arr.filter(Boolean))];
+}
+
+function fusionarSolicitudesParaSap(solicitudes = []) {
+  if (!solicitudes.length) return null;
+
+  const todasLasLineas = solicitudes.flatMap((s) =>
+    (s.lineas || []).map((l) => ({
+      itemCode: l.itemCode,
+      description: l.description,
+      quantity: Number(l.quantity || 0),
+      warehouseCode: l.warehouseCode,
+      costingCode: l.costingCode,
+      projectCode: l.projectCode,
+      rubroId: l.rubroId,
+      paqueteTrabajoId: l.paqueteTrabajoId,
+    }))
+  );
+
+  const lineasAgrupadas = agruparLineas(
+    todasLasLineas.map((l) => ({
+      ...l,
+      rubroSapCode: l.rubroId,
+      paqueteTrabajo: l.paqueteTrabajoId,
+    }))
+  );
+
+  return {
+    lineas: lineasAgrupadas.map((l) => ({
+      itemCode: l.itemCode,
+      description: l.description,
+      quantity: l.quantity,
+      warehouseCode: l.warehouseCode,
+      costingCode: l.costingCode,
+      projectCode: l.projectCode,
+      rubroId: l.rubroSapCode,
+      paqueteTrabajoId: l.paqueteTrabajo,
+    })),
+  };
 }
 
 /* =========================
@@ -324,6 +366,54 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
   };
 }
 
+async function enviarSolicitudesUnificadasASAP(ordenTrabajoId) {
+  const solicitudes = await SolicitudCompra.findAll({
+  where: {
+    ordenTrabajoId,
+  },
+  include: [
+    {
+      model: SolicitudCompraLinea,
+      as: "lineas",
+      include: [
+        {
+          association: "rubro",
+        },
+        {
+          association: "paqueteTrabajo",
+        },
+      ],
+    },
+  ],
+});
+
+  if (!solicitudes.length) {
+    throw new Error("No hay solicitudes");
+  }
+
+  // 🔥 fusionar TODAS
+  const solicitudFusionada = fusionarSolicitudesParaSap(
+    solicitudes.map((s) => s.toJSON())
+  );
+
+  // 🔥 enviar UNA sola vez
+  const resultado = await enviarSolicitudCompraASAPDesdeObjeto(
+    solicitudFusionada
+  );
+
+  // 🔥 actualizar todas
+  for (const solicitud of solicitudes) {
+    await solicitud.update({
+      estado: resultado.success ? "SENT" : "ERROR",
+      sapDocNum: resultado.success ? resultado.data.DocNum : null,
+    });
+  }
+
+  return resultado;
+}
+
 module.exports = {
   getDetalleSolicitudesTratamientoPorOrdenTrabajo,
+  enviarSolicitudesUnificadasASAP,
+  fusionarSolicitudesParaSap
 };
