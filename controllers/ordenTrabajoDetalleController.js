@@ -57,16 +57,31 @@ function fusionarSolicitudesParaSap(solicitudes = []) {
   if (!solicitudes.length) return null;
 
   const todasLasLineas = solicitudes.flatMap((s) =>
-    (s.lineas || []).map((l) => ({
-      itemCode: l.itemCode,
-      description: l.description,
-      quantity: Number(l.quantity || 0),
-      warehouseCode: l.warehouseCode,
-      costingCode: l.costingCode,
-      projectCode: l.projectCode,
-      rubroId: l.rubroId,
-      paqueteTrabajoId: l.paqueteTrabajoId,
-    }))
+    (s.lineas || []).map((l) => {
+      const rubroId = l.rubroId ?? l.rubro?.id ?? null;
+      const paqueteTrabajoId =
+        l.paqueteTrabajoId ?? l.paqueteTrabajo?.id ?? null;
+
+      // 🔥 VALIDACIÓN PRO (opcional pero recomendado)
+      if (!rubroId) {
+        console.warn("⚠️ Línea sin rubroId:", l);
+      }
+
+      if (!paqueteTrabajoId) {
+        console.warn("⚠️ Línea sin paqueteTrabajoId:", l);
+      }
+
+      return {
+        itemCode: l.itemCode,
+        description: l.description,
+        quantity: Number(l.quantity || 0),
+        warehouseCode: l.warehouseCode,
+        costingCode: l.costingCode,
+        projectCode: l.projectCode,
+        rubroId,
+        paqueteTrabajoId,
+      };
+    })
   );
 
   const lineasAgrupadas = agruparLineas(
@@ -90,7 +105,6 @@ function fusionarSolicitudesParaSap(solicitudes = []) {
     })),
   };
 }
-
 /* =========================
    SERVICE PRINCIPAL
 ========================= */
