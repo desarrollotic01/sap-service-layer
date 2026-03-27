@@ -1245,16 +1245,52 @@ async function actualizarOTACierreTecnicoSiCompleta(ordenTrabajoId, transaction)
 
 
 async function syncSolicitudesCompraOT(id) {
-  try {
-    const { id } = req.params; 
+  const ot = await OrdenTrabajo.findByPk(id);
 
-    const result = await syncSolicitudesCompraOT(id);
+  if (!ot) throw new Error("OT no encontrada");
 
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  const solicitudes = await SolicitudCompra.findAll({
+    where: { ordenTrabajoId: id },
+    include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+  });
+
+  const pendientes = solicitudes.filter(
+    (s) => s.estado === "DRAFT" || s.estado === "ERROR"
+  );
+
+  if (!pendientes.length) {
+    throw new Error("No hay solicitudes pendientes para sync");
   }
-};
+
+  const solicitudFusionada = fusionarSolicitudesParaSap(
+    pendientes.map((s) => s.toJSON())
+  );
+
+  let resultado;
+
+  if (!solicitudFusionada?.lineas?.length) {
+    resultado = {
+      success: false,
+      message: "Sin líneas válidas",
+    };
+  } else {
+    resultado = await enviarSolicitudCompraASAPDesdeObjeto(
+      solicitudFusionada
+    );
+  }
+
+  for (const solicitud of pendientes) {
+    await solicitud.update({
+      estado: resultado.success ? "SENT" : "ERROR",
+      sapDocNum: resultado.success ? resultado.data?.DocNum : null,
+    });
+  }
+
+  return {
+    success: resultado.success,
+    procesadas: pendientes.length,
+  };
+}
 
 module.exports = {
   crearOrdenTrabajo,
