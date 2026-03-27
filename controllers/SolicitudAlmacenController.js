@@ -7,11 +7,15 @@ const {
   OrdenTrabajo,
   Equipo,
   UbicacionTecnica,
+  PersonalCorreo
 } = require("../db_connection");
 
 /* =========================================================
    HELPERS
 ========================================================= */
+
+const { enviarCorreo } = require("../services/emailService");
+const { buildHtmlBloque } = require("../utils/emailTemplates");
 
 const esUUID = (value) =>
   typeof value === "string" &&
@@ -403,9 +407,13 @@ const getSolicitudesAlmacenAgrupadasParaSap = async ({
 /* =========================================================
    CREATE
 ========================================================= */
+const { v4: uuidv4 } = require("uuid");
+
+
 
 const createSolicitudAlmacen = async ({ usuarioId, data }) => {
   const t = await sequelize.transaction();
+const bloqueId = data.bloque_id || uuidv4();
 
   try {
     const errorValidacion = validarSolicitudAlmacenPayload(data);
@@ -502,6 +510,8 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
         comments: data.comments || null,
         estado: data.estado || "DRAFT",
         numeroSolicitud,
+          destinatario_id: data.destinatario_id || null,
+    bloque_id: bloqueId,
       },
       { transaction: t }
     );
@@ -516,8 +526,8 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
         warehouseCode: linea.warehouseCode,
         costingCode: linea.costingCode,
         projectCode: linea.projectCode,
-        rubroSapCode: linea.rubroSapCode,
-        paqueteTrabajo: linea.paqueteTrabajo,
+        rubroId: linea.rubroId,
+        paqueteTrabajoId: linea.paqueteTrabajoId,
       })),
       { transaction: t }
     );
@@ -539,9 +549,54 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
   }
 };
 
+
+async function enviarSolicitudesAlmacenPorCorreo(ordenId) {
+  const solicitudes = await SolicitudAlmacen.findAll({
+    where: { ordenTrabajoId: ordenId },
+    include: [
+      { model: SolicitudAlmacenLinea, as: "lineas" },
+      { model: PersonalCorreo, as: "destinatario" },
+    ],
+  });
+
+  const pendientes = solicitudes.filter(
+    (s) => s.estado === "DRAFT"
+  );
+
+  // 🔥 AGRUPAR POR BLOQUE
+  const bloques = {};
+
+  for (const s of pendientes) {
+    const key = s.bloque_id || "sin-bloque";
+
+    if (!bloques[key]) bloques[key] = [];
+    bloques[key].push(s);
+  }
+
+  // 🔥 ENVIAR POR BLOQUE
+  for (const bloqueId in bloques) {
+    const grupo = bloques[bloqueId];
+
+    const destinatario = grupo[0]?.destinatario;
+
+    if (!destinatario?.correo) continue;
+
+    await enviarCorreo({
+      to: destinatario.correo,
+      subject: `Solicitudes de almacén (Bloque ${bloqueId})`,
+      html: buildHtmlBloque(grupo),
+    });
+
+    // marcar todas como enviadas
+    for (const sol of grupo) {
+      await sol.update({ estado: "SENT" });
+    }
+  }
+}
 module.exports = {
   getSolicitudAlmacenById,
   updateSolicitudAlmacen,
   getSolicitudesAlmacenAgrupadasParaSap,
   createSolicitudAlmacen,
+  enviarSolicitudesAlmacenPorCorreo
 };

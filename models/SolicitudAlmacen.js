@@ -95,6 +95,16 @@ module.exports = (sequelize) => {
         type: DataTypes.UUID,
         allowNull: true,
       },
+
+      destinatario_id: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
+
+bloque_id: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
     },
     {
       tableName: "SolicitudesAlmacen",
@@ -131,6 +141,11 @@ module.exports = (sequelize) => {
 SolicitudAlmacen.belongsTo(db.UbicacionTecnica, {
   foreignKey: "ubicacion_tecnica_id",
   as: "ubicacionTecnica",
+});
+
+SolicitudAlmacen.belongsTo(db.PersonalCorreo, {
+  foreignKey: "destinatario_id",
+  as: "destinatario",
 });
     
   };

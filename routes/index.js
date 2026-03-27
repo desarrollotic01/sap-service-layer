@@ -27,11 +27,11 @@ const sedeRouter = require("./sedeRouter")
 const solicitudAlmacenRouter = require("./solicitudAlmacenRouter")
 const sapCatalogoRouter = require("./sapCatalogoRouter")
 const ordenPDFRouter = require("./ordenPDFRouter")
-
+const personalCorreoRouter = require("./personalCorreoRouter")
 
 router.use("/orden-pdf", ordenPDFRouter);
 router.use("/sap", sapCatalogoRouter);
-
+router.use("/personal-correo",personalCorreoRouter)
 router.use("/solicitudalmacen", solicitudAlmacenRouter);
 router.use("/rubros", rubroRouter);
 router.use("/items", itemRouter);
