@@ -142,11 +142,27 @@ const createSolicitudAlmacenHandler = async (req, res) => {
 };
 
 
+const enviarBloqueHandler = async (req, res) => {
+  try {
+    const { bloqueId, ordenTrabajoId } = req.body;
 
+    const resultado = await SolicitudAlmacenController.enviarBloqueSolicitudes({
+      bloqueId,
+      ordenTrabajoId,
+    });
+
+    res.json(resultado);
+  } catch (error) {
+    res.status(400).json({
+      error: error.message,
+    });
+  }
+};
 
 module.exports = {
     createSolicitudAlmacenHandler,
   getSolicitudAlmacenById,
   updateSolicitudAlmacen,
   getSolicitudesAlmacenAgrupadasParaSap,
+  enviarBloqueHandler
 };

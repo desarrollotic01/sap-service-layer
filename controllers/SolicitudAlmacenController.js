@@ -592,11 +592,62 @@ async function enviarSolicitudesAlmacenPorCorreo(ordenId) {
       await sol.update({ estado: "SENT" });
     }
   }
+
+
+  
 }
+
+
+
+
+const enviarBloqueSolicitudes = async ({ bloqueId, ordenTrabajoId }) => {
+  const solicitudes = await SolicitudAlmacen.findAll({
+    where: {
+      bloque_id: bloqueId,
+      ordenTrabajoId,
+    },
+    include: [
+      { model: SolicitudAlmacenLinea, as: "lineas" },
+      { model: PersonalCorreo, as: "destinatario" },
+    ],
+  });
+
+  if (!solicitudes.length) {
+    throw new Error("No hay solicitudes en este bloque");
+  }
+
+  const destinatario = solicitudes[0]?.destinatario;
+
+  if (!destinatario?.correo) {
+    throw new Error("El bloque no tiene destinatario");
+  }
+
+  const resultado = await enviarCorreo({
+    to: destinatario.correo,
+    subject: `Solicitudes de almacén (Bloque ${bloqueId})`,
+    html: buildHtmlBloque(solicitudes),
+  });
+
+  // 🔥 actualizar estado
+  for (const sol of solicitudes) {
+    await sol.update({
+      estado: resultado.success ? "SENT" : "ERROR",
+    });
+  }
+
+  return {
+    success: resultado.success,
+    total: solicitudes.length,
+  };
+};
+
+
+
 module.exports = {
   getSolicitudAlmacenById,
   updateSolicitudAlmacen,
   getSolicitudesAlmacenAgrupadasParaSap,
   createSolicitudAlmacen,
-  enviarSolicitudesAlmacenPorCorreo
+  enviarSolicitudesAlmacenPorCorreo,
+  enviarBloqueSolicitudes
 };
