@@ -178,29 +178,24 @@ const enviarSolicitudCompraASAPDesdeObjeto = async (solicitudFusionada) => {
       throw new Error("No hay líneas para enviar a SAP");
     }
 
+    // 🔥 1. Obtener IDs UNA SOLA VEZ
+    const rubroIds = [...new Set(solicitudFusionada.lineas.map(l => l.rubroId))];
+    const paqueteIds = [...new Set(solicitudFusionada.lineas.map(l => l.paqueteTrabajoId))];
+
+    const rubros = await SapRubro.findAll({ where: { id: rubroIds } });
+    const paquetes = await SapPaqueteTrabajo.findAll({ where: { id: paqueteIds } });
+
+    const rubroMap = new Map(rubros.map(r => [r.id, r]));
+    const paqueteMap = new Map(paquetes.map(p => [p.id, p]));
+
     const documentLines = [];
 
+    // 🔥 2. Loop limpio
     for (let i = 0; i < solicitudFusionada.lineas.length; i++) {
       const linea = solicitudFusionada.lineas[i];
 
-
-      const rubroIds = [...new Set(solicitudFusionada.lineas.map(l => l.rubroId))];
-const paqueteIds = [...new Set(solicitudFusionada.lineas.map(l => l.paqueteTrabajoId))];
-
-const rubros = await SapRubro.findAll({
-  where: { id: rubroIds }
-});
-
-const paquetes = await SapPaqueteTrabajo.findAll({
-  where: { id: paqueteIds }
-});
-
-// mapas rápidos
-const rubroMap = new Map(rubros.map(r => [r.id, r]));
-const paqueteMap = new Map(paquetes.map(p => [p.id, p]));
-
       const rubro = rubroMap.get(linea.rubroId);
-const paquete = paqueteMap.get(linea.paqueteTrabajoId);
+      const paquete = paqueteMap.get(linea.paqueteTrabajoId);
 
       if (!rubro?.codigo) {
         throw new Error(`Línea ${i + 1}: rubro sin código SAP`);
@@ -215,17 +210,9 @@ const paquete = paqueteMap.get(linea.paqueteTrabajoId);
         Quantity: Number(linea.quantity),
         RequiredDate: formatDate(new Date()),
 
-        ...(linea.warehouseCode && {
-          WarehouseCode: linea.warehouseCode,
-        }),
-
-        ...(linea.costingCode && {
-          CostingCode: linea.costingCode,
-        }),
-
-        ...(linea.projectCode && {
-          ProjectCode: linea.projectCode,
-        }),
+        ...(linea.warehouseCode && { WarehouseCode: linea.warehouseCode }),
+        ...(linea.costingCode && { CostingCode: linea.costingCode }),
+        ...(linea.projectCode && { ProjectCode: linea.projectCode }),
 
         U_ALS_PAQTRAB: paquete.codigo,
         U_ALS_RUBRO: rubro.codigo,
@@ -240,18 +227,15 @@ const paquete = paqueteMap.get(linea.paqueteTrabajoId);
 
     const cookies = await loginSAP();
 
-    const response = await sapAxios.post(
-      "/PurchaseRequests",
-      payload,
-      {
-        headers: { Cookie: cookies },
-      }
-    );
+    const response = await sapAxios.post("/PurchaseRequests", payload, {
+      headers: { Cookie: cookies },
+    });
 
     return {
       success: true,
       data: response.data,
     };
+
   } catch (error) {
     console.error(error.response?.data || error.message);
 
