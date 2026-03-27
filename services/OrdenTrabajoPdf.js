@@ -97,6 +97,16 @@ async function generarOrdenTrabajoPDF(orden) {
 
     if (!logoSrc) console.warn("⚠️  Logo no encontrado en ../assets/");
 
+    // ── Datos del aviso / cliente / contacto ──────────────────────────────
+    const aviso      = orden.tratamiento?.aviso ?? {};
+    const clienteData = aviso.clienteData ?? null;
+    const numeroOV   = aviso.ordenVenta;
+    const contacto   = {
+      nombre:   aviso.nombreContacto,
+      correo:   aviso.correoContacto,
+      telefono: aviso.numeroContacto,
+    };
+
     const html = `
 <!DOCTYPE html>
 <html lang="es">
@@ -298,7 +308,7 @@ async function generarOrdenTrabajoPDF(orden) {
       font-weight: 500;
     }
 
-    /* ══ EQUIPO CARD — permite corte entre secciones ══ */
+    /* ══ EQUIPO CARD ══ */
     .equipo-card {
       border: 1px solid var(--green-dim);
       border-top: 3px solid var(--green-dark);
@@ -306,10 +316,7 @@ async function generarOrdenTrabajoPDF(orden) {
       margin-bottom: 14px;
       overflow: hidden;
       box-shadow: 0 1px 8px rgba(21,128,61,0.07);
-      /* SIN break-inside: la card puede cortarse entre páginas normalmente */
     }
-
-    /* El header del equipo nunca queda huérfano: ya está en .equipo-header */
 
     .equipo-header {
       background: var(--header-bg);
@@ -376,7 +383,16 @@ async function generarOrdenTrabajoPDF(orden) {
       line-height: 1.4;
     }
 
-    /* ══ PERSONAL — no cortar tarjeta a la mitad ══ */
+    /* ══ TABLA ACTIVIDADES — anchos de columna ══ */
+    .col-num   { width: 30px; }
+    .col-tarea { width: 28%; }
+    .col-ssc   { width: 26%; }
+    .col-tipo  { width: 10%; }
+    .col-rol   { width: 13%; }
+    .col-cant  { width: 6%; text-align: center; }
+    .col-dur   { width: 10%; }
+
+    /* ══ PERSONAL ══ */
     .personal-list {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -416,14 +432,14 @@ async function generarOrdenTrabajoPDF(orden) {
       letter-spacing: 0.4px;
     }
 
-    /* ══ OBS / DESC — como texto inline, sin caja especial ══ */
+    /* ══ OBS / DESC ══ */
     .inline-text {
       font-size: 10.5px;
       line-height: 1.55;
       color: var(--gray-2);
     }
 
-    /* ══ FIRMAS — siempre juntas, nunca cortadas ══ */
+    /* ══ FIRMAS ══ */
     .firmas {
       margin-top: 36px;
       display: grid;
@@ -514,6 +530,9 @@ async function generarOrdenTrabajoPDF(orden) {
           <div class="field"><label>Tipo de Mantenimiento</label><span>${val(orden.tipoMantenimiento)}</span></div>
           <div class="field"><label>Fecha Inicio Programada</label><span>${formatearFecha(orden.fechaProgramadaInicio)}</span></div>
           <div class="field"><label>Fecha Fin Programada</label><span>${formatearFecha(orden.fechaProgramadaFin)}</span></div>
+          <div class="field"><label>Número de Aviso</label><span>${val(aviso.numeroAviso)}</span></div>
+          <div class="field"><label>Prioridad</label><span>${val(aviso.prioridad)}</span></div>
+          <div class="field"><label>Número OV</label><span>${val(numeroOV)}</span></div>
         </div>
 
         ${orden.observaciones ? `
@@ -527,6 +546,25 @@ async function generarOrdenTrabajoPDF(orden) {
           <div class="field" style="margin-bottom:3px"><label>Descripción General</label></div>
           <div class="inline-text">${val(orden.descripcionGeneral)}</div>
         </div>` : ""}
+      </div>
+
+      <!-- CLIENTE Y CONTACTO -->
+      <div class="section">
+        <div class="section-title">Cliente y Contacto</div>
+        <div class="grid">
+          <div class="field">
+            <label>Cliente</label>
+            <span>${clienteData?.nombre ?? (aviso.clienteId ? aviso.clienteId : "-")}</span>
+          </div>
+          <div class="field"><label>Orden de Venta</label><span>${val(numeroOV)}</span></div>
+          <div class="field"><label>Orden Cliente</label><span>${val(aviso.ordenCliente)}</span></div>
+          <div class="field"><label>Nombre Contacto</label><span>${val(contacto.nombre)}</span></div>
+          <div class="field"><label>Correo Contacto</label><span>${val(contacto.correo)}</span></div>
+          <div class="field"><label>Teléfono Contacto</label><span>${val(contacto.telefono)}</span></div>
+          <div class="field"><label>Sede</label><span>${val(aviso.sede)}</span></div>
+          <div class="field"><label>Almacén</label><span>${val(aviso.almacen)}</span></div>
+          <div class="field"><label>Centro de Costo</label><span>${val(aviso.centroCosto)}</span></div>
+        </div>
       </div>
 
       <!-- EQUIPOS -->
@@ -582,6 +620,15 @@ async function generarOrdenTrabajoPDF(orden) {
               <!-- SUB 3: Detalle de Actividades -->
               <div class="sub-title">Detalle de Actividades</div>
               <table>
+                <colgroup>
+                  <col class="col-num" />
+                  <col class="col-tarea" />
+                  <col class="col-ssc" />
+                  <col class="col-tipo" />
+                  <col class="col-rol" />
+                  <col class="col-cant" />
+                  <col class="col-dur" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>#</th>
@@ -589,9 +636,8 @@ async function generarOrdenTrabajoPDF(orden) {
                     <th>Sistema / Subsistema / Componente</th>
                     <th>Tipo de Trabajo</th>
                     <th>Rol Técnico</th>
-                    <th>Cant.</th>
+                    <th style="text-align:center">Cant.</th>
                     <th>Duración Est.</th>
-                    <th>Origen</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -604,7 +650,6 @@ async function generarOrdenTrabajoPDF(orden) {
                       <td>${labelRol(act.rolTecnico)}</td>
                       <td style="text-align:center;font-weight:700;color:var(--green-deep)">${val(act.cantidadTecnicos)}</td>
                       <td style="font-family:'DM Mono',monospace;font-size:9px">${val(act.duracionEstimadaValor)} ${val(act.unidadDuracion)}</td>
-                      <td>${val(act.origen)}</td>
                     </tr>
                   `).join("")}
                 </tbody>
