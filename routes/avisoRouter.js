@@ -11,7 +11,7 @@ router.post(
   upload.fields([
     { name: "documentos", maxCount: 10 },
     { name: "documentoFinal", maxCount: 1 },
-  ]),
+  ]),auth,
   handler.crearAvisoHandler
 );
 router.get("/", auth, handler.obtenerAvisosHandler);

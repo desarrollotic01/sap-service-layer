@@ -26,7 +26,7 @@ function validarAviso(body) {
   /* =====================
      CLIENTE
   ===================== */
-  if (!body.cliente) {
+  if (!body.clienteId) {
     errors.push("cliente es obligatorio");
   }
 
