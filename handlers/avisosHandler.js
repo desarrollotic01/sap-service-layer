@@ -6,6 +6,16 @@ async function crearAvisoHandler(req, res) {
   try {
     const errors = [];
 
+
+     if (Array.isArray(req.body.tipoAviso)) {
+      req.body.tipoAviso = req.body.tipoAviso[0];
+    }
+
+    if (req.body.tipoAviso) {
+      req.body.tipoAviso = req.body.tipoAviso.trim().toLowerCase();
+    }
+    
+
     if (!req.user?.id) {
       errors.push("Usuario no autenticado");
     }
