@@ -147,8 +147,9 @@ module.exports = (sequelize) => {
 },
 
 
-      supervisorAsignado: {
-        type: DataTypes.STRING,
+      supervisorId: {
+        type: DataTypes.UUID,
+        allowNull:false,
       },
 
       estadoAviso: {
@@ -261,6 +262,11 @@ Aviso.belongsTo(db.Cliente, {
   foreignKey: "clienteId",
   as: "clienteData",
 });
+
+Aviso.belongsTo(db.Trabajador,{
+  foreignKey :"supervisorId",
+  as: "supervisor"
+})
 
 
 };

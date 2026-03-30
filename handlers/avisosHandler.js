@@ -1,7 +1,6 @@
 const avisosController = require("../controllers/avisosController");
 const { validarAviso } = require("../validators/avisoValidator");
-
-
+const path = require("path");
 
 async function crearAvisoHandler(req, res) {
   try {
@@ -15,7 +14,6 @@ async function crearAvisoHandler(req, res) {
 
     const { equipos = [], ubicaciones = [] } = req.body;
 
-    // Validar tipo arreglo
     if (equipos && !Array.isArray(equipos)) {
       errors.push("Equipos debe ser un arreglo");
     }
@@ -24,33 +22,60 @@ async function crearAvisoHandler(req, res) {
       errors.push("Ubicaciones debe ser un arreglo");
     }
 
-    const tieneEquipos = Array.isArray(equipos) && equipos.length > 0;
-    const tieneUbicaciones =
-      Array.isArray(ubicaciones) && ubicaciones.length > 0;
+    const tieneEquipos = equipos.length > 0;
+    const tieneUbicaciones = ubicaciones.length > 0;
 
-    // 🔥 VALIDACIÓN EXCLUSIVA (XOR)
     if (!tieneEquipos && !tieneUbicaciones) {
-      errors.push(
-        "Debe enviar equipos o ubicaciones técnicas"
-      );
+      errors.push("Debe enviar equipos o ubicaciones técnicas");
     }
 
     if (tieneEquipos && tieneUbicaciones) {
-      errors.push(
-        "El aviso no puede tener equipos y ubicaciones al mismo tiempo"
-      );
+      errors.push("No puede tener ambos");
     }
 
     if (errors.length > 0) {
       return res.status(400).json({ errors });
     }
 
+    /* =========================
+       🔥 PROCESAR ARCHIVOS
+    ========================= */
+
+    let documentos = [];
+    let documentoFinal = null;
+
+    // 🔹 múltiples documentos
+    if (req.files?.documentos) {
+      documentos = req.files.documentos.map(file => ({
+        nombre: file.originalname,
+        url: `/uploads/adjuntos/${file.filename}`,
+        tipo: path.extname(file.originalname).replace(".", "")
+      }));
+    }
+
+    // 🔹 documento final
+    if (req.files?.documentoFinal) {
+      const file = req.files.documentoFinal[0];
+      documentoFinal = `/uploads/final/${file.filename}`;
+    }
+
+    /* =========================
+       🔥 MERGE DATA
+    ========================= */
+
+    const dataFinal = {
+      ...req.body,
+      documentos,
+      documentoFinal,
+    };
+
     const aviso = await avisosController.crearAviso(
-      req.body,
+      dataFinal,
       req.user.id
     );
 
     return res.status(201).json(aviso);
+
   } catch (error) {
     console.error("ERROR CREAR AVISO:", error);
 
@@ -59,7 +84,6 @@ async function crearAvisoHandler(req, res) {
     });
   }
 }
-
   
 
 
