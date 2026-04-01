@@ -1232,8 +1232,78 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
   }
 };
 
+/**
+ * GET /avisos/:avisoId/tratamiento/solicitudes-para-ot
+ * Devuelve las solicitudes del tratamiento formateadas
+ * para que el frontend las muestre y el usuario pueda editar/eliminar líneas
+ * antes de crear la OT.
+ */
+const obtenerSolicitudesParaOT = async (avisoId) => {
+  const tratamiento = await Tratamiento.findOne({
+    where: { aviso_id: avisoId },
+    include: [
+      {
+        model: SolicitudCompra,
+        as: "solicitudesCompra",
+        include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+      },
+      {
+        model: SolicitudAlmacen,
+        as: "solicitudesAlmacen",
+        include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+      },
+    ],
+  });
+
+  if (!tratamiento) throw new Error("No existe tratamiento para este aviso");
+
+  const formatearSolicitudes = (lista) => {
+    const resultado = { general: null, porEquipo: {} };
+
+    for (const s of lista) {
+      const payload = {
+        origenSolicitudId: s.id,         // para trazabilidad
+        requester: s.requester,
+        requiredDate: s.requiredDate,
+        department: s.department,
+        comments: s.comments,
+        lineas: (s.lineas || []).map((l) => ({
+          itemId: l.itemId,
+          itemCode: l.itemCode,
+          description: l.description,
+          quantity: l.quantity,
+          warehouseCode: l.warehouseCode,
+          costingCode: l.costingCode,
+          projectCode: l.projectCode,
+          rubroId: l.rubroId,
+          paqueteTrabajoId: l.paqueteTrabajoId,
+        })),
+      };
+
+      if (s.esGeneral) {
+        resultado.general = payload;
+      } else {
+        const key = String(s.equipo_id || s.ubicacion_tecnica_id);
+        resultado.porEquipo[key] = {
+          ...payload,
+          equipo_id: s.equipo_id || null,
+          ubicacion_tecnica_id: s.ubicacion_tecnica_id || null,
+        };
+      }
+    }
+
+    return resultado;
+  };
+
+  return {
+    solicitudesCompra: formatearSolicitudes(tratamiento.solicitudesCompra || []),
+    solicitudesAlmacen: formatearSolicitudes(tratamiento.solicitudesAlmacen || []),
+  };
+};
+
 module.exports = {
   crearTratamiento,
   obtenerTratamientoPorAviso,
   guardarCambiosTratamiento,
+  obtenerSolicitudesParaOT,   
 };

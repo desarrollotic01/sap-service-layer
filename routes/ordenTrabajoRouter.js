@@ -12,5 +12,12 @@ router.patch("/:id/completa", auth, handler.actualizarOrdenTrabajoCompletaHandle
 router.delete("/:id", auth, handler.eliminarOrdenTrabajoHandler);
 router.patch("/:id/liberar", auth, handler.liberarOrdenTrabajo);
 router.post("/:id/sync-sap",handler.syncSAPOrdenTrabajoHandler);
+router.get("/:id/solicitudes", auth,handler.obtenerSolicitudesPorOTHandler);
+
+router.get("/:id/preview-solicitudes",auth,handler.previewSolicitudesHandler);
+
+router.post("/:id/generar-solicitud-compra",auth,handler.generarSolicitudCompraHandler);
+
+router.post("/:id/generar-solicitud-almacen",auth,handler.generarSolicitudAlmacenHandler);
 
 module.exports = router;

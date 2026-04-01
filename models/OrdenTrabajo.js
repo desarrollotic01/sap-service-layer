@@ -23,7 +23,7 @@ module.exports = (sequelize) => {
     "Mejora",
     "Predictivo"
   ),
-  allowNull: false,
+  allowNull: true,
 },
 
 
@@ -52,7 +52,10 @@ module.exports = (sequelize) => {
   observaciones: DataTypes.TEXT,
 
   avisoId: DataTypes.UUID,
-  tratamientoId: DataTypes.UUID
+  tratamientoId: {
+  type: DataTypes.UUID,
+  allowNull: true, 
+}
     },
     {
       tableName: "ordenes_trabajo",

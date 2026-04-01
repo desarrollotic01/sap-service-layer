@@ -35,7 +35,7 @@ module.exports = (sequelize) => {
 
       requester: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
 
       comments: {
@@ -104,6 +104,26 @@ module.exports = (sequelize) => {
 bloque_id: {
   type: DataTypes.UUID,
   allowNull: true,
+},
+
+origen: {
+  type: DataTypes.ENUM("TRATAMIENTO", "OT"),
+  defaultValue: "TRATAMIENTO",
+},
+
+esCopia: {
+  type: DataTypes.BOOLEAN,
+  defaultValue: false,
+},
+
+origenSolicitudId: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
+
+esConsolidada: {
+  type: DataTypes.BOOLEAN,
+  defaultValue: false,
 },
     },
     {

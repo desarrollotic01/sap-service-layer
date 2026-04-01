@@ -727,8 +727,20 @@ const guardarCambiosTratamientoHandler = async (req, res) => {
   }
 };
 
+
+const obtenerSolicitudesParaOTHandler = async (req, res) => {
+  try {
+    const { avisoId } = req.params;
+    const resultado = await TratamientoController.obtenerSolicitudesParaOT(avisoId);
+    res.json(resultado);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 module.exports = {
   crearTratamiento,
   obtenerTratamiento,
   guardarCambiosTratamientoHandler,
+  obtenerSolicitudesParaOTHandler,
 };

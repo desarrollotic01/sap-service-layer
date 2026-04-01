@@ -9,6 +9,12 @@ router.post(
   TratamientoHandler.crearTratamiento
 );
 
+router.get(
+  "/avisos/:avisoId/tratamiento/solicitudes-para-ot",
+  auth,
+  TratamientoHandler.obtenerSolicitudesParaOTHandler
+);
+
 // Obtener tratamiento de un aviso
 router.get(
   "/avisos/:avisoId/tratamiento",auth,

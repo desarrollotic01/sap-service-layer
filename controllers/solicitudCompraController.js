@@ -55,9 +55,14 @@ const validarSolicitudCompraPayload = (data) => {
     return "requiredDate es obligatorio";
   }
 
-  if (!data.tratamiento_id || !esUUID(data.tratamiento_id)) {
-    return "tratamiento_id es obligatorio y debe ser un UUID válido";
-  }
+  if (data.tratamiento_id && !esUUID(data.tratamiento_id)) {
+  return "tratamiento_id inválido";
+}
+
+if (!data.tratamiento_id && !data.ordenTrabajoId) {
+  return "Debe tener tratamiento_id o ordenTrabajoId";
+}
+
 
   if (data.equipo_id && !esUUID(data.equipo_id)) {
     return "equipo_id inválido";
@@ -201,15 +206,18 @@ const createSolicitudCompra = async (usuarioId, data) => {
       throw new Error(errorValidacion);
     }
 
-    const tratamiento = await Tratamiento.findByPk(data.tratamiento_id, {
-      transaction: t,
-      lock: t.LOCK.UPDATE,
-    });
+    let tratamiento = null;
 
-    if (!tratamiento) {
-      throw new Error("El tratamiento indicado no existe");
-    }
+if (data.tratamiento_id) {
+  tratamiento = await Tratamiento.findByPk(data.tratamiento_id, {
+    transaction: t,
+    lock: t.LOCK.UPDATE,
+  });
 
+  if (!tratamiento) {
+    throw new Error("El tratamiento indicado no existe");
+  }
+}
     if (data.equipo_id) {
       const equipo = await Equipo.findByPk(data.equipo_id, {
         transaction: t,
@@ -265,6 +273,11 @@ const createSolicitudCompra = async (usuarioId, data) => {
         ubicacion_tecnica_id: data.ubicacion_tecnica_id || null,
         esGeneral: !!data.esGeneral,
         estado: "DRAFT",
+       origen:
+  data.origen ||
+  (data.ordenTrabajoId ? "OT" : "TRATAMIENTO"),
+  esCopia: data.esCopia || false,
+  origenSolicitudId: data.origenSolicitudId || null,
       },
       { transaction: t }
     );
@@ -319,6 +332,10 @@ const updateSolicitudCompra = async (solicitudId, data) => {
       return "NO_EDITABLE";
     }
 
+    if (solicitud.origen === "TRATAMIENTO") {
+  return "NO_EDITABLE_TRATAMIENTO";
+}
+
     const payloadValidacion = {
       ...data,
       tratamiento_id: data.tratamiento_id || solicitud.tratamiento_id,
@@ -361,8 +378,7 @@ const updateSolicitudCompra = async (solicitudId, data) => {
       }
     }
 
-    const lineasNormalizadas = data.lineas.map(normalizarLineaCompra);
-
+const lineasNormalizadas = (data.lineas || []).map(normalizarLineaCompra);
     await solicitud.update(
       {
         requiredDate: data.requiredDate,

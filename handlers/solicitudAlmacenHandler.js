@@ -158,11 +158,55 @@ const enviarBloqueHandler = async (req, res) => {
     });
   }
 };
+// En ordenTrabajoHandler.js
+
+const previewSolicitudesHandler = async (req, res) => {
+  try {
+    const data = await ordenTrabajoController.previewSolicitudesOT(req.params.id);
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+const generarSolicitudCompraHandler = async (req, res) => {
+  try {
+    const solicitud = await ordenTrabajoController.generarSolicitudCompraOT(req.params.id);
+    res.json({ success: true, data: solicitud });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+const generarSolicitudAlmacenHandler = async (req, res) => {
+  try {
+    const { destinatario, ccEmails = [] } = req.body;
+
+    if (!destinatario) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "destinatario es obligatorio" 
+      });
+    }
+
+    const resultado = await ordenTrabajoController.generarSolicitudAlmacenOT(
+      req.params.id,
+      { destinatario, ccEmails }
+    );
+
+    res.json({ success: true, data: resultado });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
 
 module.exports = {
     createSolicitudAlmacenHandler,
   getSolicitudAlmacenById,
   updateSolicitudAlmacen,
   getSolicitudesAlmacenAgrupadasParaSap,
-  enviarBloqueHandler
+  enviarBloqueHandler,
+  previewSolicitudesHandler,
+  generarSolicitudCompraHandler,
+  generarSolicitudAlmacenHandler,
 };

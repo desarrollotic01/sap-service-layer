@@ -2,6 +2,39 @@ const ordenTrabajoController = require("../controllers/ordenTrabajoController");
 const {  getDetalleSolicitudesTratamientoPorOrdenTrabajo,
 } = require("../controllers/ordenTrabajoDetalleController");
 
+
+
+async function obtenerSolicitudesPorOTHandler(req, res) {
+  try {
+    const { id } = req.params;
+
+    const errors = [];
+
+    if (!req.user?.id) {
+      errors.push("Usuario no autenticado");
+    }
+
+    if (!id) {
+      errors.push("ordenTrabajoId es obligatorio");
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ errors });
+    }
+
+    const solicitudes =
+      await ordenTrabajoController.obtenerSolicitudesPorOT(id);
+
+    return res.json(solicitudes);
+  } catch (error) {
+    console.error("ERROR GET SOLICITUDES OT:", error);
+
+    return res.status(500).json({
+      errors: ["Error al obtener solicitudes de la OT"],
+    });
+  }
+}
+
 /* =========================
    CREAR OT
 ========================= */
@@ -22,6 +55,8 @@ async function crearOrdenTrabajoHandler(req, res) {
       descripcionGeneral,
       estado,
       supervisorId,
+      solicitudesCompra,   // 👈 nuevo — puede venir null si no hay
+      solicitudesAlmacen,
       fechaProgramadaInicio,
       fechaProgramadaFin,
       fechaInicioReal,
@@ -705,6 +740,49 @@ const syncSAPOrdenTrabajoHandler = async (req, res) => {
     });
   }
 };
+
+
+// En ordenTrabajoHandler.js
+
+const previewSolicitudesHandler = async (req, res) => {
+  try {
+    const data = await ordenTrabajoController.previewSolicitudesOT(req.params.id);
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+const generarSolicitudCompraHandler = async (req, res) => {
+  try {
+    const solicitud = await ordenTrabajoController.generarSolicitudCompraOT(req.params.id);
+    res.json({ success: true, data: solicitud });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+const generarSolicitudAlmacenHandler = async (req, res) => {
+  try {
+    const { destinatarioId } = req.body;
+
+    if (!destinatarioId) {
+      return res.status(400).json({
+        success: false,
+        message: "destinatarioId es obligatorio",
+      });
+    }
+
+    const resultado = await ordenTrabajoController.generarSolicitudAlmacenOT(
+      req.params.id,
+      { destinatarioId }
+    );
+
+    res.json({ success: true, data: resultado });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
 /* =========================
    EXPORTS
 ========================= */
@@ -716,5 +794,9 @@ module.exports = {
   eliminarOrdenTrabajoHandler,
   liberarOrdenTrabajo,
   getDetalleSolicitudesTratamientoPorOrdenTrabajoHandler,
-  syncSAPOrdenTrabajoHandler
+  syncSAPOrdenTrabajoHandler,
+  obtenerSolicitudesPorOTHandler,
+  previewSolicitudesHandler,
+  generarSolicitudCompraHandler,
+  generarSolicitudAlmacenHandler,
 };

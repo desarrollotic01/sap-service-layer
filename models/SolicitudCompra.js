@@ -12,7 +12,7 @@ module.exports = (sequelize) => {
 
       numeroSolicitud: {
   type: DataTypes.STRING,
-  allowNull: false,
+  allowNull: true,
 },
 
       // === CABECERA SAP ===
@@ -70,7 +70,7 @@ module.exports = (sequelize) => {
       },
       tratamiento_id: {
   type: DataTypes.UUID,
-  allowNull: false,
+  allowNull: true,
 },
 
 
@@ -93,6 +93,21 @@ ordenTrabajoId: {
   type: DataTypes.UUID,
   allowNull: true,
 },
+
+origenSolicitudId: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
+
+esCopia: {
+  type: DataTypes.BOOLEAN,
+  defaultValue: false,
+},
+origen: {
+  type: DataTypes.ENUM("TRATAMIENTO", "OT"),
+  defaultValue: "OT",
+},
+
 
     },
     {
