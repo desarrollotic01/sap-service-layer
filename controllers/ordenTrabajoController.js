@@ -1007,7 +1007,14 @@ async function crearOrdenTrabajo(data) {
     await aviso.update({ estadoAviso: "con OT" }, { transaction: t });
     await t.commit();
 
-    return await OrdenTrabajo.findAll({
+
+
+  } catch (error) {
+    await t.rollback();
+    throw error;
+  }
+
+  return await OrdenTrabajo.findAll({
       where: { id: { [Op.in]: otsCreadas.map((x) => x.id) } },
       include: [
         {
@@ -1027,11 +1034,6 @@ async function crearOrdenTrabajo(data) {
       ],
       order: [["createdAt", "DESC"]],
     });
-
-  } catch (error) {
-    await t.rollback();
-    throw error;
-  }
 }
 
 async function obtenerOrdenesTrabajo() {
