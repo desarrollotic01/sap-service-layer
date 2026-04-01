@@ -595,9 +595,6 @@ const enviarBloqueSolicitudes = async ({ bloqueId, ordenTrabajoId }) => {
   };
 };
 
-
-const { v4: uuidv4 } = require("uuid");
-
 const clonarSolicitudesAlmacenATrabajo = async ({
   aviso,
   ordenTrabajoId,
