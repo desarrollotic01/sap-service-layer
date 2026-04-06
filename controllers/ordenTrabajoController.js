@@ -15,342 +15,26 @@ const {
   Notificacion,
   Equipo,
   UbicacionTecnica,
-  PersonalCorreo
+  PersonalCorreo,
 } = require("../db_connection");
 
-
-const { enviarSolicitudCompraASAP,enviarSolicitudCompraASAPDesdeObjeto } = require("../sap/sapSolicitudCompra");
 const {
-  fusionarSolicitudesParaSap } = require("../controllers/ordenTrabajoDetalleController");
+  enviarSolicitudCompraASAPDesdeObjeto,
+} = require("../sap/sapSolicitudCompra");
+const {
+  fusionarSolicitudesParaSap,
+} = require("../controllers/ordenTrabajoDetalleController");
 const { Op } = require("sequelize");
 
-const {
-  clonarSolicitudesAlmacenATrabajo,
-} = require("../controllers/SolicitudAlmacenController");
-
-
 /* =========================================================
-   HELPERS CREAR SOLICITUDES EN OT DESDE PAYLOAD
-   (el usuario ya editó/eliminó líneas en el frontend)
+   HELPERS GENERALES
 ========================================================= */
 
-async function _crearSolicitudesCompraEnOT({ ordenTrabajoId, tratamientoId, solicitudes, usuarioId, t }) {
-  if (!solicitudes) return;
-
-  const { general, porEquipo = {} } = solicitudes;
-
-  // GENERAL
-  if (general && Array.isArray(general.lineas) && general.lineas.length > 0) {
-    const sc = await SolicitudCompra.create(
-      {
-        tratamiento_id: tratamientoId,
-        ordenTrabajoId,
-        esGeneral: true,
-        esCopia: true,
-        origenSolicitudId: general.origenSolicitudId || null,
-        docDate: new Date(),
-        requiredDate: general.requiredDate,
-        department: general.department || null,
-        requester: general.requester,
-        comments: general.comments || null,
-        usuario_id: usuarioId,
-        estado: "DRAFT",
-      },
-      { transaction: t }
-    );
-
-    await SolicitudCompraLinea.bulkCreate(
-      general.lineas.map((l) => ({
-        solicitud_compra_id: sc.id,
-        itemId: l.itemId || null,
-        itemCode: l.itemCode,
-        description: l.description || "",
-        quantity: Number(l.quantity),
-        warehouseCode: l.warehouseCode || "01",
-        costingCode: l.costingCode || null,
-        projectCode: l.projectCode || null,
-        rubroId: l.rubroId || null,
-        paqueteTrabajoId: l.paqueteTrabajoId || null,
-      })),
-      { transaction: t }
-    );
-  }
-
-  // POR EQUIPO / UBICACIÓN
-  for (const [key, data] of Object.entries(porEquipo)) {
-    if (!data || !Array.isArray(data.lineas) || data.lineas.length === 0) continue;
-
-    const sc = await SolicitudCompra.create(
-      {
-        tratamiento_id: tratamientoId,
-        ordenTrabajoId,
-        esGeneral: false,
-        esCopia: true,
-        origenSolicitudId: data.origenSolicitudId || null,
-        equipo_id: data.equipo_id || null,
-        ubicacion_tecnica_id: data.ubicacion_tecnica_id || null,
-        docDate: new Date(),
-        requiredDate: data.requiredDate,
-        department: data.department || null,
-        requester: data.requester,
-        comments: data.comments || null,
-        usuario_id: usuarioId,
-        estado: "DRAFT",
-      },
-      { transaction: t }
-    );
-
-    await SolicitudCompraLinea.bulkCreate(
-      data.lineas.map((l) => ({
-        solicitud_compra_id: sc.id,
-        itemId: l.itemId || null,
-        itemCode: l.itemCode,
-        description: l.description || "",
-        quantity: Number(l.quantity),
-        warehouseCode: l.warehouseCode || "01",
-        costingCode: l.costingCode || null,
-        projectCode: l.projectCode || null,
-        rubroId: l.rubroId || null,
-        paqueteTrabajoId: l.paqueteTrabajoId || null,
-      })),
-      { transaction: t }
-    );
-  }
-}
-
-async function _crearSolicitudesAlmacenEnOT({ ordenTrabajoId, tratamientoId, solicitudes, usuarioId, t }) {
-  if (!solicitudes) return;
-
-  const { SolicitudAlmacen, SolicitudAlmacenLinea } = require("../db_connection");
-  const { general, porEquipo = {} } = solicitudes;
-
-  // GENERAL
-  if (general && Array.isArray(general.lineas) && general.lineas.length > 0) {
-    const sa = await SolicitudAlmacen.create(
-      {
-        tratamiento_id: tratamientoId,
-        ordenTrabajoId,
-        esGeneral: true,
-        esCopia: true,
-        origenSolicitudId: general.origenSolicitudId || null,
-        docDate: new Date(),
-        requiredDate: general.requiredDate,
-        department: general.department || null,
-        requester: general.requester,
-        comments: general.comments || null,
-        usuario_id: usuarioId,
-        estado: "DRAFT",
-      },
-      { transaction: t }
-    );
-
-    await SolicitudAlmacenLinea.bulkCreate(
-      general.lineas.map((l) => ({
-        solicitud_almacen_id: sa.id,
-        itemId: l.itemId || null,
-        itemCode: l.itemCode,
-        description: l.description || "",
-        quantity: Number(l.quantity),
-        warehouseCode: l.warehouseCode || "01",
-        costingCode: l.costingCode || null,
-        projectCode: l.projectCode || null,
-        rubroId: l.rubroId || null,
-        paqueteTrabajoId: l.paqueteTrabajoId || null,
-      })),
-      { transaction: t }
-    );
-  }
-
-  // POR EQUIPO / UBICACIÓN
-  for (const [key, data] of Object.entries(porEquipo)) {
-    if (!data || !Array.isArray(data.lineas) || data.lineas.length === 0) continue;
-
-    const sa = await SolicitudAlmacen.create(
-      {
-        tratamiento_id: tratamientoId,
-        ordenTrabajoId,
-        esGeneral: false,
-        esCopia: true,
-        origenSolicitudId: data.origenSolicitudId || null,
-        equipo_id: data.equipo_id || null,
-        ubicacion_tecnica_id: data.ubicacion_tecnica_id || null,
-        docDate: new Date(),
-        requiredDate: data.requiredDate,
-        department: data.department || null,
-        requester: data.requester,
-        comments: data.comments || null,
-        usuario_id: usuarioId,
-        estado: "DRAFT",
-      },
-      { transaction: t }
-    );
-
-    await SolicitudAlmacenLinea.bulkCreate(
-      data.lineas.map((l) => ({
-        solicitud_almacen_id: sa.id,
-        itemId: l.itemId || null,
-        itemCode: l.itemCode,
-        description: l.description || "",
-        quantity: Number(l.quantity),
-        warehouseCode: l.warehouseCode || "01",
-        costingCode: l.costingCode || null,
-        projectCode: l.projectCode || null,
-        rubroId: l.rubroId || null,
-        paqueteTrabajoId: l.paqueteTrabajoId || null,
-      })),
-      { transaction: t }
-    );
-  }
-}
-
-async function obtenerSolicitudesPorOT(ordenTrabajoId) {
-  const [solicitudesCompra, solicitudesAlmacen] = await Promise.all([
-    SolicitudCompra.findAll({
-      where: { ordenTrabajoId },
-      include: [
-        { model: SolicitudCompraLinea, as: "lineas" },
-        { model: Equipo, as: "equipo" },
-        { model: UbicacionTecnica, as: "ubicacionTecnica" },
-      ],
-      order: [["createdAt", "ASC"]],
-    }),
-    SolicitudAlmacen.findAll({
-      where: { ordenTrabajoId },
-      include: [
-        { model: SolicitudAlmacenLinea, as: "lineas" },
-        { model: Equipo, as: "equipo" },
-        { model: UbicacionTecnica, as: "ubicacionTecnica" },
-      ],
-      order: [["createdAt", "ASC"]],
-    }),
-  ]);
-
-  return { solicitudesCompra, solicitudesAlmacen };
-}
-
-
-async function manejarSolicitudesEnOT({
-  aviso,
-  ordenTrabajoId,
-  targetsOT,
-  usarSolicitudGeneralExistente = false,
-  crearSolicitudGeneralNueva = false,
-  t,
-}) {
-  if (usarSolicitudGeneralExistente && crearSolicitudGeneralNueva) {
-    throw new Error("No puede usar y crear solicitud general al mismo tiempo");
-  }
-
-  const tratamiento = await Tratamiento.findOne({
-    where: { aviso_id: aviso.id },
-    transaction: t,
-  });
-
-  if (!tratamiento) return;
-
-  const equipoIds = targetsOT.map(x => x.equipoId).filter(Boolean);
-  const ubicacionIds = targetsOT.map(x => x.ubicacionTecnicaId).filter(Boolean);
-
-  const where = {
-    tratamiento_id: tratamiento.id,
-    [Op.or]: [],
-  };
-
-  if (equipoIds.length) {
-    where[Op.or].push({ equipo_id: { [Op.in]: equipoIds } });
-  }
-
-  if (ubicacionIds.length) {
-    where[Op.or].push({
-      ubicacion_tecnica_id: { [Op.in]: ubicacionIds },
-    });
-  }
-
-  if (usarSolicitudGeneralExistente) {
-    where[Op.or].push({ esGeneral: true });
-  }
-
-  const solicitudes = await SolicitudCompra.findAll({
-    where,
-    include: [{ model: SolicitudCompraLinea, as: "lineas" }],
-    transaction: t,
-  });
-
-  /* =========================
-     🔥 CLONAR
-  ========================= */
-  for (const s of solicitudes) {
-    const nueva = await SolicitudCompra.create(
-      {
-        numeroSolicitud: null,
-        tratamiento_id: s.tratamiento_id,
-        ordenTrabajoId,
-
-        equipo_id: s.equipo_id,
-        ubicacion_tecnica_id: s.ubicacion_tecnica_id,
-        esGeneral: s.esGeneral,
-
-        origenSolicitudId: s.id,
-        esCopia: true,
-
-        docDate: new Date(),
-        requiredDate: s.requiredDate,
-        department: s.department,
-        requester: s.requester,
-        comments: s.comments,
-        usuario_id: s.usuario_id,
-
-        estado: "DRAFT",
-      },
-      { transaction: t }
-    );
-
-    if (s.lineas?.length) {
-      await SolicitudCompraLinea.bulkCreate(
-        s.lineas.map((l) => ({
-          solicitud_compra_id: nueva.id,
-          itemId: l.itemId,
-          itemCode: l.itemCode,
-          description: l.description,
-          quantity: l.quantity,
-          warehouseCode: l.warehouseCode,
-          costingCode: l.costingCode,
-          projectCode: l.projectCode,
-          rubroId: l.rubroId,
-          paqueteTrabajoId: l.paqueteTrabajoId,
-        })),
-        { transaction: t }
-      );
-    }
-  }
-
-  /* =========================
-     🔥 CREAR GENERAL NUEVA
-  ========================= */
-  if (crearSolicitudGeneralNueva) {
-    await SolicitudCompra.create(
-      {
-        numeroSolicitud: null,
-        tratamiento_id: tratamiento.id,
-        ordenTrabajoId,
-
-        equipo_id: null,
-        ubicacion_tecnica_id: null,
-
-        esGeneral: true,
-        esCopia: true,
-        origenSolicitudId: null,
-
-        docDate: new Date(),
-        estado: "DRAFT",
-      },
-      { transaction: t }
-    );
-  }
-}
-/* =========================================================
-   HELPERS
-========================================================= */
+/**
+ * Construye la clave única de un target.
+ * Equipo    → "E:<uuid>"
+ * Ubicación → "U:<uuid>"
+ */
 const getTargetKey = (target) => {
   if (target?.equipoId) return `E:${String(target.equipoId)}`;
   if (target?.ubicacionTecnicaId) return `U:${String(target.ubicacionTecnicaId)}`;
@@ -359,14 +43,14 @@ const getTargetKey = (target) => {
 
 const getTargetLabel = (target) => {
   if (target?.equipoId) return `equipo ${target.equipoId}`;
-  if (target?.ubicacionTecnicaId) return `ubicación técnica ${target.ubicacionTecnicaId}`;
+  if (target?.ubicacionTecnicaId)
+    return `ubicación técnica ${target.ubicacionTecnicaId}`;
   return "target inválido";
 };
 
 const ensureValidTarget = (target) => {
   const tieneEquipo = !!target?.equipoId;
   const tieneUbicacion = !!target?.ubicacionTecnicaId;
-
   if ((tieneEquipo && tieneUbicacion) || (!tieneEquipo && !tieneUbicacion)) {
     throw new Error(
       "Cada registro debe tener solo equipoId o solo ubicacionTecnicaId"
@@ -386,20 +70,20 @@ const validarActividadesPayload = (equipos = [], tipoMantenimiento = null) => {
           `El registro ${getTargetLabel(equipo)} debe tener al menos una actividad`
         );
       }
-
       for (const act of actividades) {
         if (!act.tarea || !String(act.tarea).trim()) {
           throw new Error(
             `Hay una actividad sin tarea en ${getTargetLabel(equipo)}`
           );
         }
-
         if (
           act.tipoTrabajo &&
           !["REPARACION", "CAMBIO"].includes(act.tipoTrabajo)
         ) {
           throw new Error(
-            `Tipo de trabajo inválido en ${getTargetLabel(equipo)}. Solo REPARACION o CAMBIO`
+            `Tipo de trabajo inválido en ${getTargetLabel(
+              equipo
+            )}. Solo REPARACION o CAMBIO`
           );
         }
       }
@@ -408,79 +92,196 @@ const validarActividadesPayload = (equipos = [], tipoMantenimiento = null) => {
 };
 
 /* =========================================================
-   1) Asignar Solicitudes a UNA OT
+   HELPERS SOLICITUDES — CREAR EN OT
+   (sin requester, department, comments)
 ========================================================= */
-async function asignarSolicitudesDeTratamientoAOT({
-  avisoId,
-  otId,
-  targetsOT = [],
-  asignarGeneral = false,
+
+/**
+ * Crea solicitudes de compra en una OT a partir de un payload
+ * ya editado por el usuario.
+ *
+ * @param {object} params
+ * @param {string} params.ordenTrabajoId
+ * @param {string|null} params.tratamientoId
+ * @param {{ general, porEquipo }} params.solicitudes
+ * @param {string} params.usuarioId
+ * @param {object} params.t - transacción Sequelize
+ */
+async function _crearSolicitudesCompraEnOT({
+  ordenTrabajoId,
+  tratamientoId,
+  solicitudes,
+  usuarioId,
   t,
 }) {
-  if (!avisoId) throw new Error("avisoId es obligatorio");
-  if (!otId) throw new Error("otId es obligatorio");
-  if (!Array.isArray(targetsOT)) {
-    throw new Error("targetsOT debe ser un arreglo");
-  }
+  if (!solicitudes) return;
 
-  const tratamiento = await Tratamiento.findOne({
-    where: { aviso_id: avisoId },
-    transaction: t,
-  });
+  const { general, porEquipo = {} } = solicitudes;
 
-  if (!tratamiento) throw new Error("No existe tratamiento para este aviso");
-
-  const equipoIdsOT = targetsOT.map((x) => x.equipoId).filter(Boolean);
-  const ubicacionIdsOT = targetsOT.map((x) => x.ubicacionTecnicaId).filter(Boolean);
-
-  if (equipoIdsOT.length) {
-    await SolicitudCompra.update(
-      { ordenTrabajoId: otId },
+  // GENERAL
+  if (general && Array.isArray(general.lineas) && general.lineas.length > 0) {
+    const sc = await SolicitudCompra.create(
       {
-        where: {
-          tratamiento_id: tratamiento.id,
-          esGeneral: false,
-          equipo_id: { [Op.in]: equipoIdsOT },
-        },
-        transaction: t,
-      }
-    );
-  }
-
-  if (ubicacionIdsOT.length) {
-    await SolicitudCompra.update(
-      { ordenTrabajoId: otId },
-      {
-        where: {
-          tratamiento_id: tratamiento.id,
-          esGeneral: false,
-          ubicacion_tecnica_id: { [Op.in]: ubicacionIdsOT },
-        },
-        transaction: t,
-      }
-    );
-  }
-
-  if (asignarGeneral) {
-    const general = await SolicitudCompra.findOne({
-      where: {
-        tratamiento_id: tratamiento.id,
+        tratamiento_id: tratamientoId || null,
+        ordenTrabajoId,
         esGeneral: true,
+        esCopia: true,
+        origenSolicitudId: general.origenSolicitudId || null,
+        docDate: new Date(),
+        requiredDate: general.requiredDate,
+        usuario_id: usuarioId,
+        estado: "DRAFT",
       },
-      transaction: t,
-      lock: t.LOCK.UPDATE,
-    });
+      { transaction: t }
+    );
 
-    if (general && !general.ordenTrabajoId) {
-      await general.update({ ordenTrabajoId: otId }, { transaction: t });
-    }
+    await SolicitudCompraLinea.bulkCreate(
+      general.lineas.map((l) => ({
+        solicitud_compra_id: sc.id,
+        itemId: l.itemId || null,
+        itemCode: l.itemCode,
+        description: l.description || "",
+        quantity: Number(l.quantity),
+        warehouseCode: l.warehouseCode || "01",
+        costingCode: l.costingCode || null,
+        projectCode: l.projectCode || null,
+        rubroId: l.rubroId || null,
+        paqueteTrabajoId: l.paqueteTrabajoId || null,
+      })),
+      { transaction: t }
+    );
   }
 
-  return { ok: true };
+  // POR EQUIPO / UBICACIÓN
+  for (const [key, data] of Object.entries(porEquipo)) {
+    if (!data || !Array.isArray(data.lineas) || data.lineas.length === 0)
+      continue;
+
+    const sc = await SolicitudCompra.create(
+      {
+        tratamiento_id: tratamientoId || null,
+        ordenTrabajoId,
+        esGeneral: false,
+        esCopia: true,
+        origenSolicitudId: data.origenSolicitudId || null,
+        equipo_id: data.equipo_id || null,
+        ubicacion_tecnica_id: data.ubicacion_tecnica_id || null,
+        docDate: new Date(),
+        requiredDate: data.requiredDate,
+        usuario_id: usuarioId,
+        estado: "DRAFT",
+      },
+      { transaction: t }
+    );
+
+    await SolicitudCompraLinea.bulkCreate(
+      data.lineas.map((l) => ({
+        solicitud_compra_id: sc.id,
+        itemId: l.itemId || null,
+        itemCode: l.itemCode,
+        description: l.description || "",
+        quantity: Number(l.quantity),
+        warehouseCode: l.warehouseCode || "01",
+        costingCode: l.costingCode || null,
+        projectCode: l.projectCode || null,
+        rubroId: l.rubroId || null,
+        paqueteTrabajoId: l.paqueteTrabajoId || null,
+      })),
+      { transaction: t }
+    );
+  }
+}
+
+/**
+ * Igual que la de compra pero para almacén.
+ */
+async function _crearSolicitudesAlmacenEnOT({
+  ordenTrabajoId,
+  tratamientoId,
+  solicitudes,
+  usuarioId,
+  t,
+}) {
+  if (!solicitudes) return;
+
+  const { general, porEquipo = {} } = solicitudes;
+
+  // GENERAL
+  if (general && Array.isArray(general.lineas) && general.lineas.length > 0) {
+    const sa = await SolicitudAlmacen.create(
+      {
+        tratamiento_id: tratamientoId || null,
+        ordenTrabajoId,
+        esGeneral: true,
+        esCopia: true,
+        origenSolicitudId: general.origenSolicitudId || null,
+        docDate: new Date(),
+        requiredDate: general.requiredDate,
+        usuario_id: usuarioId,
+        estado: "DRAFT",
+      },
+      { transaction: t }
+    );
+
+    await SolicitudAlmacenLinea.bulkCreate(
+      general.lineas.map((l) => ({
+        solicitud_almacen_id: sa.id,
+        itemId: l.itemId || null,
+        itemCode: l.itemCode,
+        description: l.description || "",
+        quantity: Number(l.quantity),
+        warehouseCode: l.warehouseCode || "01",
+        costingCode: l.costingCode || null,
+        projectCode: l.projectCode || null,
+        rubroId: l.rubroId || null,
+        paqueteTrabajoId: l.paqueteTrabajoId || null,
+      })),
+      { transaction: t }
+    );
+  }
+
+  // POR EQUIPO / UBICACIÓN
+  for (const [key, data] of Object.entries(porEquipo)) {
+    if (!data || !Array.isArray(data.lineas) || data.lineas.length === 0)
+      continue;
+
+    const sa = await SolicitudAlmacen.create(
+      {
+        tratamiento_id: tratamientoId || null,
+        ordenTrabajoId,
+        esGeneral: false,
+        esCopia: true,
+        origenSolicitudId: data.origenSolicitudId || null,
+        equipo_id: data.equipo_id || null,
+        ubicacion_tecnica_id: data.ubicacion_tecnica_id || null,
+        docDate: new Date(),
+        requiredDate: data.requiredDate,
+        usuario_id: usuarioId,
+        estado: "DRAFT",
+      },
+      { transaction: t }
+    );
+
+    await SolicitudAlmacenLinea.bulkCreate(
+      data.lineas.map((l) => ({
+        solicitud_almacen_id: sa.id,
+        itemId: l.itemId || null,
+        itemCode: l.itemCode,
+        description: l.description || "",
+        quantity: Number(l.quantity),
+        warehouseCode: l.warehouseCode || "01",
+        costingCode: l.costingCode || null,
+        projectCode: l.projectCode || null,
+        rubroId: l.rubroId || null,
+        paqueteTrabajoId: l.paqueteTrabajoId || null,
+      })),
+      { transaction: t }
+    );
+  }
 }
 
 /* =========================================================
-   2) Copiar actividades a OT
+   HELPER — COPIAR ACTIVIDADES A TARGETS OT
 ========================================================= */
 async function copiarActividadesATargetsOT({
   avisoId,
@@ -538,77 +339,68 @@ async function copiarActividadesATargetsOT({
     }
   }
 
+  // Para los targets sin actividades en payload, las tomamos del tratamiento en BD
   if (keysSinPayload.length > 0) {
     const tratamiento = await Tratamiento.findOne({
       where: { aviso_id: avisoId },
       transaction: t,
     });
 
-    if (!tratamiento) throw new Error("No existe tratamiento para este aviso");
+    if (tratamiento) {
+      const equipoIds = targetsOT.map((x) => x.equipoId).filter(Boolean);
+      const ubicacionIds = targetsOT
+        .map((x) => x.ubicacionTecnicaId)
+        .filter(Boolean);
 
-    const equipoIds = targetsOT.map((x) => x.equipoId).filter(Boolean);
-    const ubicacionIds = targetsOT.map((x) => x.ubicacionTecnicaId).filter(Boolean);
+      const where = { tratamientoId: tratamiento.id, [Op.or]: [] };
 
-    const where = {
-      tratamientoId: tratamiento.id,
-      [Op.or]: [],
-    };
+      if (equipoIds.length)
+        where[Op.or].push({ equipoId: { [Op.in]: equipoIds } });
+      if (ubicacionIds.length)
+        where[Op.or].push({ ubicacionTecnicaId: { [Op.in]: ubicacionIds } });
 
-    if (equipoIds.length) {
-      where[Op.or].push({
-        equipoId: { [Op.in]: equipoIds },
-      });
-    }
+      if (where[Op.or].length > 0) {
+        const tes = await TratamientoEquipo.findAll({
+          where,
+          include: [{ association: "actividades" }],
+          transaction: t,
+        });
 
-    if (ubicacionIds.length) {
-      where[Op.or].push({
-        ubicacionTecnicaId: { [Op.in]: ubicacionIds },
-      });
-    }
+        const actsByTargetKey = new Map();
+        for (const te of tes) {
+          actsByTargetKey.set(getTargetKey(te), te.actividades || []);
+        }
 
-    if (where[Op.or].length > 0) {
-      const tes = await TratamientoEquipo.findAll({
-        where,
-        include: [{ association: "actividades" }],
-        transaction: t,
-      });
+        for (const targetOT of targetsOT) {
+          const key = getTargetKey(targetOT);
+          if (!keysSinPayload.includes(key)) continue;
 
-      const actsByTargetKey = new Map();
-
-      for (const te of tes) {
-        const key = getTargetKey(te);
-        actsByTargetKey.set(key, te.actividades || []);
-      }
-
-      for (const targetOT of targetsOT) {
-        const key = getTargetKey(targetOT);
-        if (!keysSinPayload.includes(key)) continue;
-
-        const acts = actsByTargetKey.get(key) || [];
-
-        for (const act of acts) {
-          actividadesCrear.push({
-            ordenTrabajoEquipoId: targetOT.id,
-            planMantenimientoActividadId: act.planMantenimientoActividadId || null,
-            sistema: act.sistema || null,
-            subsistema: act.subsistema || null,
-            componente: act.componente || null,
-            tarea: act.tarea || null,
-            descripcion: act.descripcion || null,
-            tipoTrabajo: act.tipoTrabajo || null,
-            rolTecnico: act.rolTecnico || null,
-            cantidadTecnicos: act.cantidadTecnicos ?? null,
-            duracionEstimadaValor: act.duracionEstimadaValor ?? null,
-            unidadDuracion: act.unidadDuracion || "min",
-            duracionEstimadaMin: act.duracionEstimadaMin ?? null,
-            duracionRealValor: act.duracionRealValor ?? null,
-            unidadDuracionReal: act.unidadDuracionReal || "min",
-            duracionRealMin: act.duracionRealMin ?? null,
-            observaciones: act.observaciones || null,
-            estado: "PENDIENTE",
-            origen: "TRATAMIENTO",
-            tratamientoEquipoActividadId: act.tratamientoEquipoActividadId || null,
-          });
+          const acts = actsByTargetKey.get(key) || [];
+          for (const act of acts) {
+            actividadesCrear.push({
+              ordenTrabajoEquipoId: targetOT.id,
+              planMantenimientoActividadId:
+                act.planMantenimientoActividadId || null,
+              sistema: act.sistema || null,
+              subsistema: act.subsistema || null,
+              componente: act.componente || null,
+              tarea: act.tarea || null,
+              descripcion: act.descripcion || null,
+              tipoTrabajo: act.tipoTrabajo || null,
+              rolTecnico: act.rolTecnico || null,
+              cantidadTecnicos: act.cantidadTecnicos ?? null,
+              duracionEstimadaValor: act.duracionEstimadaValor ?? null,
+              unidadDuracion: act.unidadDuracion || "min",
+              duracionEstimadaMin: act.duracionEstimadaMin ?? null,
+              duracionRealValor: null,
+              unidadDuracionReal: "min",
+              duracionRealMin: null,
+              observaciones: act.observaciones || null,
+              estado: "PENDIENTE",
+              origen: "TRATAMIENTO",
+              tratamientoEquipoActividadId: act.id || null,
+            });
+          }
         }
       }
     }
@@ -622,7 +414,7 @@ async function copiarActividadesATargetsOT({
 }
 
 /* =========================================================
-   3) Validar registros pertenezcan al aviso
+   HELPER — VALIDAR TARGETS DEL AVISO
 ========================================================= */
 async function validarTargetsDelAviso(avisoId, equipos, t) {
   if (!Array.isArray(equipos) || equipos.length === 0) {
@@ -642,91 +434,32 @@ async function validarTargetsDelAviso(avisoId, equipos, t) {
   const equipoIdsAviso = new Set(
     (aviso.equiposRelacion || []).map((x) => String(x.equipoId))
   );
-
   const ubicacionIdsAviso = new Set(
-    (aviso.ubicacionesRelacion || []).map(
-      (x) => String(x.ubicacionTecnicaId || x.ubicacionId)
+    (aviso.ubicacionesRelacion || []).map((x) =>
+      String(x.ubicacionTecnicaId || x.ubicacionId)
     )
   );
 
   for (const equipo of equipos) {
     ensureValidTarget(equipo);
 
-    if (equipo.equipoId) {
-      if (!equipoIdsAviso.has(String(equipo.equipoId))) {
-        throw new Error(`El equipo ${equipo.equipoId} no pertenece al aviso`);
-      }
+    if (equipo.equipoId && !equipoIdsAviso.has(String(equipo.equipoId))) {
+      throw new Error(`El equipo ${equipo.equipoId} no pertenece al aviso`);
     }
 
-    if (equipo.ubicacionTecnicaId) {
-      if (!ubicacionIdsAviso.has(String(equipo.ubicacionTecnicaId))) {
-        throw new Error(
-          `La ubicación técnica ${equipo.ubicacionTecnicaId} no pertenece al aviso`
-        );
-      }
-    }
-  }
-}
-
-
-async function crearSolicitudesDesdePayload({
-  ordenTrabajoId,
-  solicitudes,
-  t,
-}) {
-  const { solicitudGeneral, solicitudesPorEquipo } = solicitudes;
-
-  // GENERAL
-  if (solicitudGeneral) {
-    const nueva = await SolicitudCompra.create(
-      {
-        ordenTrabajoId,
-        esGeneral: true,
-        ...solicitudGeneral,
-      },
-      { transaction: t }
-    );
-
-    if (solicitudGeneral.lineas?.length) {
-      await SolicitudCompraLinea.bulkCreate(
-        solicitudGeneral.lineas.map((l) => ({
-          ...l,
-          solicitud_compra_id: nueva.id,
-        })),
-        { transaction: t }
-      );
-    }
-  }
-
-  // POR EQUIPO
-  for (const key in solicitudesPorEquipo) {
-    const s = solicitudesPorEquipo[key];
-
-    const nueva = await SolicitudCompra.create(
-      {
-        ordenTrabajoId,
-        esGeneral: false,
-        equipo_id: s.targetMeta?.equipo_id || null,
-        ubicacion_tecnica_id: s.targetMeta?.ubicacion_tecnica_id || null,
-        ...s,
-      },
-      { transaction: t }
-    );
-
-    if (s.lineas?.length) {
-      await SolicitudCompraLinea.bulkCreate(
-        s.lineas.map((l) => ({
-          ...l,
-          solicitud_compra_id: nueva.id,
-        })),
-        { transaction: t }
+    if (
+      equipo.ubicacionTecnicaId &&
+      !ubicacionIdsAviso.has(String(equipo.ubicacionTecnicaId))
+    ) {
+      throw new Error(
+        `La ubicación técnica ${equipo.ubicacionTecnicaId} no pertenece al aviso`
       );
     }
   }
 }
 
 /* =========================================================
-   4) Crear una OT interna
+   HELPER — CREAR UNA OT INTERNA
 ========================================================= */
 async function crearOTInterna(
   {
@@ -734,9 +467,10 @@ async function crearOTInterna(
     otDataBase,
     equipos,
     adjuntos,
-    solicitudesCompra = null,   // 👈 viene del payload (ya editadas por el usuario)
-    solicitudesAlmacen = null,  // 👈 idem
+    solicitudesCompra = null,
+    solicitudesAlmacen = null,
     usuarioId = null,
+    tratamientoId = null,
   },
   t
 ) {
@@ -763,7 +497,8 @@ async function crearOTInterna(
         ordenTrabajoId: ot.id,
         equipoId: x.equipoId || null,
         ubicacionTecnicaId: x.ubicacionTecnicaId || null,
-        descripcionEquipo: x.descripcionEquipo || x.descripcionUbicacion || null,
+        descripcionEquipo:
+          x.descripcionEquipo || x.descripcionUbicacion || null,
         prioridad: x.prioridad || "MEDIA",
         planMantenimientoId: x.planMantenimientoId || null,
         fechaInicioProgramada: x.fechaInicioProgramada || null,
@@ -778,35 +513,29 @@ async function crearOTInterna(
     { transaction: t, returning: true }
   );
 
-  // Buscar tratamientoId para las solicitudes
-  const tratamiento = await Tratamiento.findOne({
-    where: { aviso_id: aviso.id },
-    transaction: t,
-  });
-
-  // ✅ SOLICITUDES DE COMPRA — desde payload (ya editadas)
+  // Solicitudes de compra
   if (solicitudesCompra) {
     await _crearSolicitudesCompraEnOT({
       ordenTrabajoId: ot.id,
-      tratamientoId: tratamiento?.id || null,
+      tratamientoId,
       solicitudes: solicitudesCompra,
       usuarioId,
       t,
     });
   }
 
-  // ✅ SOLICITUDES DE ALMACÉN — desde payload (ya editadas)
+  // Solicitudes de almacén
   if (solicitudesAlmacen) {
     await _crearSolicitudesAlmacenEnOT({
       ordenTrabajoId: ot.id,
-      tratamientoId: tratamiento?.id || null,
+      tratamientoId,
       solicitudes: solicitudesAlmacen,
       usuarioId,
       t,
     });
   }
 
-  // Copiar actividades del tratamiento
+  // Actividades del tratamiento
   await copiarActividadesATargetsOT({
     avisoId: aviso.id,
     targetsOT,
@@ -817,7 +546,7 @@ async function crearOTInterna(
   // Trabajadores
   const trabajadoresTarget = [];
   targetsOT.forEach((targetCreado, index) => {
-    const trabajadores = equipos[index].trabajadores || [];
+    const trabajadores = equipos[index]?.trabajadores || [];
     trabajadores.forEach((trab) => {
       trabajadoresTarget.push({
         ordenTrabajoEquipoId: targetCreado.id,
@@ -828,7 +557,9 @@ async function crearOTInterna(
   });
 
   if (trabajadoresTarget.length) {
-    await OrdenTrabajoEquipoTrabajador.bulkCreate(trabajadoresTarget, { transaction: t });
+    await OrdenTrabajoEquipoTrabajador.bulkCreate(trabajadoresTarget, {
+      transaction: t,
+    });
   }
 
   // Adjuntos OT general
@@ -854,7 +585,10 @@ async function crearOTInterna(
     const equipoCreado = targetsOT[index];
     const payloadEquipo = equipos[index];
 
-    if (Array.isArray(payloadEquipo.adjuntos) && payloadEquipo.adjuntos.length) {
+    if (
+      Array.isArray(payloadEquipo?.adjuntos) &&
+      payloadEquipo.adjuntos.length
+    ) {
       await Adjunto.bulkCreate(
         payloadEquipo.adjuntos.map((a) => ({
           nombre: a.nombre,
@@ -876,7 +610,34 @@ async function crearOTInterna(
 }
 
 /* =========================================================
-   5) FUNCIÓN PRINCIPAL: crearOrdenTrabajo
+   FUNCIÓN PRINCIPAL — crearOrdenTrabajo
+   
+   Payload esperado:
+   {
+     avisoId,
+     equipos: [...],
+     adjuntos: [...],
+     modo: "GRUPAL" | "INDIVIDUAL",
+     
+     // Solo en INDIVIDUAL — indica a qué OT va la solicitud general
+     // de forma INDEPENDIENTE para compra y almacén
+     solicitudGeneralStrategy: {
+       compra:  { tipo: "ASIGNAR", targetKey: "E:<uuid>" } | { tipo: "NINGUNA" },
+       almacen: { tipo: "ASIGNAR", targetKey: "U:<uuid>" } | { tipo: "NINGUNA" },
+     },
+     
+     // Solicitudes ya editadas por el usuario
+     // general puede ser null si no existe
+     // porEquipo puede estar vacío si no hay por equipo
+     solicitudesCompra: {
+       general: { requiredDate, lineas: [...], origenSolicitudId } | null,
+       porEquipo: { "E:<uuid>": { requiredDate, lineas: [...] } }
+     },
+     solicitudesAlmacen: { ... }, // misma estructura
+     
+     usuarioId,
+     ...otData (descripcionGeneral, etc.)
+   }
 ========================================================= */
 async function crearOrdenTrabajo(data) {
   const t = await sequelize.transaction();
@@ -886,7 +647,7 @@ async function crearOrdenTrabajo(data) {
       equipos = [],
       adjuntos = [],
       modo = "GRUPAL",
-      solicitudGeneralStrategy = { tipo: "NINGUNA" },
+      solicitudGeneralStrategy = { compra: { tipo: "NINGUNA" }, almacen: { tipo: "NINGUNA" } },
       solicitudesCompra = null,
       solicitudesAlmacen = null,
       usuarioId = null,
@@ -894,7 +655,8 @@ async function crearOrdenTrabajo(data) {
     } = data;
 
     if (!otData.avisoId) throw new Error("avisoId es obligatorio");
-    if (!equipos.length) throw new Error("Debe enviar al menos un equipo o ubicación técnica");
+    if (!equipos.length)
+      throw new Error("Debe enviar al menos un equipo o ubicación técnica");
 
     equipos.forEach(ensureValidTarget);
 
@@ -902,7 +664,8 @@ async function crearOrdenTrabajo(data) {
     if (!aviso) throw new Error("Aviso no encontrado");
 
     if (aviso.tipoAviso === "mantenimiento") {
-      if (!aviso.tipoMantenimiento) throw new Error("El aviso no tiene tipo de mantenimiento");
+      if (!aviso.tipoMantenimiento)
+        throw new Error("El aviso no tiene tipo de mantenimiento");
       otData.tipoMantenimiento = aviso.tipoMantenimiento;
     } else {
       otData.tipoMantenimiento = null;
@@ -911,13 +674,20 @@ async function crearOrdenTrabajo(data) {
     await validarTargetsDelAviso(aviso.id, equipos, t);
     validarActividadesPayload(equipos, otData.tipoMantenimiento);
 
+    // Obtener tratamientoId si existe
+    const tratamiento = await Tratamiento.findOne({
+      where: { aviso_id: aviso.id },
+      transaction: t,
+    });
+    const tratamientoId = tratamiento?.id || null;
+
     const otsCreadas = [];
 
-    /* =========================================================
-       🔵 MODO GRUPAL
-       - Todo el payload viaja junto
-       - La general viaja si el front la mandó (nunca se fuerza)
-    ========================================================= */
+    /* =====================================================
+       MODO GRUPAL
+       - Una sola OT con todos los equipos
+       - La solicitud general va directamente si existe
+    ===================================================== */
     if (modo === "GRUPAL") {
       const ot = await crearOTInterna(
         {
@@ -925,43 +695,78 @@ async function crearOrdenTrabajo(data) {
           otDataBase: otData,
           equipos,
           adjuntos,
-          solicitudesCompra,   // null = sin solicitudes, sin error
-          solicitudesAlmacen,  // null = sin solicitudes, sin error
+          solicitudesCompra,
+          solicitudesAlmacen,
           usuarioId,
+          tratamientoId,
         },
         t
       );
-
       otsCreadas.push(ot);
     }
 
-    /* =========================================================
-       🟣 MODO INDIVIDUAL
-       - Una OT por equipo
-       - La general solo va a la OT cuyo targetKey coincide
-       - Si tipo = "NINGUNA", ninguna OT lleva la general
-    ========================================================= */
+    /* =====================================================
+       MODO INDIVIDUAL
+       - Una OT por equipo/ubicación
+       - Solicitud por equipo → va a su OT automáticamente
+       - Solicitud general → el usuario elige el targetKey
+         de forma independiente para compra y almacén
+         Si tipo="NINGUNA" → no se asigna a ninguna OT
+         (queda pendiente para asignar después)
+    ===================================================== */
     if (modo === "INDIVIDUAL") {
-      const { tipo = "NINGUNA", targetKey = null } = solicitudGeneralStrategy;
+      const estrategiaCompra = solicitudGeneralStrategy?.compra || { tipo: "NINGUNA" };
+      const estrategiaAlmacen = solicitudGeneralStrategy?.almacen || { tipo: "NINGUNA" };
 
-      if (tipo === "ASIGNAR" && !targetKey) {
-        throw new Error("Debe enviar targetKey para asignar la solicitud general");
+      // Validar que el targetKey exista en los equipos enviados
+      if (estrategiaCompra.tipo === "ASIGNAR") {
+        if (!estrategiaCompra.targetKey) {
+          throw new Error(
+            "solicitudGeneralStrategy.compra.targetKey es obligatorio cuando tipo=ASIGNAR"
+          );
+        }
+        const existe = equipos.some(
+          (e) => getTargetKey(e) === estrategiaCompra.targetKey
+        );
+        if (!existe) {
+          throw new Error(
+            `solicitudGeneralStrategy.compra.targetKey "${estrategiaCompra.targetKey}" no corresponde a ningún equipo enviado`
+          );
+        }
+      }
+
+      if (estrategiaAlmacen.tipo === "ASIGNAR") {
+        if (!estrategiaAlmacen.targetKey) {
+          throw new Error(
+            "solicitudGeneralStrategy.almacen.targetKey es obligatorio cuando tipo=ASIGNAR"
+          );
+        }
+        const existe = equipos.some(
+          (e) => getTargetKey(e) === estrategiaAlmacen.targetKey
+        );
+        if (!existe) {
+          throw new Error(
+            `solicitudGeneralStrategy.almacen.targetKey "${estrategiaAlmacen.targetKey}" no corresponde a ningún equipo enviado`
+          );
+        }
       }
 
       for (const equipo of equipos) {
         const key = getTargetKey(equipo);
-        const esLaQueRecibeLaGeneral = tipo === "ASIGNAR" && key === targetKey;
 
-        // ── Compra ──────────────────────────────────────────
+        // ── Compra para esta OT ──────────────────────────
         let solicitudesCompraParaOT = null;
 
         if (solicitudesCompra) {
           const datoPorEquipo = solicitudesCompra.porEquipo?.[key] ?? null;
-          const generalParaOT  = esLaQueRecibeLaGeneral
-            ? (solicitudesCompra.general ?? null)
-            : null;
 
-          // Solo construir el objeto si hay algo que meter
+          // La general solo va a la OT cuyo targetKey coincide con la estrategia
+          const generalParaOT =
+            estrategiaCompra.tipo === "ASIGNAR" &&
+            estrategiaCompra.targetKey === key
+              ? (solicitudesCompra.general ?? null)
+              : null;
+
           if (generalParaOT || datoPorEquipo) {
             solicitudesCompraParaOT = {
               general: generalParaOT,
@@ -970,14 +775,17 @@ async function crearOrdenTrabajo(data) {
           }
         }
 
-        // ── Almacén ─────────────────────────────────────────
+        // ── Almacén para esta OT ─────────────────────────
         let solicitudesAlmacenParaOT = null;
 
         if (solicitudesAlmacen) {
           const datoPorEquipo = solicitudesAlmacen.porEquipo?.[key] ?? null;
-          const generalParaOT  = esLaQueRecibeLaGeneral
-            ? (solicitudesAlmacen.general ?? null)
-            : null;
+
+          const generalParaOT =
+            estrategiaAlmacen.tipo === "ASIGNAR" &&
+            estrategiaAlmacen.targetKey === key
+              ? (solicitudesAlmacen.general ?? null)
+              : null;
 
           if (generalParaOT || datoPorEquipo) {
             solicitudesAlmacenParaOT = {
@@ -993,9 +801,10 @@ async function crearOrdenTrabajo(data) {
             otDataBase: otData,
             equipos: [equipo],
             adjuntos,
-            solicitudesCompra: solicitudesCompraParaOT,   // puede ser null → sin error
-            solicitudesAlmacen: solicitudesAlmacenParaOT, // puede ser null → sin error
+            solicitudesCompra: solicitudesCompraParaOT,
+            solicitudesAlmacen: solicitudesAlmacenParaOT,
             usuarioId,
+            tratamientoId,
           },
           t
         );
@@ -1007,14 +816,8 @@ async function crearOrdenTrabajo(data) {
     await aviso.update({ estadoAviso: "con OT" }, { transaction: t });
     await t.commit();
 
-
-
-  } catch (error) {
-    await t.rollback();
-    throw error;
-  }
-
-  return await OrdenTrabajo.findAll({
+    // Retornar OTs completas fuera de la transacción
+    return await OrdenTrabajo.findAll({
       where: { id: { [Op.in]: otsCreadas.map((x) => x.id) } },
       include: [
         {
@@ -1034,10 +837,134 @@ async function crearOrdenTrabajo(data) {
       ],
       order: [["createdAt", "DESC"]],
     });
+  } catch (error) {
+    await t.rollback();
+    throw error;
+  }
 }
 
+/* =========================================================
+   OBTENER SOLICITUDES PENDIENTES (general sin asignar)
+   
+   Útil para el modal del frontend: muestra si existe una
+   solicitud general del tratamiento que todavía no fue
+   asignada a ninguna OT.
+========================================================= */
+async function obtenerSolicitudesGeneralesPendientes(avisoId) {
+  const tratamiento = await Tratamiento.findOne({
+    where: { aviso_id: avisoId },
+  });
+
+  if (!tratamiento) throw new Error("No existe tratamiento para este aviso");
+
+  // Solicitudes generales del tratamiento que NO tienen OT asignada
+  const [comprasSinOT, almacenesSinOT] = await Promise.all([
+    SolicitudCompra.findAll({
+      where: {
+        tratamiento_id: tratamiento.id,
+        esGeneral: true,
+        ordenTrabajoId: null,
+      },
+      include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+    }),
+    SolicitudAlmacen.findAll({
+      where: {
+        tratamiento_id: tratamiento.id,
+        esGeneral: true,
+        ordenTrabajoId: null,
+      },
+      include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+    }),
+  ]);
+
+  return {
+    hayPendientes: comprasSinOT.length > 0 || almacenesSinOT.length > 0,
+    solicitudesCompra: comprasSinOT,
+    solicitudesAlmacen: almacenesSinOT,
+  };
+}
+
+/* =========================================================
+   ASIGNAR SOLICITUD GENERAL A UNA OT (después de crearla)
+   
+   Permite que el usuario, desde el modal, asigne la solicitud
+   general que quedó sin OT a una OT específica.
+========================================================= */
+async function asignarSolicitudGeneralAOT({
+  solicitudCompraId = null,
+  solicitudAlmacenId = null,
+  ordenTrabajoId,
+}) {
+  if (!ordenTrabajoId) throw new Error("ordenTrabajoId es obligatorio");
+  if (!solicitudCompraId && !solicitudAlmacenId) {
+    throw new Error("Debe enviar al menos solicitudCompraId o solicitudAlmacenId");
+  }
+
+  const ot = await OrdenTrabajo.findByPk(ordenTrabajoId);
+  if (!ot) throw new Error("OT no encontrada");
+
+  const resultados = {};
+
+  if (solicitudCompraId) {
+    const sc = await SolicitudCompra.findByPk(solicitudCompraId);
+    if (!sc) throw new Error(`SolicitudCompra ${solicitudCompraId} no encontrada`);
+    if (sc.ordenTrabajoId) {
+      throw new Error(
+        `La solicitud de compra ya está asignada a la OT ${sc.ordenTrabajoId}`
+      );
+    }
+    await sc.update({ ordenTrabajoId });
+    resultados.solicitudCompra = sc;
+  }
+
+  if (solicitudAlmacenId) {
+    const sa = await SolicitudAlmacen.findByPk(solicitudAlmacenId);
+    if (!sa) throw new Error(`SolicitudAlmacen ${solicitudAlmacenId} no encontrada`);
+    if (sa.ordenTrabajoId) {
+      throw new Error(
+        `La solicitud de almacén ya está asignada a la OT ${sa.ordenTrabajoId}`
+      );
+    }
+    await sa.update({ ordenTrabajoId });
+    resultados.solicitudAlmacen = sa;
+  }
+
+  return resultados;
+}
+
+/* =========================================================
+   OBTENER SOLICITUDES POR OT
+========================================================= */
+async function obtenerSolicitudesPorOT(ordenTrabajoId) {
+  const [solicitudesCompra, solicitudesAlmacen] = await Promise.all([
+    SolicitudCompra.findAll({
+      where: { ordenTrabajoId },
+      include: [
+        { model: SolicitudCompraLinea, as: "lineas" },
+        { model: Equipo, as: "equipo" },
+        { model: UbicacionTecnica, as: "ubicacionTecnica" },
+      ],
+      order: [["createdAt", "ASC"]],
+    }),
+    SolicitudAlmacen.findAll({
+      where: { ordenTrabajoId },
+      include: [
+        { model: SolicitudAlmacenLinea, as: "lineas" },
+        { model: Equipo, as: "equipo" },
+        { model: UbicacionTecnica, as: "ubicacionTecnica" },
+      ],
+      order: [["createdAt", "ASC"]],
+    }),
+  ]);
+
+  return { solicitudesCompra, solicitudesAlmacen };
+}
+
+/* =========================================================
+   OBTENER ÓRDENES DE TRABAJO
+========================================================= */
 async function obtenerOrdenesTrabajo() {
-  return await OrdenTrabajo.findAll({
+  return OrdenTrabajo.findAll({
     include: [
       {
         association: "equipos",
@@ -1055,11 +982,9 @@ async function obtenerOrdenesTrabajo() {
 }
 
 async function obtenerOrdenTrabajoPorId(id) {
-  return await OrdenTrabajo.findByPk(id, {
+  return OrdenTrabajo.findByPk(id, {
     include: [
-      {
-        association: "tratamiento",
-      },
+      { association: "tratamiento" },
       {
         association: "equipos",
         include: [
@@ -1076,110 +1001,72 @@ async function obtenerOrdenTrabajoPorId(id) {
   });
 }
 
+/* =========================================================
+   ACTUALIZAR OT COMPLETA
+========================================================= */
 async function actualizarOrdenTrabajoCompleta(id, data) {
   const transaction = await sequelize.transaction();
 
   try {
     const ot = await OrdenTrabajo.findByPk(id, { transaction });
-
     if (!ot) {
       await transaction.rollback();
       return null;
     }
 
-    /* =========================
-       1. ACTUALIZAR OT PRINCIPAL
-    ========================= */
     const camposOTPermitidos = [
-      "numeroOT",
-      "tipoMantenimiento",
-      "descripcionGeneral",
-      "estado",
-      "supervisorId",
-      "fechaProgramadaInicio",
-      "fechaProgramadaFin",
-      "fechaInicioReal",
-      "fechaFinReal",
-      "fechaCierre",
-      "observaciones",
-      "avisoId",
-      "tratamientoId",
-      "id"
+      "numeroOT", "tipoMantenimiento", "descripcionGeneral", "estado",
+      "supervisorId", "fechaProgramadaInicio", "fechaProgramadaFin",
+      "fechaInicioReal", "fechaFinReal", "fechaCierre", "observaciones",
+      "avisoId", "tratamientoId", "id",
     ];
 
     const dataOT = {};
-
     for (const campo of camposOTPermitidos) {
-      if (data[campo] !== undefined) {
-        dataOT[campo] = data[campo];
-      }
+      if (data[campo] !== undefined) dataOT[campo] = data[campo];
     }
 
     await ot.update(dataOT, { transaction });
 
-    /* =========================
-       2. ADJUNTOS GENERALES OT
-    ========================= */
+    // Adjuntos generales OT
     if (Array.isArray(data.adjuntos)) {
       const adjuntosActualesOT = await Adjunto.findAll({
         where: { ordenTrabajoId: id, ordenTrabajoEquipoId: null },
         transaction,
       });
 
-      const idsAdjuntosPayloadOT = data.adjuntos
-        .filter((a) => a.id)
-        .map((a) => a.id);
+      const idsPayloadOT = data.adjuntos.filter((a) => a.id).map((a) => a.id);
 
-      for (const adjuntoActual of adjuntosActualesOT) {
-        if (!idsAdjuntosPayloadOT.includes(adjuntoActual.id)) {
-          await adjuntoActual.destroy({ transaction });
-        }
+      for (const adj of adjuntosActualesOT) {
+        if (!idsPayloadOT.includes(adj.id)) await adj.destroy({ transaction });
       }
 
       for (const adjunto of data.adjuntos) {
-        const payloadAdjuntoOT = {
-          nombre: adjunto.nombre,
-          url: adjunto.url,
-          extension: adjunto.extension ?? null,
-          categoria: adjunto.categoria ?? null,
+        const payload = {
+          nombre: adjunto.nombre, url: adjunto.url,
+          extension: adjunto.extension ?? null, categoria: adjunto.categoria ?? null,
           mostrarEnPortal: adjunto.mostrarEnPortal ?? false,
           tituloPortal: adjunto.tituloPortal ?? null,
           descripcionPortal: adjunto.descripcionPortal ?? null,
           ordenPortal: adjunto.ordenPortal ?? 0,
-          ordenTrabajoId: id,
-          ordenTrabajoEquipoId: null,
+          ordenTrabajoId: id, ordenTrabajoEquipoId: null,
         };
 
         if (adjunto.id) {
           const existente = await Adjunto.findOne({
-            where: {
-              id: adjunto.id,
-              ordenTrabajoId: id,
-              ordenTrabajoEquipoId: null,
-            },
+            where: { id: adjunto.id, ordenTrabajoId: id, ordenTrabajoEquipoId: null },
             transaction,
           });
-
-          if (existente) {
-            await existente.update(payloadAdjuntoOT, { transaction });
-          } else {
-            await Adjunto.create(
-              {
-                id: adjunto.id,
-                ...payloadAdjuntoOT,
-              },
-              { transaction }
-            );
-          }
+          existente
+            ? await existente.update(payload, { transaction })
+            : await Adjunto.create({ id: adjunto.id, ...payload }, { transaction });
         } else {
-          await Adjunto.create(payloadAdjuntoOT, { transaction });
+          await Adjunto.create(payload, { transaction });
         }
       }
     }
 
-    /* =========================
-       3. EQUIPOS
-    ========================= */
+    // Equipos
     if (Array.isArray(data.equipos)) {
       const equiposActuales = await OrdenTrabajoEquipo.findAll({
         where: { ordenTrabajoId: id },
@@ -1188,24 +1075,16 @@ async function actualizarOrdenTrabajoCompleta(id, data) {
 
       const idsEquiposPayload = data.equipos.filter((e) => e.id).map((e) => e.id);
 
-      for (const equipoActual of equiposActuales) {
-        if (!idsEquiposPayload.includes(equipoActual.id)) {
+      for (const eq of equiposActuales) {
+        if (!idsEquiposPayload.includes(eq.id)) {
           await OrdenTrabajoEquipoTrabajador.destroy({
-            where: { ordenTrabajoEquipoId: equipoActual.id },
-            transaction,
+            where: { ordenTrabajoEquipoId: eq.id }, transaction,
           });
-
           await OrdenTrabajoEquipoActividad.destroy({
-            where: { ordenTrabajoEquipoId: equipoActual.id },
-            transaction,
+            where: { ordenTrabajoEquipoId: eq.id }, transaction,
           });
-
-          await Adjunto.destroy({
-            where: { ordenTrabajoEquipoId: equipoActual.id },
-            transaction,
-          });
-
-          await equipoActual.destroy({ transaction });
+          await Adjunto.destroy({ where: { ordenTrabajoEquipoId: eq.id }, transaction });
+          await eq.destroy({ transaction });
         }
       }
 
@@ -1226,112 +1105,64 @@ async function actualizarOrdenTrabajoCompleta(id, data) {
           observaciones: equipo.observaciones ?? null,
         };
 
-        let equipoGuardado = null;
+        let equipoGuardado;
 
         if (equipo.id) {
           equipoGuardado = await OrdenTrabajoEquipo.findOne({
-            where: {
-              id: equipo.id,
-              ordenTrabajoId: id,
-            },
-            transaction,
+            where: { id: equipo.id, ordenTrabajoId: id }, transaction,
           });
-
-          if (equipoGuardado) {
-            await equipoGuardado.update(payloadEquipo, { transaction });
-          } else {
-            equipoGuardado = await OrdenTrabajoEquipo.create(
-              {
-                id: equipo.id,
-                ...payloadEquipo,
-              },
-              { transaction }
-            );
-          }
+          equipoGuardado
+            ? await equipoGuardado.update(payloadEquipo, { transaction })
+            : (equipoGuardado = await OrdenTrabajoEquipo.create(
+                { id: equipo.id, ...payloadEquipo }, { transaction }
+              ));
         } else {
-          equipoGuardado = await OrdenTrabajoEquipo.create(payloadEquipo, {
-            transaction,
-          });
+          equipoGuardado = await OrdenTrabajoEquipo.create(payloadEquipo, { transaction });
         }
 
-        /* =========================
-           4. TRABAJADORES POR EQUIPO
-        ========================= */
+        // Trabajadores
         if (Array.isArray(equipo.trabajadores)) {
-          const trabajadoresActuales = await OrdenTrabajoEquipoTrabajador.findAll({
-            where: { ordenTrabajoEquipoId: equipoGuardado.id },
-            transaction,
+          const trabActuales = await OrdenTrabajoEquipoTrabajador.findAll({
+            where: { ordenTrabajoEquipoId: equipoGuardado.id }, transaction,
           });
-
-          const idsTrabajadoresPayload = equipo.trabajadores
-            .filter((t) => t.id)
-            .map((t) => t.id);
-
-          for (const trabajadorActual of trabajadoresActuales) {
-            if (!idsTrabajadoresPayload.includes(trabajadorActual.id)) {
-              await trabajadorActual.destroy({ transaction });
-            }
+          const idsTrabPayload = equipo.trabajadores.filter((t) => t.id).map((t) => t.id);
+          for (const trab of trabActuales) {
+            if (!idsTrabPayload.includes(trab.id)) await trab.destroy({ transaction });
           }
-
           for (const trabajador of equipo.trabajadores) {
-            const payloadTrabajador = {
+            const payloadTrab = {
               ordenTrabajoEquipoId: equipoGuardado.id,
               trabajadorId: trabajador.trabajadorId,
               esEncargado: trabajador.esEncargado ?? false,
             };
-
             if (trabajador.id) {
               const existente = await OrdenTrabajoEquipoTrabajador.findOne({
-                where: {
-                  id: trabajador.id,
-                  ordenTrabajoEquipoId: equipoGuardado.id,
-                },
-                transaction,
+                where: { id: trabajador.id, ordenTrabajoEquipoId: equipoGuardado.id }, transaction,
               });
-
-              if (existente) {
-                await existente.update(payloadTrabajador, { transaction });
-              } else {
-                await OrdenTrabajoEquipoTrabajador.create(
-                  {
-                    id: trabajador.id,
-                    ...payloadTrabajador,
-                  },
-                  { transaction }
-                );
-              }
+              existente
+                ? await existente.update(payloadTrab, { transaction })
+                : await OrdenTrabajoEquipoTrabajador.create(
+                    { id: trabajador.id, ...payloadTrab }, { transaction }
+                  );
             } else {
-              await OrdenTrabajoEquipoTrabajador.create(payloadTrabajador, {
-                transaction,
-              });
+              await OrdenTrabajoEquipoTrabajador.create(payloadTrab, { transaction });
             }
           }
         }
 
-        /* =========================
-           5. ACTIVIDADES POR EQUIPO
-        ========================= */
+        // Actividades
         if (Array.isArray(equipo.actividades)) {
-          const actividadesActuales = await OrdenTrabajoEquipoActividad.findAll({
-            where: { ordenTrabajoEquipoId: equipoGuardado.id },
-            transaction,
+          const actActuales = await OrdenTrabajoEquipoActividad.findAll({
+            where: { ordenTrabajoEquipoId: equipoGuardado.id }, transaction,
           });
-
-          const idsActividadesPayload = equipo.actividades
-            .filter((a) => a.id)
-            .map((a) => a.id);
-
-          for (const actividadActual of actividadesActuales) {
-            if (!idsActividadesPayload.includes(actividadActual.id)) {
-              await actividadActual.destroy({ transaction });
-            }
+          const idsActPayload = equipo.actividades.filter((a) => a.id).map((a) => a.id);
+          for (const act of actActuales) {
+            if (!idsActPayload.includes(act.id)) await act.destroy({ transaction });
           }
-
           for (const actividad of equipo.actividades) {
-            const payloadActividad = {
+            const payloadAct = {
               ordenTrabajoEquipoId: equipoGuardado.id,
-              planMantenimientoActividadId:
-                actividad.planMantenimientoActividadId ?? null,
+              planMantenimientoActividadId: actividad.planMantenimientoActividadId ?? null,
               sistema: actividad.sistema ?? null,
               subsistema: actividad.subsistema ?? null,
               componente: actividad.componente ?? null,
@@ -1346,64 +1177,37 @@ async function actualizarOrdenTrabajoCompleta(id, data) {
               estado: actividad.estado ?? "PENDIENTE",
               origen: actividad.origen ?? "PLAN",
               descripcion: actividad.descripcion ?? null,
-              tratamientoEquipoActividadId:
-                actividad.tratamientoEquipoActividadId ?? null,
+              tratamientoEquipoActividadId: actividad.tratamientoEquipoActividadId ?? null,
               observaciones: actividad.observaciones ?? null,
             };
-
             if (actividad.id) {
               const existente = await OrdenTrabajoEquipoActividad.findOne({
-                where: {
-                  id: actividad.id,
-                  ordenTrabajoEquipoId: equipoGuardado.id,
-                },
-                transaction,
+                where: { id: actividad.id, ordenTrabajoEquipoId: equipoGuardado.id }, transaction,
               });
-
-              if (existente) {
-                await existente.update(payloadActividad, { transaction });
-              } else {
-                await OrdenTrabajoEquipoActividad.create(
-                  {
-                    id: actividad.id,
-                    ...payloadActividad,
-                  },
-                  { transaction }
-                );
-              }
+              existente
+                ? await existente.update(payloadAct, { transaction })
+                : await OrdenTrabajoEquipoActividad.create(
+                    { id: actividad.id, ...payloadAct }, { transaction }
+                  );
             } else {
-              await OrdenTrabajoEquipoActividad.create(payloadActividad, {
-                transaction,
-              });
+              await OrdenTrabajoEquipoActividad.create(payloadAct, { transaction });
             }
           }
         }
 
-        /* =========================
-           6. ADJUNTOS POR EQUIPO
-        ========================= */
+        // Adjuntos por equipo
         if (Array.isArray(equipo.adjuntos)) {
-          const adjuntosActualesEquipo = await Adjunto.findAll({
-            where: { ordenTrabajoEquipoId: equipoGuardado.id },
-            transaction,
+          const adjActuales = await Adjunto.findAll({
+            where: { ordenTrabajoEquipoId: equipoGuardado.id }, transaction,
           });
-
-          const idsAdjuntosPayloadEquipo = equipo.adjuntos
-            .filter((a) => a.id)
-            .map((a) => a.id);
-
-          for (const adjuntoActual of adjuntosActualesEquipo) {
-            if (!idsAdjuntosPayloadEquipo.includes(adjuntoActual.id)) {
-              await adjuntoActual.destroy({ transaction });
-            }
+          const idsAdjPayload = equipo.adjuntos.filter((a) => a.id).map((a) => a.id);
+          for (const adj of adjActuales) {
+            if (!idsAdjPayload.includes(adj.id)) await adj.destroy({ transaction });
           }
-
           for (const adjunto of equipo.adjuntos) {
-            const payloadAdjuntoEquipo = {
-              nombre: adjunto.nombre,
-              url: adjunto.url,
-              extension: adjunto.extension ?? null,
-              categoria: adjunto.categoria ?? null,
+            const payloadAdj = {
+              nombre: adjunto.nombre, url: adjunto.url,
+              extension: adjunto.extension ?? null, categoria: adjunto.categoria ?? null,
               mostrarEnPortal: adjunto.mostrarEnPortal ?? false,
               tituloPortal: adjunto.tituloPortal ?? null,
               descripcionPortal: adjunto.descripcionPortal ?? null,
@@ -1411,29 +1215,15 @@ async function actualizarOrdenTrabajoCompleta(id, data) {
               ordenTrabajoId: null,
               ordenTrabajoEquipoId: equipoGuardado.id,
             };
-
             if (adjunto.id) {
               const existente = await Adjunto.findOne({
-                where: {
-                  id: adjunto.id,
-                  ordenTrabajoEquipoId: equipoGuardado.id,
-                },
-                transaction,
+                where: { id: adjunto.id, ordenTrabajoEquipoId: equipoGuardado.id }, transaction,
               });
-
-              if (existente) {
-                await existente.update(payloadAdjuntoEquipo, { transaction });
-              } else {
-                await Adjunto.create(
-                  {
-                    id: adjunto.id,
-                    ...payloadAdjuntoEquipo,
-                  },
-                  { transaction }
-                );
-              }
+              existente
+                ? await existente.update(payloadAdj, { transaction })
+                : await Adjunto.create({ id: adjunto.id, ...payloadAdj }, { transaction });
             } else {
-              await Adjunto.create(payloadAdjuntoEquipo, { transaction });
+              await Adjunto.create(payloadAdj, { transaction });
             }
           }
         }
@@ -1442,44 +1232,32 @@ async function actualizarOrdenTrabajoCompleta(id, data) {
 
     await transaction.commit();
 
-    const otActualizada = await OrdenTrabajo.findByPk(id, {
+    return OrdenTrabajo.findByPk(id, {
       include: [
         {
           model: OrdenTrabajoEquipo,
           as: "equipos",
           include: [
-            {
-              model: OrdenTrabajoEquipoTrabajador,
-              as: "trabajadores",
-            },
-            {
-              model: OrdenTrabajoEquipoActividad,
-              as: "actividades",
-            },
-            {
-              model: Adjunto,
-              as: "adjuntos",
-            },
+            { model: OrdenTrabajoEquipoTrabajador, as: "trabajadores" },
+            { model: OrdenTrabajoEquipoActividad, as: "actividades" },
+            { model: Adjunto, as: "adjuntos" },
           ],
         },
-        {
-          model: Adjunto,
-          as: "adjuntos",
-        },
+        { model: Adjunto, as: "adjuntos" },
       ],
     });
-
-    return otActualizada;
   } catch (error) {
     await transaction.rollback();
     throw error;
   }
 }
 
-
+/* =========================================================
+   ELIMINAR OT
+========================================================= */
 async function eliminarOrdenTrabajo(id) {
   const ot = await OrdenTrabajo.findByPk(id);
-  if (!ot) return null; 
+  if (!ot) return null;
 
   await Adjunto.destroy({ where: { ordenTrabajoId: id } });
   await OrdenTrabajoEquipo.destroy({ where: { ordenTrabajoId: id } });
@@ -1488,15 +1266,11 @@ async function eliminarOrdenTrabajo(id) {
   return true;
 }
 
-
-
 /* =========================================================
-   6) CAMBIAR A CIERRE_TECNICO SI TODAS TIENEN NOTIFICACION
+   CIERRE TÉCNICO
 ========================================================= */
 async function actualizarOTACierreTecnicoSiCompleta(ordenTrabajoId, transaction) {
-  if (!ordenTrabajoId) {
-    throw new Error("ordenTrabajoId es obligatorio");
-  }
+  if (!ordenTrabajoId) throw new Error("ordenTrabajoId es obligatorio");
 
   const totalRegistrosOT = await OrdenTrabajoEquipo.count({
     where: { ordenTrabajoId },
@@ -1505,10 +1279,8 @@ async function actualizarOTACierreTecnicoSiCompleta(ordenTrabajoId, transaction)
 
   if (!totalRegistrosOT) {
     return {
-      ok: false,
-      changed: false,
-      totalRegistrosOT: 0,
-      totalNotificaciones: 0,
+      ok: false, changed: false,
+      totalRegistrosOT: 0, totalNotificaciones: 0,
       reason: "La OT no tiene registros asociados",
     };
   }
@@ -1532,32 +1304,19 @@ async function actualizarOTACierreTecnicoSiCompleta(ordenTrabajoId, transaction)
   if (totalNotificaciones === totalRegistrosOT) {
     await OrdenTrabajo.update(
       { estado: "CIERRE_TECNICO" },
-      {
-        where: { id: ordenTrabajoId },
-        transaction,
-      }
+      { where: { id: ordenTrabajoId }, transaction }
     );
-
-    return {
-      ok: true,
-      changed: true,
-      totalRegistrosOT,
-      totalNotificaciones,
-    };
+    return { ok: true, changed: true, totalRegistrosOT, totalNotificaciones };
   }
 
-  return {
-    ok: true,
-    changed: false,
-    totalRegistrosOT,
-    totalNotificaciones,
-  };
+  return { ok: true, changed: false, totalRegistrosOT, totalNotificaciones };
 }
 
-
+/* =========================================================
+   SYNC SAP
+========================================================= */
 async function syncSolicitudesCompraOT(id) {
   const ot = await OrdenTrabajo.findByPk(id);
-
   if (!ot) throw new Error("OT no encontrada");
 
   const solicitudes = await SolicitudCompra.findAll({
@@ -1569,25 +1328,17 @@ async function syncSolicitudesCompraOT(id) {
     (s) => s.estado === "DRAFT" || s.estado === "ERROR"
   );
 
-  if (!pendientes.length) {
-    throw new Error("No hay solicitudes pendientes para sync");
-  }
+  if (!pendientes.length) throw new Error("No hay solicitudes pendientes para sync");
 
   const solicitudFusionada = fusionarSolicitudesParaSap(
     pendientes.map((s) => s.toJSON())
   );
 
   let resultado;
-
   if (!solicitudFusionada?.lineas?.length) {
-    resultado = {
-      success: false,
-      message: "Sin líneas válidas",
-    };
+    resultado = { success: false, message: "Sin líneas válidas" };
   } else {
-    resultado = await enviarSolicitudCompraASAPDesdeObjeto(
-      solicitudFusionada
-    );
+    resultado = await enviarSolicitudCompraASAPDesdeObjeto(solicitudFusionada);
   }
 
   for (const solicitud of pendientes) {
@@ -1597,35 +1348,13 @@ async function syncSolicitudesCompraOT(id) {
     });
   }
 
-  return {
-    success: resultado.success,
-    procesadas: pendientes.length,
-  };
+  return { success: resultado.success, procesadas: pendientes.length };
 }
 
-
-async function _obtenerOVdeOT(ordenTrabajoId) {
-  const ot = await OrdenTrabajo.findByPk(ordenTrabajoId, {
-    include: [{ association: "aviso" }],
-  });
-
-  if (!ot) throw new Error("OT no encontrada");
-
-  const aviso = ot.aviso;
-  const ov = aviso?.numeroOV || aviso?.ordenVenta || aviso?.ov;
-
-  if (!ov || !String(ov).trim()) {
-    throw new Error(`El aviso ${aviso?.numeroAviso || ot.avisoId} no tiene número de OV`);
-  }
-
-  return String(ov).trim();
-}
-
-// ordenTrabajoController.js
-
+/* =========================================================
+   PREVIEW SOLICITUDES
+========================================================= */
 async function previewSolicitudesOT(ordenTrabajoId) {
-  const { SolicitudAlmacen, SolicitudAlmacenLinea } = require("../db_connection");
-
   const [solicitudesCompra, solicitudesAlmacen] = await Promise.all([
     SolicitudCompra.findAll({
       where: { ordenTrabajoId },
@@ -1638,15 +1367,12 @@ async function previewSolicitudesOT(ordenTrabajoId) {
   ]);
 
   return {
-    compra:  _fusionarItemsParaVista(solicitudesCompra),
+    compra: _fusionarItemsParaVista(solicitudesCompra),
     almacen: _fusionarItemsParaVista(solicitudesAlmacen),
   };
 }
 
-// Fusiona líneas de TODAS las solicitudes, sumando por itemCode
-// Si tienen distinto costingCode/projectCode → líneas separadas
 function _fusionarItemsParaVista(solicitudes) {
-  // key = itemCode + "|" + (costingCode||"") + "|" + (projectCode||"")
   const mapa = new Map();
 
   for (const s of solicitudes) {
@@ -1664,14 +1390,14 @@ function _fusionarItemsParaVista(solicitudes) {
         });
       } else {
         mapa.set(key, {
-          itemCode:    l.itemCode,
-          itemId:      l.itemId || null,
+          itemCode: l.itemCode,
+          itemId: l.itemId || null,
           description: l.description || "",
-          quantity:    Number(l.quantity),
+          quantity: Number(l.quantity),
           warehouseCode: l.warehouseCode || "01",
-          costingCode:   l.costingCode || null,
-          projectCode:   l.projectCode || null,
-          rubroId:       l.rubroId || null,
+          costingCode: l.costingCode || null,
+          projectCode: l.projectCode || null,
+          rubroId: l.rubroId || null,
           paqueteTrabajoId: l.paqueteTrabajoId || null,
           fuentes: [{
             solicitudId: s.id,
@@ -1691,6 +1417,37 @@ function _fusionarItemsParaVista(solicitudes) {
   };
 }
 
+/* =========================================================
+   GENERAR NÚMERO DE SOLICITUD PARA OT
+========================================================= */
+async function _obtenerOVdeOT(ordenTrabajoId) {
+  const ot = await OrdenTrabajo.findByPk(ordenTrabajoId, {
+    include: [{ association: "aviso" }],
+  });
+  if (!ot) throw new Error("OT no encontrada");
+
+  const aviso = ot.aviso;
+  const ov = aviso?.numeroOV || aviso?.ordenVenta || aviso?.ov;
+
+  if (!ov || !String(ov).trim()) {
+    throw new Error(
+      `El aviso ${aviso?.numeroAviso || ot.avisoId} no tiene número de OV`
+    );
+  }
+  return String(ov).trim();
+}
+
+async function _generarNumeroSolicitudOT({ modelo, prefijo, ordenVenta }) {
+  const total = await modelo.count({
+    where: { numeroSolicitud: { [Op.like]: `${prefijo}-${ordenVenta}-%` } },
+  });
+  const correlativo = String(total + 1).padStart(3, "0");
+  return `${prefijo}-${ordenVenta}-${correlativo}`;
+}
+
+/* =========================================================
+   GENERAR SOLICITUD COMPRA CONSOLIDADA
+========================================================= */
 async function generarSolicitudCompraOT(ordenTrabajoId) {
   const ot = await OrdenTrabajo.findByPk(ordenTrabajoId);
   if (!ot) throw new Error("OT no encontrada");
@@ -1698,14 +1455,12 @@ async function generarSolicitudCompraOT(ordenTrabajoId) {
     throw new Error("Solo se puede generar la solicitud en estado CREADO");
   }
 
-  // Verificar que no exista ya una consolidada
   const yaExiste = await SolicitudCompra.findOne({
     where: { ordenTrabajoId, esConsolidada: true },
   });
 
   if (yaExiste) {
-    // Devolver la existente en vez de lanzar error
-    return await SolicitudCompra.findByPk(yaExiste.id, {
+    return SolicitudCompra.findByPk(yaExiste.id, {
       include: [{ model: SolicitudCompraLinea, as: "lineas" }],
     });
   }
@@ -1721,7 +1476,6 @@ async function generarSolicitudCompraOT(ordenTrabajoId) {
   if (!lineas.length) throw new Error("No hay líneas válidas para generar la solicitud");
 
   const ordenVenta = await _obtenerOVdeOT(ordenTrabajoId);
-
   const numero = await _generarNumeroSolicitudOT({
     modelo: SolicitudCompra,
     prefijo: "SC",
@@ -1731,70 +1485,69 @@ async function generarSolicitudCompraOT(ordenTrabajoId) {
   const base = solicitudes[0];
 
   const consolidada = await SolicitudCompra.create({
-    numeroSolicitud:  numero,
+    numeroSolicitud: numero,
     ordenTrabajoId,
-    tratamiento_id:   base.tratamiento_id,
-    esGeneral:        true,
-    esCopia:          false,
-    esConsolidada:    true,
-    docDate:          new Date(),
-    requiredDate:     base.requiredDate,
-    requester:        base.requester,
-    department:       base.department,
-    comments:         base.comments,
-    usuario_id:       base.usuario_id,
-    estado:           "GENERADA",
+    tratamiento_id: base.tratamiento_id,
+    esGeneral: true,
+    esCopia: false,
+    esConsolidada: true,
+    docDate: new Date(),
+    requiredDate: base.requiredDate,
+    usuario_id: base.usuario_id,
+    estado: "GENERADA",
   });
 
   await SolicitudCompraLinea.bulkCreate(
     lineas.map((l) => ({
       solicitud_compra_id: consolidada.id,
-      itemId:           l.itemId,
-      itemCode:         l.itemCode,
-      description:      l.description,
-      quantity:         l.quantity,
-      warehouseCode:    l.warehouseCode,
-      costingCode:      l.costingCode,
-      projectCode:      l.projectCode,
-      rubroId:          l.rubroId,
+      itemId: l.itemId,
+      itemCode: l.itemCode,
+      description: l.description,
+      quantity: l.quantity,
+      warehouseCode: l.warehouseCode,
+      costingCode: l.costingCode,
+      projectCode: l.projectCode,
+      rubroId: l.rubroId,
       paqueteTrabajoId: l.paqueteTrabajoId,
     }))
   );
 
-  return await SolicitudCompra.findByPk(consolidada.id, {
+  return SolicitudCompra.findByPk(consolidada.id, {
     include: [{ model: SolicitudCompraLinea, as: "lineas" }],
   });
 }
 
+/* =========================================================
+   GENERAR SOLICITUD ALMACÉN CONSOLIDADA
+========================================================= */
 function _construirMailto({ destinatario, numero, otNumero, lineas }) {
   const subject = encodeURIComponent(
     `Solicitud de Almacén ${numero} - OT ${otNumero}`
   );
-
   const itemsTexto = lineas
-    .map((l, i) => `${i + 1}. [${l.itemCode}] ${l.description} - Cant: ${l.quantity}`)
+    .map(
+      (l, i) =>
+        `${i + 1}. [${l.itemCode}] ${l.description} - Cant: ${l.quantity}`
+    )
     .join("\n");
+  const bodyTexto =
+    `Estimados,\n\nSe solicita la entrega de los siguientes materiales para la OT ${otNumero}:\n\n` +
+    `${itemsTexto}\n\nNúmero de solicitud: ${numero}\n\nSaludos.`;
 
-  const bodyTexto = 
-    `Estimados,\n\n` +
-    `Se solicita la entrega de los siguientes materiales para la OT ${otNumero}:\n\n` +
-    `${itemsTexto}\n\n` +
-    `Número de solicitud: ${numero}\n\n` +
-    `Saludos.`;
-
-  return `mailto:${encodeURIComponent(destinatario)}` +
+  return (
+    `mailto:${encodeURIComponent(destinatario)}` +
     `?subject=${subject}` +
-    `&body=${encodeURIComponent(bodyTexto)}`;
+    `&body=${encodeURIComponent(bodyTexto)}`
+  );
 }
 
 async function generarSolicitudAlmacenOT(ordenTrabajoId, { destinatarioId }) {
-
   if (!destinatarioId) throw new Error("destinatarioId es obligatorio");
 
-  // Verificar que el destinatario existe
   const destinatario = await PersonalCorreo.findByPk(destinatarioId);
   if (!destinatario) throw new Error("Destinatario no encontrado");
-  if (!destinatario.correo) throw new Error("El destinatario no tiene correo registrado");
+  if (!destinatario.correo)
+    throw new Error("El destinatario no tiene correo registrado");
 
   const ot = await OrdenTrabajo.findByPk(ordenTrabajoId);
   if (!ot) throw new Error("OT no encontrada");
@@ -1802,7 +1555,6 @@ async function generarSolicitudAlmacenOT(ordenTrabajoId, { destinatarioId }) {
     throw new Error("Solo se puede generar la solicitud en estado CREADO");
   }
 
-  // Si ya existe consolidada, actualizar destinatario y regenerar mailto
   const yaExiste = await SolicitudAlmacen.findOne({
     where: { ordenTrabajoId, esConsolidada: true },
     include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
@@ -1810,14 +1562,12 @@ async function generarSolicitudAlmacenOT(ordenTrabajoId, { destinatarioId }) {
 
   if (yaExiste) {
     await yaExiste.update({ destinatario_id: destinatarioId });
-
     const mailtoLink = _construirMailto({
       destinatario: destinatario.correo,
-      numero:       yaExiste.numeroSolicitud,
-      otNumero:     ot.numeroOT,
-      lineas:       yaExiste.lineas,
+      numero: yaExiste.numeroSolicitud,
+      otNumero: ot.numeroOT,
+      lineas: yaExiste.lineas,
     });
-
     return {
       solicitud: await SolicitudAlmacen.findByPk(yaExiste.id, {
         include: [
@@ -1829,16 +1579,17 @@ async function generarSolicitudAlmacenOT(ordenTrabajoId, { destinatarioId }) {
     };
   }
 
-  // Traer solicitudes DRAFT para fusionar
   const solicitudes = await SolicitudAlmacen.findAll({
     where: { ordenTrabajoId, esConsolidada: false },
     include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
   });
 
-  if (!solicitudes.length) throw new Error("No hay solicitudes de almacén en esta OT");
+  if (!solicitudes.length)
+    throw new Error("No hay solicitudes de almacén en esta OT");
 
   const { lineas } = _fusionarItemsParaVista(solicitudes);
-  if (!lineas.length) throw new Error("No hay líneas válidas para generar la solicitud");
+  if (!lineas.length)
+    throw new Error("No hay líneas válidas para generar la solicitud");
 
   const ordenVenta = await _obtenerOVdeOT(ordenTrabajoId);
   const numero = await _generarNumeroSolicitudOT({
@@ -1850,33 +1601,26 @@ async function generarSolicitudAlmacenOT(ordenTrabajoId, { destinatarioId }) {
   const base = solicitudes[0];
 
   const consolidada = await SolicitudAlmacen.create({
-    numeroSolicitud:  numero,
+    numeroSolicitud: numero,
     ordenTrabajoId,
-    tratamiento_id:   base.tratamiento_id,
-    esGeneral:        true,
-    esCopia:          false,
-    esConsolidada:    true,
-    docDate:          new Date(),
-    requiredDate:     base.requiredDate,
-    requester:        base.requester,
-    department:       base.department,
-    comments:         base.comments,
-    usuario_id:       base.usuario_id,
-    destinatario_id:  destinatarioId,   // 👈 FK a PersonalCorreo
-    estado:           "DRAFT",          // no va a SAP, pero mantenemos el enum
+    tratamiento_id: base.tratamiento_id,
+    esGeneral: true,
+    esCopia: false,
+    esConsolidada: true,
+    docDate: new Date(),
+    requiredDate: base.requiredDate,
+    usuario_id: base.usuario_id,
+    destinatario_id: destinatarioId,
+    estado: "DRAFT",
   });
 
   await SolicitudAlmacenLinea.bulkCreate(
     lineas.map((l) => ({
       solicitud_almacen_id: consolidada.id,
-      itemId:           l.itemId,
-      itemCode:         l.itemCode,
-      description:      l.description,
-      quantity:         l.quantity,
-      warehouseCode:    l.warehouseCode,
-      costingCode:      l.costingCode,
-      projectCode:      l.projectCode,
-      rubroId:          l.rubroId,
+      itemId: l.itemId, itemCode: l.itemCode,
+      description: l.description, quantity: l.quantity,
+      warehouseCode: l.warehouseCode, costingCode: l.costingCode,
+      projectCode: l.projectCode, rubroId: l.rubroId,
       paqueteTrabajoId: l.paqueteTrabajoId,
     }))
   );
@@ -1890,21 +1634,22 @@ async function generarSolicitudAlmacenOT(ordenTrabajoId, { destinatarioId }) {
 
   const mailtoLink = _construirMailto({
     destinatario: destinatario.correo,
-    numero,
-    otNumero: ot.numeroOT,
-    lineas,
+    numero, otNumero: ot.numeroOT, lineas,
   });
 
   return { solicitud: solicitudCompleta, mailtoLink };
 }
 
+/* =========================================================
+   LIBERAR OT
+========================================================= */
 async function liberarOrdenTrabajo(id) {
-
   const ot = await OrdenTrabajo.findByPk(id);
   if (!ot) throw new Error("OT no encontrada");
-  if (ot.estado !== "CREADO") throw new Error("Solo se puede liberar en estado CREADO");
+  if (ot.estado !== "CREADO")
+    throw new Error("Solo se puede liberar en estado CREADO");
 
-  /* ── COMPRA → SAP ─────────────────────────────────── */
+  // Compra → SAP
   const scConsolidada = await SolicitudCompra.findOne({
     where: { ordenTrabajoId: id, esConsolidada: true, estado: "GENERADA" },
     include: [
@@ -1919,15 +1664,16 @@ async function liberarOrdenTrabajo(id) {
   let resultadoSAP = { success: true, message: "Sin solicitud de compra" };
 
   if (scConsolidada) {
-    resultadoSAP = await enviarSolicitudCompraASAPDesdeObjeto(scConsolidada.toJSON());
-
+    resultadoSAP = await enviarSolicitudCompraASAPDesdeObjeto(
+      scConsolidada.toJSON()
+    );
     await scConsolidada.update({
-      estado:    resultadoSAP.success ? "SENT"  : "ERROR",
+      estado: resultadoSAP.success ? "SENT" : "ERROR",
       sapDocNum: resultadoSAP.success ? resultadoSAP.data?.DocNum : null,
     });
   }
 
-  /* ── ALMACÉN → Outlook ────────────────────────────── */
+  // Almacén → Outlook
   const saConsolidada = await SolicitudAlmacen.findOne({
     where: { ordenTrabajoId: id, esConsolidada: true },
     include: [
@@ -1941,27 +1687,113 @@ async function liberarOrdenTrabajo(id) {
   if (saConsolidada?.destinatario?.correo) {
     mailtoLink = _construirMailto({
       destinatario: saConsolidada.destinatario.correo,
-      numero:       saConsolidada.numeroSolicitud,
-      otNumero:     ot.numeroOT,
-      lineas:       saConsolidada.lineas,
+      numero: saConsolidada.numeroSolicitud,
+      otNumero: ot.numeroOT,
+      lineas: saConsolidada.lineas,
     });
-
-    // Marcar como enviada (en términos del sistema)
     await saConsolidada.update({ estado: "SENT" });
   }
 
-  /* ── LIBERAR ──────────────────────────────────────── */
   await ot.update({ estado: "LIBERADO" });
 
-  return {
-    ot,
-    resultadoSAP,
-    mailtoAlmacen: mailtoLink,
-  };
+  return { ot, resultadoSAP, mailtoAlmacen: mailtoLink };
 }
 
 
 
+/* =========================================================
+   CREAR SOLICITUD COMPRA GENERAL NUEVA PARA UNA OT
+========================================================= */
+async function crearSolicitudCompraGeneralEnOT(ordenTrabajoId, { requiredDate, lineas }, usuarioId) {
+  const ot = await OrdenTrabajo.findByPk(ordenTrabajoId, {
+    include: [{ association: "aviso" }],
+  });
+  if (!ot) throw new Error("OT no encontrada");
+
+  const tratamiento = await Tratamiento.findOne({
+    where: { aviso_id: ot.avisoId },
+  });
+
+  const sc = await SolicitudCompra.create({
+    tratamiento_id: tratamiento?.id || null,
+    ordenTrabajoId,
+    esGeneral: true,
+    esCopia: false,
+    origenSolicitudId: null,
+    docDate: new Date(),
+    requiredDate,
+    usuario_id: usuarioId,
+    estado: "DRAFT",
+  });
+
+  await SolicitudCompraLinea.bulkCreate(
+    lineas.map((l) => ({
+      solicitud_compra_id: sc.id,
+      itemId: l.itemId || null,
+      itemCode: l.itemCode,
+      description: l.description || "",
+      quantity: Number(l.quantity),
+      warehouseCode: l.warehouseCode || "01",
+      costingCode: l.costingCode || null,
+      projectCode: l.projectCode || null,
+      rubroId: l.rubroId,
+      paqueteTrabajoId: l.paqueteTrabajoId,
+    }))
+  );
+
+  return SolicitudCompra.findByPk(sc.id, {
+    include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+  });
+}
+
+/* =========================================================
+   CREAR SOLICITUD ALMACÉN GENERAL NUEVA PARA UNA OT
+========================================================= */
+async function crearSolicitudAlmacenGeneralEnOT(ordenTrabajoId, { requiredDate, lineas }, usuarioId) {
+  const ot = await OrdenTrabajo.findByPk(ordenTrabajoId, {
+    include: [{ association: "aviso" }],
+  });
+  if (!ot) throw new Error("OT no encontrada");
+
+  const tratamiento = await Tratamiento.findOne({
+    where: { aviso_id: ot.avisoId },
+  });
+
+  const sa = await SolicitudAlmacen.create({
+    tratamiento_id: tratamiento?.id || null,
+    ordenTrabajoId,
+    esGeneral: true,
+    esCopia: false,
+    origenSolicitudId: null,
+    docDate: new Date(),
+    requiredDate,
+    usuario_id: usuarioId,
+    estado: "DRAFT",
+  });
+
+  await SolicitudAlmacenLinea.bulkCreate(
+    lineas.map((l) => ({
+      solicitud_almacen_id: sa.id,
+      itemId: l.itemId || null,
+      itemCode: l.itemCode,
+      description: l.description || "",
+      quantity: Number(l.quantity),
+      warehouseCode: l.warehouseCode || "01",
+      costingCode: l.costingCode || null,
+      projectCode: l.projectCode || null,
+      rubroId: l.rubroId,
+      paqueteTrabajoId: l.paqueteTrabajoId,
+    }))
+  );
+
+  return SolicitudAlmacen.findByPk(sa.id, {
+    include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+  });
+}
+
+/* =========================================================
+   EXPORTS
+========================================================= */
 module.exports = {
   crearOrdenTrabajo,
   obtenerOrdenesTrabajo,
@@ -1975,4 +1807,9 @@ module.exports = {
   previewSolicitudesOT,
   generarSolicitudCompraOT,
   generarSolicitudAlmacenOT,
+  // Nuevas — para el modal de solicitud general pendiente
+  obtenerSolicitudesGeneralesPendientes,
+  asignarSolicitudGeneralAOT,
+  crearSolicitudCompraGeneralEnOT,
+  crearSolicitudAlmacenGeneralEnOT,
 };

@@ -147,17 +147,12 @@ const esSolicitudVacia = (solicitud) => {
   const requiredDateVacio =
     !solicitud.requiredDate || !String(solicitud.requiredDate).trim();
 
-  const departmentVacio =
-    !solicitud.department || !String(solicitud.department).trim();
 
-  const requesterVacio =
-    !solicitud.requester || !String(solicitud.requester).trim();
 
   const emailVacio =
     !solicitud.email || !String(solicitud.email).trim();
 
-  const commentsVacio =
-    !solicitud.comments || !String(solicitud.comments).trim();
+
 
   const lineasVacias =
     !Array.isArray(solicitud.lineas) ||
@@ -166,10 +161,9 @@ const esSolicitudVacia = (solicitud) => {
 
   return (
     requiredDateVacio &&
-    departmentVacio &&
-    requesterVacio &&
+  
     emailVacio &&
-    commentsVacio &&
+  
     lineasVacias
   );
 };
@@ -205,23 +199,6 @@ const validarSolicitud = (solicitud, nombreSolicitud) => {
 
   if (!esFechaValida(solicitud.requiredDate)) {
     return `${nombreSolicitud}: requiredDate no tiene un formato de fecha válido`;
-  }
-
-
-  if (
-    solicitud.department !== undefined &&
-    solicitud.department !== null &&
-    typeof solicitud.department !== "string"
-  ) {
-    return `${nombreSolicitud}: department debe ser texto`;
-  }
-
-  if (
-    solicitud.comments !== undefined &&
-    solicitud.comments !== null &&
-    typeof solicitud.comments !== "string"
-  ) {
-    return `${nombreSolicitud}: comments debe ser texto`;
   }
 
   if (!Array.isArray(solicitud.lineas)) {

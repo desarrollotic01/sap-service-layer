@@ -96,7 +96,9 @@ const obtenerOrdenVentaParaTarget = async ({
     );
 
     if (!ov) {
-      throw new Error(`El equipo ${equipoId} no tiene número de OV asociado`);
+      throw new Error(
+        `El equipo ${equipoId} no tiene número de OV asociado (tampoco el aviso)`
+      );
     }
 
     return ov;
@@ -118,7 +120,9 @@ const obtenerOrdenVentaParaTarget = async ({
     );
 
     if (!ov) {
-      throw new Error(`La ubicación técnica ${ubicacionId} no tiene número de OV asociado`);
+      throw new Error(
+        `La ubicación técnica ${ubicacionId} no tiene número de OV asociado (tampoco el aviso)`
+      );
     }
 
     return ov;
@@ -161,15 +165,10 @@ const esSolicitudVacia = (solicitud) => {
   const requiredDateVacio =
     !solicitud.requiredDate || !String(solicitud.requiredDate).trim();
 
-  const emailVacio = !solicitud.email || !String(solicitud.email).trim();
-
-  const requesterVacio =
-    !solicitud.requester || !String(solicitud.requester).trim();
-
   const lineasVacias =
     !Array.isArray(solicitud.lineas) || solicitud.lineas.length === 0;
 
-  return requiredDateVacio && emailVacio && requesterVacio && lineasVacias;
+  return requiredDateVacio && lineasVacias;
 };
 
 const normalizarSolicitudOpcional = (solicitud) => {
@@ -199,13 +198,6 @@ const validarSolicitud = (solicitud, nombre) => {
 
   if (!solicitud.requiredDate || !String(solicitud.requiredDate).trim()) {
     throw new Error(`${nombre}: requiredDate es obligatorio`);
-  }
-
-  if (
-    (!solicitud.requester || !String(solicitud.requester).trim()) &&
-    (!solicitud.email || !String(solicitud.email).trim())
-  ) {
-    throw new Error(`${nombre}: requester o email es obligatorio`);
   }
 
   if (!Array.isArray(solicitud.lineas) || solicitud.lineas.length === 0) {
@@ -328,12 +320,6 @@ const crearSolicitudCompra = async ({
   ubicacionId = null,
   aviso,
 }) => {
-  const requester = String(data.requester || data.email || "").trim();
-
-  if (!requester) {
-    throw new Error("Solicitud de compra: requester o email es obligatorio");
-  }
-
   const ordenVenta = await obtenerOrdenVentaParaTarget({
     aviso,
     equipoId,
@@ -357,9 +343,6 @@ const crearSolicitudCompra = async ({
       esGeneral,
       docDate: new Date(),
       requiredDate: data.requiredDate,
-      department: data.department || null,
-      requester,
-      comments: data.comments || null,
       usuario_id: usuarioId,
       estado: "DRAFT",
     },
@@ -398,12 +381,6 @@ const crearSolicitudAlmacen = async ({
   ubicacionId = null,
   aviso,
 }) => {
-  const requester = String(data.requester || data.email || "").trim();
-
-  if (!requester) {
-    throw new Error("Solicitud de almacén: requester o email es obligatorio");
-  }
-
   const ordenVenta = await obtenerOrdenVentaParaTarget({
     aviso,
     equipoId,
@@ -427,9 +404,6 @@ const crearSolicitudAlmacen = async ({
       esGeneral,
       docDate: new Date(),
       requiredDate: data.requiredDate,
-      department: data.department || null,
-      requester,
-      comments: data.comments || null,
       usuario_id: usuarioId,
       estado: "DRAFT",
     },
@@ -446,8 +420,8 @@ const crearSolicitudAlmacen = async ({
       warehouseCode: l.warehouseCode || "01",
       costingCode: l.costCenter || l.costingCode || null,
       projectCode: l.projectCode || null,
-       rubroId: l.rubroId || null,
-    paqueteTrabajoId: l.paqueteTrabajoId || null,
+      rubroId: l.rubroId || null,
+      paqueteTrabajoId: l.paqueteTrabajoId || null,
     })),
     { transaction: t }
   );
@@ -1039,18 +1013,9 @@ const upsertSolicitud = async ({
 
   let solicitud = await SolicitudCompra.findOne({ where, transaction: t });
 
-  const requester = String(data.requester || data.email || "").trim();
-
-  if (!requester) {
-    throw new Error("Solicitud de compra: requester o email es obligatorio");
-  }
-
   const header = {
     docDate: new Date(),
     requiredDate: data.requiredDate,
-    department: data.department || null,
-    requester,
-    comments: data.comments || null,
     usuario_id: usuarioId,
     estado: "DRAFT",
     tratamiento_id: tratamientoId,
@@ -1075,10 +1040,7 @@ const upsertSolicitud = async ({
     });
 
     solicitud = await SolicitudCompra.create(
-      {
-        ...header,
-        numeroSolicitud,
-      },
+      { ...header, numeroSolicitud },
       { transaction: t }
     );
   } else {
@@ -1101,7 +1063,7 @@ const upsertSolicitud = async ({
       projectCode: l.projectCode || null,
       warehouseCode: l.warehouseCode,
       rubroId: l.rubroId || null,
-paqueteTrabajoId: l.paqueteTrabajoId || null,
+      paqueteTrabajoId: l.paqueteTrabajoId || null,
     })),
     { transaction: t }
   );
@@ -1232,12 +1194,6 @@ const guardarCambiosTratamiento = async ({ tratamientoId, body, usuarioId }) => 
   }
 };
 
-/**
- * GET /avisos/:avisoId/tratamiento/solicitudes-para-ot
- * Devuelve las solicitudes del tratamiento formateadas
- * para que el frontend las muestre y el usuario pueda editar/eliminar líneas
- * antes de crear la OT.
- */
 const obtenerSolicitudesParaOT = async (avisoId) => {
   const tratamiento = await Tratamiento.findOne({
     where: { aviso_id: avisoId },
@@ -1262,11 +1218,8 @@ const obtenerSolicitudesParaOT = async (avisoId) => {
 
     for (const s of lista) {
       const payload = {
-        origenSolicitudId: s.id,         // para trazabilidad
-        requester: s.requester,
+        origenSolicitudId: s.id,
         requiredDate: s.requiredDate,
-        department: s.department,
-        comments: s.comments,
         lineas: (s.lineas || []).map((l) => ({
           itemId: l.itemId,
           itemCode: l.itemCode,
@@ -1305,5 +1258,5 @@ module.exports = {
   crearTratamiento,
   obtenerTratamientoPorAviso,
   guardarCambiosTratamiento,
-  obtenerSolicitudesParaOT,   
+  obtenerSolicitudesParaOT,
 };

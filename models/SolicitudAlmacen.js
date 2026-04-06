@@ -28,20 +28,6 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-      department: {
-        type: DataTypes.STRING,
-        allowNull: true,
-      },
-
-      requester: {
-        type: DataTypes.STRING,
-        allowNull: true,
-      },
-
-      comments: {
-        type: DataTypes.TEXT,
-        allowNull: true,
-      },
 
       docCurrency: {
         type: DataTypes.STRING,
