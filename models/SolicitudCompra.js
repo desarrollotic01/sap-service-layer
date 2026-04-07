@@ -14,6 +14,10 @@ module.exports = (sequelize) => {
   type: DataTypes.STRING,
   allowNull: true,
 },
+esConsolidada: {
+  type: DataTypes.BOOLEAN,
+  defaultValue: false,
+},
 
       // === CABECERA SAP ===
       docDate: {
