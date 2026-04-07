@@ -157,7 +157,8 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
 
   const infoAviso = aviso
     ? {
-        cliente: aviso.clienteData?.nombre || null,
+         cliente: aviso.clienteData?.razonSocial || 
+               aviso.clienteData?.nombre || null,
         direccion: aviso.direccionAtencion || null,
         numeroOV: aviso.ordenVenta || null,
         contacto: {
@@ -209,7 +210,9 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
   where: {
     tratamiento_id: ordenPlain.tratamientoId,
     esGeneral: true,
-    ordenTrabajoId: ordenPlain.id, 
+    ordenTrabajoId: ordenPlain.id,
+        esCopia: false,     
+ 
   },
   include: [{ model: SolicitudCompraLinea, as: "lineas" }],
   order: [["createdAt", "ASC"]],
@@ -255,7 +258,8 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
   where: {
     tratamiento_id: ordenPlain.tratamientoId,
     esGeneral: true,
-    ordenTrabajoId: ordenPlain.id,  // ← AGREGAR ESTO
+    ordenTrabajoId: ordenPlain.id, 
+        esCopia: false,        
   },
   include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
   order: [["createdAt", "ASC"]],
