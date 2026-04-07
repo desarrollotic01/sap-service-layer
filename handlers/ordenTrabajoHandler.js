@@ -461,18 +461,7 @@ async function eliminarOrdenTrabajoHandler(req, res) {
   }
 }
 
-/* =========================================================
-   PATCH LIBERAR
-========================================================= */
-async function liberarOrdenTrabajoHandler(req, res) {
-  try {
-    const { id } = req.params;
-    const ot = await ordenTrabajoController.liberarOrdenTrabajo(id);
-    res.json({ message: "Orden de Trabajo liberada correctamente", data: ot });
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-}
+
 
 /* =========================================================
    GET DETALLE SOLICITUDES TRATAMIENTO POR OT
@@ -679,7 +668,8 @@ module.exports = {
   obtenerOrdenTrabajoPorIdHandler,
   actualizarOrdenTrabajoCompletaHandler,
   eliminarOrdenTrabajoHandler,
-  liberarOrdenTrabajo: liberarOrdenTrabajoHandler,
+  liberarOrdenTrabajoHandler,
+  verificarLiberacionHandler,
   getDetalleSolicitudesTratamientoPorOrdenTrabajoHandler,
   syncSAPOrdenTrabajoHandler,
   obtenerSolicitudesPorOTHandler,
