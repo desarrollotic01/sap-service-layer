@@ -88,6 +88,12 @@ module.exports = (sequelize) => {
   foreignKey: "ordenTrabajoId",
   as: "solicitudesCompra",
 });
+
+
+OrdenTrabajo.hasMany(models.SolicitudAlmacen, {
+  foreignKey: "ordenTrabajoId",
+  as: "solicitudesAlmacen",
+});
 };
 
   return OrdenTrabajo;
