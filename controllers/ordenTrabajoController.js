@@ -107,6 +107,8 @@ const validarActividadesPayload = (equipos = [], tipoMantenimiento = null) => {
  * @param {string} params.usuarioId
  * @param {object} params.t - transacción Sequelize
  */
+// ─── REEMPLAZAR en ordenTrabajoController.js ───────────────────────────────
+
 async function _crearSolicitudesCompraEnOT({
   ordenTrabajoId,
   tratamientoId,
@@ -150,6 +152,23 @@ async function _crearSolicitudesCompraEnOT({
       })),
       { transaction: t }
     );
+
+    // Marcar la solicitud general original del tratamiento como "asignada"
+    // para que no aparezca disponible en el siguiente equipo
+    if (tratamientoId) {
+      await SolicitudCompra.update(
+        { ordenTrabajoId },
+        {
+          where: {
+            tratamiento_id: tratamientoId,
+            esGeneral: true,
+            esCopia: false,
+            ordenTrabajoId: null,
+          },
+          transaction: t,
+        }
+      );
+    }
   }
 
   // POR EQUIPO / UBICACIÓN
@@ -192,9 +211,6 @@ async function _crearSolicitudesCompraEnOT({
   }
 }
 
-/**
- * Igual que la de compra pero para almacén.
- */
 async function _crearSolicitudesAlmacenEnOT({
   ordenTrabajoId,
   tratamientoId,
@@ -210,7 +226,7 @@ async function _crearSolicitudesAlmacenEnOT({
   if (general && Array.isArray(general.lineas) && general.lineas.length > 0) {
     const sa = await SolicitudAlmacen.create(
       {
-                numeroSolicitud: `SA-OT-${Date.now()}`,   // ← AGREGAR
+        numeroSolicitud: `SA-OT-${Date.now()}`,
         tratamiento_id: tratamientoId || null,
         ordenTrabajoId,
         esGeneral: true,
@@ -239,6 +255,23 @@ async function _crearSolicitudesAlmacenEnOT({
       })),
       { transaction: t }
     );
+
+    // Marcar la solicitud general original del tratamiento como "asignada"
+    // para que no aparezca disponible en el siguiente equipo
+    if (tratamientoId) {
+      await SolicitudAlmacen.update(
+        { ordenTrabajoId },
+        {
+          where: {
+            tratamiento_id: tratamientoId,
+            esGeneral: true,
+            esCopia: false,
+            ordenTrabajoId: null,
+          },
+          transaction: t,
+        }
+      );
+    }
   }
 
   // POR EQUIPO / UBICACIÓN
@@ -248,7 +281,7 @@ async function _crearSolicitudesAlmacenEnOT({
 
     const sa = await SolicitudAlmacen.create(
       {
-                numeroSolicitud: `SA-OT-${Date.now()}`,   // ← AGREGAR
+        numeroSolicitud: `SA-OT-${Date.now()}-${key.slice(0, 8)}`,
         tratamiento_id: tratamientoId || null,
         ordenTrabajoId,
         esGeneral: false,
@@ -281,7 +314,6 @@ async function _crearSolicitudesAlmacenEnOT({
     );
   }
 }
-
 /* =========================================================
    HELPER — COPIAR ACTIVIDADES A TARGETS OT
 ========================================================= */
