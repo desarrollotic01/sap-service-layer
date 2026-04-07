@@ -210,6 +210,7 @@ async function _crearSolicitudesAlmacenEnOT({
   if (general && Array.isArray(general.lineas) && general.lineas.length > 0) {
     const sa = await SolicitudAlmacen.create(
       {
+                numeroSolicitud: `SA-OT-${Date.now()}`,   // ← AGREGAR
         tratamiento_id: tratamientoId || null,
         ordenTrabajoId,
         esGeneral: true,
@@ -247,6 +248,7 @@ async function _crearSolicitudesAlmacenEnOT({
 
     const sa = await SolicitudAlmacen.create(
       {
+                numeroSolicitud: `SA-OT-${Date.now()}`,   // ← AGREGAR
         tratamiento_id: tratamientoId || null,
         ordenTrabajoId,
         esGeneral: false,
