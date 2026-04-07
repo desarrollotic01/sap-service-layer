@@ -26,6 +26,10 @@ const {
 } = require("../controllers/ordenTrabajoDetalleController");
 const { Op } = require("sequelize");
 
+
+const {enviarCorreoSolicitudAlmacen,
+} = require("../services/emailService");
+
 /* =========================================================
    HELPERS GENERALES
 ========================================================= */
@@ -1684,63 +1688,367 @@ async function generarSolicitudAlmacenOT(ordenTrabajoId, { destinatarioId }) {
   return { solicitud: solicitudCompleta, mailtoLink };
 }
 
-/* =========================================================
-   LIBERAR OT
-========================================================= */
-async function liberarOrdenTrabajo(id) {
-  const ot = await OrdenTrabajo.findByPk(id);
-  if (!ot) throw new Error("OT no encontrada");
-  if (ot.estado !== "CREADO")
-    throw new Error("Solo se puede liberar en estado CREADO");
 
-  // Compra → SAP
-  const scConsolidada = await SolicitudCompra.findOne({
-    where: { ordenTrabajoId: id, esConsolidada: true, estado: "GENERADA" },
-    include: [
-      {
-        model: SolicitudCompraLinea,
-        as: "lineas",
-        include: [{ association: "rubro" }, { association: "paqueteTrabajo" }],
-      },
-    ],
-  });
-
-  let resultadoSAP = { success: true, message: "Sin solicitud de compra" };
-
-  if (scConsolidada) {
-    resultadoSAP = await enviarSolicitudCompraASAPDesdeObjeto(
-      scConsolidada.toJSON()
-    );
-    await scConsolidada.update({
-      estado: resultadoSAP.success ? "SENT" : "ERROR",
-      sapDocNum: resultadoSAP.success ? resultadoSAP.data?.DocNum : null,
-    });
-  }
-
-  // Almacén → Outlook
-  const saConsolidada = await SolicitudAlmacen.findOne({
-    where: { ordenTrabajoId: id, esConsolidada: true },
+async function _consolidarSolicitudesAlmacen(ordenTrabajoId, ot, destinatarioId) {
+  // ── Verificar si ya existe una consolidada ──────────
+  const yaExiste = await SolicitudAlmacen.findOne({
+    where: { ordenTrabajoId, esConsolidada: true },
     include: [
       { model: SolicitudAlmacenLinea, as: "lineas" },
       { model: PersonalCorreo, as: "destinatario" },
     ],
   });
-
-  let mailtoLink = null;
-
-  if (saConsolidada?.destinatario?.correo) {
-    mailtoLink = _construirMailto({
-      destinatario: saConsolidada.destinatario.correo,
-      numero: saConsolidada.numeroSolicitud,
-      otNumero: ot.numeroOT,
-      lineas: saConsolidada.lineas,
-    });
-    await saConsolidada.update({ estado: "SENT" });
+ 
+  if (yaExiste) {
+    // Actualizar destinatario si cambió
+    if (destinatarioId && yaExiste.destinatario_id !== destinatarioId) {
+      await yaExiste.update({ destinatario_id: destinatarioId });
+    }
+    const dest = await PersonalCorreo.findByPk(
+      destinatarioId || yaExiste.destinatario_id
+    );
+ 
+    let resultadoCorreo = { success: false, error: "Sin destinatario" };
+    if (dest?.correo) {
+      resultadoCorreo = await enviarCorreoSolicitudAlmacen({
+        destinatarioCorreo: dest.correo,
+        destinatarioNombre: dest.nombre,
+        numeroSolicitud: yaExiste.numeroSolicitud,
+        otNumero: ot.numeroOT,
+        lineas: yaExiste.lineas || [],
+      });
+    }
+ 
+    return {
+      solicitud: yaExiste,
+      resultadoCorreo,
+      destinatario: dest || null,
+    };
   }
+ 
+  // ── Traer todas las solicitudes de almacén DRAFT ────
+  const solicitudes = await SolicitudAlmacen.findAll({
+    where: { ordenTrabajoId, esConsolidada: false },
+    include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+    order: [["createdAt", "ASC"]],
+  });
+ 
+  if (!solicitudes.length) return null;
+ 
+  // ── Fusionar líneas ─────────────────────────────────
+  const todasLasLineas = solicitudes.flatMap((s) =>
+    (s.lineas || []).map((l) => ({
+      itemId: l.itemId || null,
+      itemCode: l.itemCode,
+      description: l.description || "",
+      quantity: Number(l.quantity || 0),
+      warehouseCode: l.warehouseCode || "01",
+      costingCode: l.costingCode || null,
+      projectCode: l.projectCode || null,
+      rubroId: l.rubroId || null,
+      paqueteTrabajoId: l.paqueteTrabajoId || null,
+    }))
+  );
+ 
+  if (!todasLasLineas.length) return null;
+ 
+  // ── Generar número SA-OV-001 ────────────────────────
+  const aviso = await Aviso.findByPk(ot.avisoId);
+  const ov = aviso?.ordenVenta || aviso?.numeroOV || "OT";
+  const total = await SolicitudAlmacen.count({
+    where: { numeroSolicitud: { [Op.like]: `SA-${ov}-%` } },
+  });
+  const numero = `SA-${ov}-${String(total + 1).padStart(3, "0")}`;
+ 
+  const base = solicitudes[0];
+ 
+  // ── Crear la consolidada ────────────────────────────
+  const consolidada = await SolicitudAlmacen.create({
+    numeroSolicitud: numero,
+    ordenTrabajoId,
+    tratamiento_id: base.tratamiento_id || null,
+    esGeneral: true,
+    esCopia: false,
+    esConsolidada: true,
+    docDate: new Date(),
+    requiredDate: base.requiredDate || null,
+    usuario_id: base.usuario_id || null,
+    destinatario_id: destinatarioId || null,
+    estado: "DRAFT",
+  });
+ 
+  await SolicitudAlmacenLinea.bulkCreate(
+    todasLasLineas.map((l) => ({
+      solicitud_almacen_id: consolidada.id,
+      itemId: l.itemId,
+      itemCode: l.itemCode,
+      description: l.description,
+      quantity: l.quantity,
+      warehouseCode: l.warehouseCode,
+      costingCode: l.costingCode,
+      projectCode: l.projectCode,
+      rubroId: l.rubroId,
+      paqueteTrabajoId: l.paqueteTrabajoId,
+    }))
+  );
+ 
+  // ── Enviar correo automáticamente ──────────────────
+  let resultadoCorreo = { success: false, error: "Sin destinatario" };
+  let destinatario = null;
+ 
+  if (destinatarioId) {
+    destinatario = await PersonalCorreo.findByPk(destinatarioId);
+    if (destinatario?.correo) {
+      resultadoCorreo = await enviarCorreoSolicitudAlmacen({
+        destinatarioCorreo: destinatario.correo,
+        destinatarioNombre: destinatario.nombre,
+        numeroSolicitud: numero,
+        otNumero: ot.numeroOT,
+        lineas: todasLasLineas,
+      });
+    }
+  }
+ 
+  const solicitudCompleta = await SolicitudAlmacen.findByPk(consolidada.id, {
+    include: [
+      { model: SolicitudAlmacenLinea, as: "lineas" },
+      { model: PersonalCorreo, as: "destinatario" },
+    ],
+  });
+ 
+  return {
+    solicitud: solicitudCompleta,
+    resultadoCorreo,
+    destinatario,
+  };
+}
 
+async function verificarSolicitudesParaLiberar(ordenTrabajoId) {
+  const ot = await OrdenTrabajo.findByPk(ordenTrabajoId);
+  if (!ot) throw new Error("OT no encontrada");
+  if (ot.estado !== "CREADO")
+    throw new Error("Solo se puede liberar en estado CREADO");
+ 
+  const solicitudesCompra = await SolicitudCompra.findAll({
+    where: { ordenTrabajoId, esConsolidada: false },
+    include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+  });
+ 
+  const solicitudesAlmacen = await SolicitudAlmacen.findAll({
+    where: { ordenTrabajoId, esConsolidada: false },
+    include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+  });
+ 
+  const totalLineasCompra = solicitudesCompra.reduce(
+    (acc, s) => acc + (s.lineas?.length || 0), 0
+  );
+  const totalLineasAlmacen = solicitudesAlmacen.reduce(
+    (acc, s) => acc + (s.lineas?.length || 0), 0
+  );
+ 
+  const destinatariosDisponibles = await PersonalCorreo.findAll({
+    attributes: ["id", "nombre", "correo"],
+    order: [["nombre", "ASC"]],
+  });
+ 
+  return {
+    hayCompra: totalLineasCompra > 0,
+    hayAlmacen: totalLineasAlmacen > 0,
+    totalLineasCompra,
+    totalLineasAlmacen,
+    destinatariosDisponibles,
+  };
+}
+ 
+/* =========================================================
+   LIBERAR OT
+   POST /ordenes-trabajo/:id/liberar
+   Body: { destinatarioId?: string }
+========================================================= */
+async function liberarOrdenTrabajo(id, { destinatarioId = null } = {}) {
+  const ot = await OrdenTrabajo.findByPk(id);
+  if (!ot) throw new Error("OT no encontrada");
+  if (ot.estado !== "CREADO")
+    throw new Error("Solo se puede liberar en estado CREADO");
+ 
+  const resultado = {
+    ot: null,
+    compra: {
+      consolidada: null,
+      numeroSolicitud: null,
+      resultadoSAP: null,
+      enviada: false,
+    },
+    almacen: {
+      consolidada: null,
+      numeroSolicitud: null,
+      correoEnviado: false,
+      destinatario: null,
+      errorCorreo: null,
+    },
+  };
+ 
+  /* ─── COMPRA → SAP ──────────────────────────────────── */
+  const solicitudesCompraDraft = await SolicitudCompra.findAll({
+    where: { ordenTrabajoId: id, esConsolidada: false },
+    include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+  });
+ 
+  const hayLineasCompra = solicitudesCompraDraft.some(
+    (s) => (s.lineas?.length || 0) > 0
+  );
+ 
+  if (hayLineasCompra) {
+    // Consolidar todas las solicitudes de compra en una sola
+    const yaExisteCompra = await SolicitudCompra.findOne({
+      where: { ordenTrabajoId: id, esConsolidada: true },
+      include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+    });
+ 
+    let consolidadaCompra = yaExisteCompra;
+ 
+    if (!consolidadaCompra) {
+      // Fusionar todas las líneas
+      const todasLineasCompra = solicitudesCompraDraft.flatMap((s) =>
+        (s.lineas || []).map((l) => ({
+          itemId: l.itemId || null,
+          itemCode: l.itemCode,
+          description: l.description || "",
+          quantity: Number(l.quantity || 0),
+          warehouseCode: l.warehouseCode || "01",
+          costingCode: l.costingCode || null,
+          projectCode: l.projectCode || null,
+          rubroId: l.rubroId || null,
+          paqueteTrabajoId: l.paqueteTrabajoId || null,
+        }))
+      );
+ 
+      if (todasLineasCompra.length > 0) {
+        // Generar número SC-OV-001
+        const aviso = await Aviso.findByPk(ot.avisoId);
+        const ov = aviso?.ordenVenta || aviso?.numeroOV || "OT";
+        const totalSC = await SolicitudCompra.count({
+          where: { numeroSolicitud: { [Op.like]: `SC-${ov}-%` } },
+        });
+        const numeroSC = `SC-${ov}-${String(totalSC + 1).padStart(3, "0")}`;
+ 
+        const base = solicitudesCompraDraft[0];
+        consolidadaCompra = await SolicitudCompra.create({
+          numeroSolicitud: numeroSC,
+          ordenTrabajoId: id,
+          tratamiento_id: base.tratamiento_id || null,
+          esGeneral: true,
+          esCopia: false,
+          esConsolidada: true,
+          docDate: new Date(),
+          requiredDate: base.requiredDate || null,
+          usuario_id: base.usuario_id || null,
+          estado: "DRAFT",
+        });
+ 
+        await SolicitudCompraLinea.bulkCreate(
+          todasLineasCompra.map((l) => ({
+            solicitud_compra_id: consolidadaCompra.id,
+            itemId: l.itemId,
+            itemCode: l.itemCode,
+            description: l.description,
+            quantity: l.quantity,
+            warehouseCode: l.warehouseCode,
+            costingCode: l.costingCode,
+            projectCode: l.projectCode,
+            rubroId: l.rubroId,
+            paqueteTrabajoId: l.paqueteTrabajoId,
+          }))
+        );
+ 
+        consolidadaCompra = await SolicitudCompra.findByPk(consolidadaCompra.id, {
+          include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+        });
+      }
+    }
+ 
+    if (consolidadaCompra) {
+      resultado.compra.consolidada = consolidadaCompra;
+      resultado.compra.numeroSolicitud = consolidadaCompra.numeroSolicitud;
+ 
+      // Enviar a SAP
+      const resultadoSAP = await enviarSolicitudCompraASAPDesdeObjeto(
+        consolidadaCompra.toJSON()
+      );
+ 
+      await consolidadaCompra.update({
+        estado: resultadoSAP.success ? "SENT" : "ERROR",
+        sapDocNum: resultadoSAP.success ? resultadoSAP.data?.DocNum : null,
+      });
+ 
+      resultado.compra.resultadoSAP = resultadoSAP;
+      resultado.compra.enviada = resultadoSAP.success;
+ 
+      // Marcar solicitudes originales
+      if (resultadoSAP.success) {
+        for (const sc of solicitudesCompraDraft) {
+          await sc.update({ estado: "SENT" });
+        }
+      }
+    }
+  }
+ 
+  /* ─── ALMACÉN → CORREO ──────────────────────────────── */
+  const solicitudesAlmacenDraft = await SolicitudAlmacen.findAll({
+    where: { ordenTrabajoId: id, esConsolidada: false },
+    include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+  });
+ 
+  const hayLineasAlmacen = solicitudesAlmacenDraft.some(
+    (s) => (s.lineas?.length || 0) > 0
+  );
+ 
+  if (hayLineasAlmacen) {
+    const resultadoAlmacen = await _consolidarSolicitudesAlmacen(
+      id,
+      ot,
+      destinatarioId
+    );
+ 
+    if (resultadoAlmacen) {
+      const { solicitud, resultadoCorreo, destinatario } = resultadoAlmacen;
+ 
+      resultado.almacen.consolidada = solicitud;
+      resultado.almacen.numeroSolicitud = solicitud?.numeroSolicitud || null;
+      resultado.almacen.correoEnviado = resultadoCorreo.success;
+      resultado.almacen.destinatario = destinatario?.correo || null;
+      resultado.almacen.errorCorreo = resultadoCorreo.success
+        ? null
+        : resultadoCorreo.error;
+ 
+      if (resultadoCorreo.success) {
+        await solicitud.update({ estado: "SENT" });
+        for (const sa of solicitudesAlmacenDraft) {
+          await sa.update({ estado: "SENT" });
+        }
+      }
+    }
+  }
+ 
+  /* ─── LIBERAR OT ────────────────────────────────────── */
   await ot.update({ estado: "LIBERADO" });
-
-  return { ot, resultadoSAP, mailtoAlmacen: mailtoLink };
+ 
+  resultado.ot = await OrdenTrabajo.findByPk(id, {
+    include: [
+      {
+        association: "equipos",
+        include: [
+          { association: "equipo" },
+          { association: "ubicacionTecnica" },
+          { association: "actividades" },
+          { association: "trabajadores", include: ["trabajador"] },
+        ],
+      },
+      { association: "adjuntos" },
+    ],
+  });
+ 
+  return resultado;
 }
 
 
@@ -1844,6 +2152,7 @@ module.exports = {
   obtenerOrdenTrabajoPorId,
   actualizarOrdenTrabajoCompleta,
   eliminarOrdenTrabajo,
+  verificarSolicitudesParaLiberar,
   liberarOrdenTrabajo,
   actualizarOTACierreTecnicoSiCompleta,
   syncSolicitudesCompraOT,

@@ -634,6 +634,42 @@ async function crearSolicitudAlmacenGeneralHandler(req, res) {
     return res.status(400).json({ success: false, message: error.message });
   }
 }
+
+async function verificarLiberacionHandler(req, res) {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ errors: ["id es obligatorio"] });
+ 
+    const data = await ordenTrabajoController.verificarSolicitudesParaLiberar(id);
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error("ERROR VERIFICAR LIBERACION:", error);
+    return res.status(400).json({ success: false, message: error.message });
+  }
+}
+ 
+/* =========================================================
+   POST LIBERAR OT (nueva versión con destinatario)
+========================================================= */
+async function liberarOrdenTrabajoHandler(req, res) {
+  try {
+    const { id } = req.params;
+    const { destinatarioId = null } = req.body || {};
+ 
+    if (!id) return res.status(400).json({ errors: ["id es obligatorio"] });
+ 
+    const data = await ordenTrabajoController.liberarOrdenTrabajo(id, { destinatarioId });
+    return res.json({
+      success: true,
+      message: "Orden de Trabajo liberada correctamente",
+      data,
+    });
+  } catch (error) {
+    console.error("ERROR LIBERAR OT:", error);
+    return res.status(400).json({ success: false, message: error.message });
+  }
+}
+ 
 /* =========================================================
    EXPORTS
 ========================================================= */
@@ -655,4 +691,5 @@ module.exports = {
   asignarSolicitudGeneralAOTHandler,
   crearSolicitudCompraGeneralHandler,
   crearSolicitudAlmacenGeneralHandler,
+  verificarLiberacionHandler,
 };
