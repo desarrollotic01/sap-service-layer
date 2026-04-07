@@ -816,10 +816,9 @@ async function crearOrdenTrabajo(data) {
     }
 
     await aviso.update({ estadoAviso: "con OT" }, { transaction: t });
-    await t.commit();
 
-    // Retornar OTs completas fuera de la transacción
-    return await OrdenTrabajo.findAll({
+    // Traer las OTs dentro de la transacción
+    const resultado = await OrdenTrabajo.findAll({
       where: { id: { [Op.in]: otsCreadas.map((x) => x.id) } },
       include: [
         {
@@ -838,9 +837,20 @@ async function crearOrdenTrabajo(data) {
         { association: "adjuntos" },
       ],
       order: [["createdAt", "DESC"]],
+      transaction: t,  // ← dentro de la transacción
     });
+
+    await t.commit();
+    return resultado;  // ← retornar después del commit
+
   } catch (error) {
-    await t.rollback();
+    try {
+      await t.rollback();
+    } catch (rollbackErr) {
+      if (!rollbackErr.message?.includes('finished with state')) {
+        console.error('Rollback error:', rollbackErr);
+      }
+    }
     throw error;
   }
 }
