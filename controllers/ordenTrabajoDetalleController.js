@@ -205,19 +205,15 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
   /* =========================
      COMPRA GENERAL
   ========================= */
-  const solicitudesCompraGenerales = await SolicitudCompra.findAll({
-    where: {
-      tratamiento_id: ordenPlain.tratamientoId,
-      esGeneral: true,
-    },
-    include: [
-      {
-        model: SolicitudCompraLinea,
-        as: "lineas",
-      },
-    ],
-    order: [["createdAt", "ASC"]],
-  });
+ const solicitudesCompraGenerales = await SolicitudCompra.findAll({
+  where: {
+    tratamiento_id: ordenPlain.tratamientoId,
+    esGeneral: true,
+    ordenTrabajoId: ordenPlain.id, 
+  },
+  include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+  order: [["createdAt", "ASC"]],
+});
 
   /* =========================
      COMPRA ESPECIFICA
@@ -241,38 +237,29 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
   }
 
   const solicitudesCompraEspecificas = compraSpecificOr.length
-    ? await SolicitudCompra.findAll({
-        where: {
-          tratamiento_id: ordenPlain.tratamientoId,
-          esGeneral: false,
-          [Op.or]: compraSpecificOr,
-        },
-        include: [
-          {
-            model: SolicitudCompraLinea,
-            as: "lineas",
-          },
-        ],
-        order: [["createdAt", "ASC"]],
-      })
-    : [];
+  ? await SolicitudCompra.findAll({
+      where: {
+        tratamiento_id: ordenPlain.tratamientoId,
+        esGeneral: false,
+        ordenTrabajoId: ordenPlain.id,  
+      },
+      include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+      order: [["createdAt", "ASC"]],
+    })
+  : [];
 
   /* =========================
      ALMACEN GENERAL
   ========================= */
   const solicitudesAlmacenGenerales = await SolicitudAlmacen.findAll({
-    where: {
-      tratamiento_id: ordenPlain.tratamientoId,
-      esGeneral: true,
-    },
-    include: [
-      {
-        model: SolicitudAlmacenLinea,
-        as: "lineas",
-      },
-    ],
-    order: [["createdAt", "ASC"]],
-  });
+  where: {
+    tratamiento_id: ordenPlain.tratamientoId,
+    esGeneral: true,
+    ordenTrabajoId: ordenPlain.id,  // ← AGREGAR ESTO
+  },
+  include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+  order: [["createdAt", "ASC"]],
+});
 
   /* =========================
      ALMACEN ESPECIFICA
@@ -296,21 +283,16 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
   }
 
   const solicitudesAlmacenEspecificas = almacenSpecificOr.length
-    ? await SolicitudAlmacen.findAll({
-        where: {
-          tratamiento_id: ordenPlain.tratamientoId,
-          esGeneral: false,
-          [Op.or]: almacenSpecificOr,
-        },
-        include: [
-          {
-            model: SolicitudAlmacenLinea,
-            as: "lineas",
-          },
-        ],
-        order: [["createdAt", "ASC"]],
-      })
-    : [];
+  ? await SolicitudAlmacen.findAll({
+      where: {
+        tratamiento_id: ordenPlain.tratamientoId,
+        esGeneral: false,
+        ordenTrabajoId: ordenPlain.id,  // ← solo las de esta OT
+      },
+      include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+      order: [["createdAt", "ASC"]],
+    })
+  : [];
 
   /* =========================
      MAPEO FINAL
