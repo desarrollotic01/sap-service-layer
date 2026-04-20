@@ -36,6 +36,8 @@ const normalizarLinea = (linea = {}, idx = 0) => ({
   warehouseCode: String(linea.warehouseCode || "").trim(),
   costingCode: String(linea.costingCode || linea.costCenter || "").trim() || null,
   projectCode: String(linea.projectCode || "").trim() || null,
+  rubroId: linea.rubroId || null,
+  paqueteTrabajoId: linea.paqueteTrabajoId || null,
   rubroSapCode:
     linea.rubroSapCode === "" ||
     linea.rubroSapCode === null ||
@@ -67,7 +69,9 @@ const validarSolicitudAlmacenPayload = (data) => {
     return "ordenTrabajoId inválido";
   }
 
-  if (!data.requester && !data.email) {
+  // requester/email solo es obligatorio cuando no hay un contexto de OT o tratamiento
+  const tieneContexto = data.ordenTrabajoId || data.tratamiento_id;
+  if (!tieneContexto && !data.requester && !data.email) {
     return "requester o email es obligatorio";
   }
 
@@ -84,6 +88,9 @@ const validarSolicitudAlmacenPayload = (data) => {
       return `quantity inválido en línea ${i + 1}`;
     if (!l.warehouseCode)
       return `warehouseCode es obligatorio en línea ${i + 1}`;
+    if (!l.rubroId) return `rubroId es obligatorio en línea ${i + 1}`;
+    if (!l.paqueteTrabajoId)
+      return `paqueteTrabajoId es obligatorio en línea ${i + 1}`;
   }
 
   return null;
@@ -446,6 +453,14 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
       transaction: t,
     });
 
+    // Normalizar ccEmails: acepta array de strings o string separado por comas
+    let ccEmails = [];
+    if (Array.isArray(data.ccEmails)) {
+      ccEmails = data.ccEmails.map(String).filter(Boolean);
+    } else if (typeof data.ccEmails === "string" && data.ccEmails.trim()) {
+      ccEmails = data.ccEmails.split(",").map((e) => e.trim()).filter(Boolean);
+    }
+
     const solicitud = await SolicitudAlmacen.create(
       {
         usuario_id: usuarioId || null,
@@ -467,8 +482,8 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
 
         destinatario_id: data.destinatario_id || null,
         bloque_id: bloqueId,
+        ccEmails,
 
-        // 🔥 NUEVO
         origen: data.tratamiento_id ? "TRATAMIENTO" : "OT",
         esCopia: data.esCopia || false,
         origenSolicitudId: data.origenSolicitudId || null,
@@ -486,6 +501,8 @@ const createSolicitudAlmacen = async ({ usuarioId, data }) => {
         warehouseCode: l.warehouseCode,
         costingCode: l.costingCode,
         projectCode: l.projectCode,
+        rubroId: l.rubroId,
+        paqueteTrabajoId: l.paqueteTrabajoId,
         rubroSapCode: l.rubroSapCode,
         paqueteTrabajo: l.paqueteTrabajo,
       })),
@@ -531,19 +548,25 @@ async function enviarSolicitudesAlmacenPorCorreo(ordenId) {
   for (const bloqueId in bloques) {
     const grupo = bloques[bloqueId];
 
-    const destinatario = grupo[0]?.destinatario;
+    const primera = grupo[0];
+    const destinatario = primera?.destinatario;
 
     if (!destinatario?.correo) continue;
 
-    await enviarCorreo({
+    const ccEmails = Array.isArray(primera.ccEmails)
+      ? primera.ccEmails.filter(Boolean)
+      : [];
+
+    const resultado = await enviarCorreo({
       to: destinatario.correo,
+      cc: ccEmails,
       subject: `Solicitudes de almacén (Bloque ${bloqueId})`,
       html: buildHtmlBloque(grupo),
     });
 
-    // marcar todas como enviadas
+    // marcar todas como enviadas o con error
     for (const sol of grupo) {
-      await sol.update({ estado: "SENT" });
+      await sol.update({ estado: resultado.success ? "SENT" : "ERROR" });
     }
   }
 
@@ -554,7 +577,7 @@ async function enviarSolicitudesAlmacenPorCorreo(ordenId) {
 
 
 
-const enviarBloqueSolicitudes = async ({ bloqueId, ordenTrabajoId }) => {
+const enviarBloqueSolicitudes = async ({ bloqueId, ordenTrabajoId, destinatarioId = null, ccEmails: ccParam = [] }) => {
   const solicitudes = await SolicitudAlmacen.findAll({
     where: {
       bloque_id: bloqueId,
@@ -570,19 +593,45 @@ const enviarBloqueSolicitudes = async ({ bloqueId, ordenTrabajoId }) => {
     throw new Error("No hay solicitudes en este bloque");
   }
 
-  const destinatario = solicitudes[0]?.destinatario;
+  const primera = solicitudes[0];
+
+  // Resolver destinatario: puede venir como parámetro (post-liberación) o estar en la solicitud
+  let destinatario = primera?.destinatario;
+  if (destinatarioId && (!destinatario || destinatario.id !== destinatarioId)) {
+    destinatario = await PersonalCorreo.findByPk(destinatarioId);
+    // Guardar el destinatario elegido en todas las solicitudes del bloque
+    for (const sol of solicitudes) {
+      await sol.update({ destinatario_id: destinatarioId });
+    }
+  }
 
   if (!destinatario?.correo) {
-    throw new Error("El bloque no tiene destinatario");
+    throw new Error("El bloque no tiene destinatario (TO)");
+  }
+
+  // Resolver CC: prioriza los que vienen del request, luego los guardados en la solicitud
+  const ccEmails =
+    Array.isArray(ccParam) && ccParam.length > 0
+      ? ccParam.filter(Boolean)
+      : Array.isArray(primera.ccEmails)
+      ? primera.ccEmails.filter(Boolean)
+      : [];
+
+  // Persistir ccEmails si se enviaron nuevos
+  if (Array.isArray(ccParam) && ccParam.length > 0) {
+    for (const sol of solicitudes) {
+      await sol.update({ ccEmails });
+    }
   }
 
   const resultado = await enviarCorreo({
     to: destinatario.correo,
+    cc: ccEmails,
     subject: `Solicitudes de almacén (Bloque ${bloqueId})`,
     html: buildHtmlBloque(solicitudes),
   });
 
-  // 🔥 actualizar estado
+  // Actualizar estado de todas las solicitudes del bloque
   for (const sol of solicitudes) {
     await sol.update({
       estado: resultado.success ? "SENT" : "ERROR",
@@ -592,6 +641,9 @@ const enviarBloqueSolicitudes = async ({ bloqueId, ordenTrabajoId }) => {
   return {
     success: resultado.success,
     total: solicitudes.length,
+    destinatario: destinatario.correo,
+    cc: ccEmails,
+    error: resultado.error || undefined,
   };
 };
 
@@ -713,6 +765,59 @@ const getSolicitudesAlmacenByOT = async (ordenTrabajoId) => {
   });
 };
 
+/* =========================================================
+   GET ALL (con paginación y búsqueda por numeroSolicitud)
+========================================================= */
+
+const getAllSolicitudesAlmacen = async (page = 1, limit = 20, search = "") => {
+  const offset = (page - 1) * limit;
+
+  const where = search
+    ? { numeroSolicitud: { [Op.iLike]: `%${search}%` } }
+    : {};
+
+  const response = await SolicitudAlmacen.findAndCountAll({
+    where,
+    attributes: ["id", "numeroSolicitud", "estado", "requiredDate", "docDate", "requester", "esGeneral", "origen", "createdAt"],
+    include: [
+      {
+        model: SolicitudAlmacenLinea,
+        as: "lineas",
+        attributes: ["id", "itemCode", "description", "quantity", "warehouseCode", "costingCode", "projectCode"],
+        required: false,
+      },
+      {
+        model: OrdenTrabajo,
+        as: "ordenTrabajo",
+        attributes: ["id", "numeroOT"],
+        required: false,
+      },
+      {
+        model: Equipo,
+        as: "equipo",
+        attributes: ["id", "nombre"],
+        required: false,
+      },
+      {
+        model: UbicacionTecnica,
+        as: "ubicacionTecnica",
+        attributes: ["id", "nombre"],
+        required: false,
+      },
+    ],
+    order: [["createdAt", "DESC"]],
+    limit,
+    offset,
+  });
+
+  return {
+    data: response.rows,
+    totalCount: response.count,
+    totalPages: Math.ceil(response.count / limit),
+    currentPage: page,
+  };
+};
+
 module.exports = {
   getSolicitudAlmacenById,
   updateSolicitudAlmacen,
@@ -724,4 +829,5 @@ module.exports = {
   // 🔥 NUEVOS (IMPORTANTES)
   clonarSolicitudesAlmacenATrabajo,
   getSolicitudesAlmacenByOT,
+  getAllSolicitudesAlmacen,
 };

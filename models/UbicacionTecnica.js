@@ -37,7 +37,7 @@ module.exports = (sequelize) => {
 
       paisId: {
         type: DataTypes.UUID,
-        allowNull: false,
+        allowNull: true,
       },
 
       sede: {

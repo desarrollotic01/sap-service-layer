@@ -117,6 +117,7 @@ async function crearOrdenTrabajoHandler(req, res) {
       solicitudesCompra,
       solicitudesAlmacen,
       tipoMantenimiento,
+      tipoAviso,
       numeroOT,
       descripcionGeneral,
       estado,
@@ -130,9 +131,11 @@ async function crearOrdenTrabajoHandler(req, res) {
       adjuntos,
     } = req.body || {};
 
+    const esVenta = tipoAviso === "venta";
+
     /* ── Validaciones generales ───────────────────────── */
     if (!avisoId) errors.push("avisoId es requerido");
-    if (!Array.isArray(equipos) || equipos.length === 0)
+    if (!esVenta && (!Array.isArray(equipos) || equipos.length === 0))
       errors.push("Debe incluir al menos un equipo o ubicación técnica");
 
     if (!["GRUPAL", "INDIVIDUAL"].includes(modo))
@@ -197,6 +200,22 @@ async function crearOrdenTrabajoHandler(req, res) {
     }
 
     /* ── Validar estructura de solicitudes (opcional) ─── */
+
+    // Una entrada de solicitud se considera "vacía" si no tiene fecha ni líneas con contenido real.
+    // En ese caso se ignora y no se valida (evita errores cuando el usuario no llenó el formulario).
+    const isEntradaVacia = (entry) => {
+      if (!entry) return true;
+      const hasDate = Boolean(entry.requiredDate);
+      const hasLineas =
+        Array.isArray(entry.lineas) &&
+        entry.lineas.some(
+          (l) =>
+            (l.itemCode?.trim() || l.description?.trim()) &&
+            Number(l.quantity) > 0
+        );
+      return !hasDate && !hasLineas;
+    };
+
     const validarSolicitudesPayload = (solicitudes, label) => {
       if (!solicitudes) return;
       if (typeof solicitudes !== "object" || Array.isArray(solicitudes)) {
@@ -205,11 +224,14 @@ async function crearOrdenTrabajoHandler(req, res) {
       }
       // general puede ser null o un objeto con requiredDate y lineas
       if (solicitudes.general !== undefined && solicitudes.general !== null) {
-        if (!solicitudes.general.requiredDate) {
-          errors.push(`${label}.general: requiredDate es obligatorio`);
-        }
-        if (!Array.isArray(solicitudes.general.lineas) || solicitudes.general.lineas.length === 0) {
-          errors.push(`${label}.general: debe tener al menos una línea`);
+        // Si la entrada general está completamente vacía, se ignora
+        if (!isEntradaVacia(solicitudes.general)) {
+          if (!solicitudes.general.requiredDate) {
+            errors.push(`${label}.general: requiredDate es obligatorio`);
+          }
+          if (!Array.isArray(solicitudes.general.lineas) || solicitudes.general.lineas.length === 0) {
+            errors.push(`${label}.general: debe tener al menos una línea`);
+          }
         }
       }
       // porEquipo
@@ -219,6 +241,8 @@ async function crearOrdenTrabajoHandler(req, res) {
         } else {
           for (const [key, data] of Object.entries(solicitudes.porEquipo)) {
             if (!data) continue;
+            // Si la entrada por equipo está completamente vacía, se ignora
+            if (isEntradaVacia(data)) continue;
             if (!data.requiredDate) {
               errors.push(`${label}.porEquipo[${key}]: requiredDate es obligatorio`);
             }
@@ -487,7 +511,7 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajoHandler(req, res) 
 }
 
 /* =========================================================
-   POST SYNC SAP
+   POST SYNC SAP — COMPRA
 ========================================================= */
 async function syncSAPOrdenTrabajoHandler(req, res) {
   try {
@@ -495,7 +519,29 @@ async function syncSAPOrdenTrabajoHandler(req, res) {
     const result = await ordenTrabajoController.syncSolicitudesCompraOT(id);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(400).json({ success: false, message: error.message });
+  }
+}
+
+/* =========================================================
+   POST SYNC CORREO — ALMACÉN
+========================================================= */
+async function syncAlmacenOrdenTrabajoHandler(req, res) {
+  try {
+    const { id } = req.params;
+    const { destinatarioId } = req.body || {};
+
+    if (!destinatarioId) {
+      return res.status(400).json({
+        success: false,
+        message: "destinatarioId es obligatorio",
+      });
+    }
+
+    const result = await ordenTrabajoController.syncSolicitudesAlmacenOT(id, { destinatarioId });
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
   }
 }
 
@@ -643,11 +689,11 @@ async function verificarLiberacionHandler(req, res) {
 async function liberarOrdenTrabajoHandler(req, res) {
   try {
     const { id } = req.params;
-    const { destinatarioId = null } = req.body || {};
- 
+    const { destinatarioId = null, ccEmails = [] } = req.body || {};
+
     if (!id) return res.status(400).json({ errors: ["id es obligatorio"] });
- 
-    const data = await ordenTrabajoController.liberarOrdenTrabajo(id, { destinatarioId });
+
+    const data = await ordenTrabajoController.liberarOrdenTrabajo(id, { destinatarioId, ccEmails });
     return res.json({
       success: true,
       message: "Orden de Trabajo liberada correctamente",
@@ -682,4 +728,5 @@ module.exports = {
   crearSolicitudCompraGeneralHandler,
   crearSolicitudAlmacenGeneralHandler,
   verificarLiberacionHandler,
+  syncAlmacenOrdenTrabajoHandler,
 };

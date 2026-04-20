@@ -20,6 +20,7 @@ async function obtenerConfig(userId, view) {
         prioridad: "",
         tipoMantenimiento: "",
         solicitante: "",
+        estado: "",
       },
     });
   }
@@ -54,6 +55,7 @@ async function resetFiltros(userId, view) {
       prioridad: "",
       tipoMantenimiento: "",
       solicitante: "",
+      estado: "",
     },
   });
 

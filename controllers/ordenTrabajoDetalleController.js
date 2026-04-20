@@ -5,6 +5,7 @@ const {
   SolicitudAlmacenLinea,
   SolicitudCompra,
   SolicitudCompraLinea,
+  PersonalCorreo,
 } = require("../db_connection");
 
 const {
@@ -258,10 +259,13 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
   where: {
     tratamiento_id: ordenPlain.tratamientoId,
     esGeneral: true,
-    ordenTrabajoId: ordenPlain.id, 
-        esCopia: false,        
+    ordenTrabajoId: ordenPlain.id,
+    esCopia: false,
   },
-  include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+  include: [
+    { model: SolicitudAlmacenLinea, as: "lineas" },
+    { model: PersonalCorreo, as: "destinatario", required: false },
+  ],
   order: [["createdAt", "ASC"]],
 });
 
@@ -291,9 +295,12 @@ async function getDetalleSolicitudesTratamientoPorOrdenTrabajo(ordenTrabajoId) {
       where: {
         tratamiento_id: ordenPlain.tratamientoId,
         esGeneral: false,
-        ordenTrabajoId: ordenPlain.id,  // ← solo las de esta OT
+        ordenTrabajoId: ordenPlain.id,
       },
-      include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+      include: [
+        { model: SolicitudAlmacenLinea, as: "lineas" },
+        { model: PersonalCorreo, as: "destinatario", required: false },
+      ],
       order: [["createdAt", "ASC"]],
     })
   : [];

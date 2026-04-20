@@ -27,8 +27,8 @@ const {
 const { Op } = require("sequelize");
 
 
-const {enviarCorreoSolicitudAlmacen,
-} = require("../services/emailService");
+const { enviarCorreoSolicitudAlmacen, enviarCorreo } = require("../services/emailService");
+const { buildHtmlBloque } = require("../utils/emailTemplates");
 
 /* =========================================================
    HELPERS GENERALES
@@ -111,6 +111,12 @@ const validarActividadesPayload = (equipos = [], tipoMantenimiento = null) => {
  * @param {string} params.usuarioId
  * @param {object} params.t - transacción Sequelize
  */
+const parseRequiredDate = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+};
+
 // ─── REEMPLAZAR en ordenTrabajoController.js ───────────────────────────────
 
 async function _crearSolicitudesCompraEnOT({
@@ -124,8 +130,12 @@ async function _crearSolicitudesCompraEnOT({
 
   const { general, porEquipo = {} } = solicitudes;
 
+  const lineasValidas = (lineas) =>
+    (lineas || []).filter((l) => l.itemCode?.trim() || l.description?.trim());
+
   // GENERAL
-  if (general && Array.isArray(general.lineas) && general.lineas.length > 0) {
+  const generalLineas = lineasValidas(general?.lineas);
+  if (general && generalLineas.length > 0) {
     const sc = await SolicitudCompra.create(
       {
         tratamiento_id: tratamientoId || null,
@@ -134,7 +144,7 @@ async function _crearSolicitudesCompraEnOT({
         esCopia: true,
         origenSolicitudId: general.origenSolicitudId || null,
         docDate: new Date(),
-        requiredDate: general.requiredDate,
+        requiredDate: parseRequiredDate(general.requiredDate),
         usuario_id: usuarioId,
         estado: "DRAFT",
       },
@@ -142,12 +152,12 @@ async function _crearSolicitudesCompraEnOT({
     );
 
     await SolicitudCompraLinea.bulkCreate(
-      general.lineas.map((l) => ({
+      generalLineas.map((l) => ({
         solicitud_compra_id: sc.id,
         itemId: l.itemId || null,
-        itemCode: l.itemCode,
+        itemCode: l.itemCode || "",
         description: l.description || "",
-        quantity: Number(l.quantity),
+        quantity: Number(l.quantity) || 1,
         warehouseCode: l.warehouseCode || "01",
         costingCode: l.costingCode || null,
         projectCode: l.projectCode || null,
@@ -177,8 +187,8 @@ async function _crearSolicitudesCompraEnOT({
 
   // POR EQUIPO / UBICACIÓN
   for (const [key, data] of Object.entries(porEquipo)) {
-    if (!data || !Array.isArray(data.lineas) || data.lineas.length === 0)
-      continue;
+    const equipoLineas = lineasValidas(data?.lineas);
+    if (!data || equipoLineas.length === 0) continue;
 
     const sc = await SolicitudCompra.create(
       {
@@ -190,7 +200,7 @@ async function _crearSolicitudesCompraEnOT({
         equipo_id: data.equipo_id || null,
         ubicacion_tecnica_id: data.ubicacion_tecnica_id || null,
         docDate: new Date(),
-        requiredDate: data.requiredDate,
+        requiredDate: parseRequiredDate(data.requiredDate),
         usuario_id: usuarioId,
         estado: "DRAFT",
       },
@@ -198,12 +208,12 @@ async function _crearSolicitudesCompraEnOT({
     );
 
     await SolicitudCompraLinea.bulkCreate(
-      data.lineas.map((l) => ({
+      equipoLineas.map((l) => ({
         solicitud_compra_id: sc.id,
         itemId: l.itemId || null,
-        itemCode: l.itemCode,
+        itemCode: l.itemCode || "",
         description: l.description || "",
-        quantity: Number(l.quantity),
+        quantity: Number(l.quantity) || 1,
         warehouseCode: l.warehouseCode || "01",
         costingCode: l.costingCode || null,
         projectCode: l.projectCode || null,
@@ -214,6 +224,7 @@ async function _crearSolicitudesCompraEnOT({
     );
   }
 }
+
 
 async function _crearSolicitudesAlmacenEnOT({
   ordenTrabajoId,
@@ -226,8 +237,12 @@ async function _crearSolicitudesAlmacenEnOT({
 
   const { general, porEquipo = {} } = solicitudes;
 
+  const lineasValidas = (lineas) =>
+    (lineas || []).filter((l) => l.itemCode?.trim() || l.description?.trim());
+
   // GENERAL
-  if (general && Array.isArray(general.lineas) && general.lineas.length > 0) {
+  const generalLineas = lineasValidas(general?.lineas);
+  if (general && generalLineas.length > 0) {
     const sa = await SolicitudAlmacen.create(
       {
         numeroSolicitud: `SA-OT-${Date.now()}`,
@@ -237,7 +252,7 @@ async function _crearSolicitudesAlmacenEnOT({
         esCopia: true,
         origenSolicitudId: general.origenSolicitudId || null,
         docDate: new Date(),
-        requiredDate: general.requiredDate,
+        requiredDate: parseRequiredDate(general.requiredDate),
         usuario_id: usuarioId,
         estado: "DRAFT",
       },
@@ -245,12 +260,12 @@ async function _crearSolicitudesAlmacenEnOT({
     );
 
     await SolicitudAlmacenLinea.bulkCreate(
-      general.lineas.map((l) => ({
+      generalLineas.map((l) => ({
         solicitud_almacen_id: sa.id,
         itemId: l.itemId || null,
-        itemCode: l.itemCode,
+        itemCode: l.itemCode || "",
         description: l.description || "",
-        quantity: Number(l.quantity),
+        quantity: Number(l.quantity) || 1,
         warehouseCode: l.warehouseCode || "01",
         costingCode: l.costingCode || null,
         projectCode: l.projectCode || null,
@@ -280,8 +295,8 @@ async function _crearSolicitudesAlmacenEnOT({
 
   // POR EQUIPO / UBICACIÓN
   for (const [key, data] of Object.entries(porEquipo)) {
-    if (!data || !Array.isArray(data.lineas) || data.lineas.length === 0)
-      continue;
+    const equipoLineas = lineasValidas(data?.lineas);
+    if (!data || equipoLineas.length === 0) continue;
 
     const sa = await SolicitudAlmacen.create(
       {
@@ -294,7 +309,7 @@ async function _crearSolicitudesAlmacenEnOT({
         equipo_id: data.equipo_id || null,
         ubicacion_tecnica_id: data.ubicacion_tecnica_id || null,
         docDate: new Date(),
-        requiredDate: data.requiredDate,
+        requiredDate: parseRequiredDate(data.requiredDate),
         usuario_id: usuarioId,
         estado: "DRAFT",
       },
@@ -302,12 +317,12 @@ async function _crearSolicitudesAlmacenEnOT({
     );
 
     await SolicitudAlmacenLinea.bulkCreate(
-      data.lineas.map((l) => ({
+      equipoLineas.map((l) => ({
         solicitud_almacen_id: sa.id,
         itemId: l.itemId || null,
-        itemCode: l.itemCode,
+        itemCode: l.itemCode || "",
         description: l.description || "",
-        quantity: Number(l.quantity),
+        quantity: Number(l.quantity) || 1,
         warehouseCode: l.warehouseCode || "01",
         costingCode: l.costingCode || null,
         projectCode: l.projectCode || null,
@@ -693,13 +708,16 @@ async function crearOrdenTrabajo(data) {
     } = data;
 
     if (!otData.avisoId) throw new Error("avisoId es obligatorio");
-    if (!equipos.length)
-      throw new Error("Debe enviar al menos un equipo o ubicación técnica");
-
-    equipos.forEach(ensureValidTarget);
 
     const aviso = await Aviso.findByPk(otData.avisoId, { transaction: t });
     if (!aviso) throw new Error("Aviso no encontrado");
+
+    const esVenta = aviso.tipoAviso === "venta";
+
+    if (!esVenta && !equipos.length)
+      throw new Error("Debe enviar al menos un equipo o ubicación técnica");
+
+    equipos.forEach(ensureValidTarget);
 
     if (aviso.tipoAviso === "mantenimiento") {
       if (!aviso.tipoMantenimiento)
@@ -709,7 +727,7 @@ async function crearOrdenTrabajo(data) {
       otData.tipoMantenimiento = null;
     }
 
-    await validarTargetsDelAviso(aviso.id, equipos, t);
+    if (!esVenta) await validarTargetsDelAviso(aviso.id, equipos, t);
     validarActividadesPayload(equipos, otData.tipoMantenimiento);
 
     // Obtener tratamientoId si existe
@@ -1025,6 +1043,8 @@ async function obtenerOrdenesTrabajo() {
         ],
       },
       { association: "adjuntos" },
+      { association: "supervisor", attributes: ["id", "nombre", "apellido"] },
+      { association: "aviso", attributes: ["id", "tipoAviso", "numeroAviso"] },
     ],
   });
 }
@@ -1361,42 +1381,215 @@ async function actualizarOTACierreTecnicoSiCompleta(ordenTrabajoId, transaction)
 }
 
 /* =========================================================
-   SYNC SAP
+   SYNC SAP — COMPRA (segunda tanda post-liberación)
+   Solo procesa solicitudes NO consolidadas con estado DRAFT o ERROR,
+   genera un nuevo número SC-OV-XXX y crea un nuevo registro consolidado.
 ========================================================= */
 async function syncSolicitudesCompraOT(id) {
   const ot = await OrdenTrabajo.findByPk(id);
   if (!ot) throw new Error("OT no encontrada");
 
-  const solicitudes = await SolicitudCompra.findAll({
-    where: { ordenTrabajoId: id },
+  // Solo solicitudes DRAFT (no ERROR, no SENT) — evita procesar las ya intentadas
+  const pendientes = await SolicitudCompra.findAll({
+    where: {
+      ordenTrabajoId: id,
+      esConsolidada: false,
+      esCopia: true,
+      estado: "DRAFT",
+    },
     include: [{ model: SolicitudCompraLinea, as: "lineas" }],
   });
 
-  const pendientes = solicitudes.filter(
-    (s) => s.estado === "DRAFT" || s.estado === "ERROR"
-  );
+  if (!pendientes.length) throw new Error("No hay solicitudes DRAFT pendientes para sync");
 
-  if (!pendientes.length) throw new Error("No hay solicitudes pendientes para sync");
+  // Fusionar líneas
+  const { lineas } = _fusionarItemsParaVista(pendientes);
+  if (!lineas.length) throw new Error("No hay líneas válidas para sync");
 
-  const solicitudFusionada = fusionarSolicitudesParaSap(
-    pendientes.map((s) => s.toJSON())
-  );
+  // ── Buscar si ya existe una consolidada en ERROR o DRAFT ──────────────────
+  // Si existe, la reutilizamos (actualizar líneas + reintentar SAP) en vez de duplicar
+  let consolidada = await SolicitudCompra.findOne({
+    where: {
+      ordenTrabajoId: id,
+      esConsolidada: true,
+      estado: { [Op.in]: ["DRAFT", "ERROR"] },
+    },
+  });
 
-  let resultado;
-  if (!solicitudFusionada?.lineas?.length) {
-    resultado = { success: false, message: "Sin líneas válidas" };
+  if (consolidada) {
+    // Reemplazar líneas de la consolidada existente
+    await SolicitudCompraLinea.destroy({
+      where: { solicitud_compra_id: consolidada.id },
+    });
+    await consolidada.update({ estado: "DRAFT", sapDocNum: null });
   } else {
-    resultado = await enviarSolicitudCompraASAPDesdeObjeto(solicitudFusionada);
-  }
-
-  for (const solicitud of pendientes) {
-    await solicitud.update({
-      estado: resultado.success ? "SENT" : "ERROR",
-      sapDocNum: resultado.success ? resultado.data?.DocNum : null,
+    // Crear nueva consolidada
+    const ordenVenta = await _obtenerOVdeOT(id);
+    const numero = await _generarNumeroSolicitudOT({
+      modelo: SolicitudCompra,
+      prefijo: "SC",
+      ordenVenta,
+    });
+    const base = pendientes[0];
+    consolidada = await SolicitudCompra.create({
+      numeroSolicitud: numero,
+      ordenTrabajoId: id,
+      tratamiento_id: base.tratamiento_id || null,
+      esGeneral: true,
+      esCopia: false,
+      esConsolidada: true,
+      docDate: new Date(),
+      requiredDate: base.requiredDate || null,
+      usuario_id: base.usuario_id || null,
+      estado: "DRAFT",
     });
   }
 
-  return { success: resultado.success, procesadas: pendientes.length };
+  await SolicitudCompraLinea.bulkCreate(
+    lineas.map((l) => ({
+      solicitud_compra_id: consolidada.id,
+      itemId: l.itemId || null,
+      itemCode: l.itemCode,
+      description: l.description || "",
+      quantity: l.quantity,
+      warehouseCode: l.warehouseCode || "01",
+      costingCode: l.costingCode || null,
+      projectCode: l.projectCode || null,
+      rubroId: l.rubroId || null,
+      paqueteTrabajoId: l.paqueteTrabajoId || null,
+    }))
+  );
+
+  const consolidadaConLineas = await SolicitudCompra.findByPk(consolidada.id, {
+    include: [{ model: SolicitudCompraLinea, as: "lineas" }],
+  });
+
+  // Enviar a SAP
+  const resultado = await enviarSolicitudCompraASAPDesdeObjeto(
+    consolidadaConLineas.toJSON()
+  );
+
+  // Actualizar estado de la consolidada
+  await consolidada.update({
+    estado: resultado.success ? "SENT" : "ERROR",
+    sapDocNum: resultado.success ? resultado.data?.DocNum : null,
+  });
+
+  // Si fue exitoso, marcar los originales como SENT
+  // Si falló, los originales quedan en DRAFT para poder reintentar
+  if (resultado.success) {
+    for (const sc of pendientes) {
+      await sc.update({ estado: "SENT" });
+    }
+  }
+
+  return {
+    success: resultado.success,
+    numeroSolicitud: consolidada.numeroSolicitud,
+    procesadas: pendientes.length,
+    sapDocNum: resultado.success ? resultado.data?.DocNum : null,
+    error: resultado.success ? undefined : resultado.error,
+  };
+}
+
+/* =========================================================
+   SYNC CORREO — ALMACÉN (segunda tanda post-liberación)
+   Solo procesa solicitudes NO consolidadas con estado DRAFT,
+   genera un nuevo número SA-OV-XXX y envía correo al destinatario.
+========================================================= */
+async function syncSolicitudesAlmacenOT(id, { destinatarioId }) {
+  if (!destinatarioId) throw new Error("destinatarioId es obligatorio");
+
+  const ot = await OrdenTrabajo.findByPk(id);
+  if (!ot) throw new Error("OT no encontrada");
+
+  const destinatario = await PersonalCorreo.findByPk(destinatarioId);
+  if (!destinatario) throw new Error("Destinatario no encontrado");
+  if (!destinatario.correo) throw new Error("El destinatario no tiene correo registrado");
+
+  // Solo las copias OT (no consolidadas) pendientes — excluimos el original del tratamiento
+  const pendientes = await SolicitudAlmacen.findAll({
+    where: {
+      ordenTrabajoId: id,
+      esConsolidada: false,
+      esCopia: true,
+      estado: { [Op.in]: ["DRAFT", "ERROR"] },
+    },
+    include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
+  });
+
+  if (!pendientes.length) throw new Error("No hay solicitudes de almacén pendientes para sync");
+
+  const { lineas } = _fusionarItemsParaVista(pendientes);
+  if (!lineas.length) throw new Error("No hay líneas válidas para sync");
+
+  // Generar nuevo número SA-OV-XXX
+  const ordenVenta = await _obtenerOVdeOT(id);
+  const numero = await _generarNumeroSolicitudOT({
+    modelo: SolicitudAlmacen,
+    prefijo: "SA",
+    ordenVenta,
+  });
+
+  const base = pendientes[0];
+
+  // Crear registro consolidado
+  const consolidada = await SolicitudAlmacen.create({
+    numeroSolicitud: numero,
+    ordenTrabajoId: id,
+    tratamiento_id: base.tratamiento_id || null,
+    esGeneral: true,
+    esCopia: false,
+    esConsolidada: true,
+    docDate: new Date(),
+    requiredDate: base.requiredDate || null,
+    usuario_id: base.usuario_id || null,
+    destinatario_id: destinatarioId,
+    estado: "DRAFT",
+  });
+
+  await SolicitudAlmacenLinea.bulkCreate(
+    lineas.map((l) => ({
+      solicitud_almacen_id: consolidada.id,
+      itemId: l.itemId || null,
+      itemCode: l.itemCode,
+      description: l.description || "",
+      quantity: l.quantity,
+      warehouseCode: l.warehouseCode || "01",
+      costingCode: l.costingCode || null,
+      projectCode: l.projectCode || null,
+      rubroId: l.rubroId || null,
+      paqueteTrabajoId: l.paqueteTrabajoId || null,
+    }))
+  );
+
+  // Enviar correo
+  const resultadoCorreo = await enviarCorreoSolicitudAlmacen({
+    destinatarioCorreo: destinatario.correo,
+    destinatarioNombre: destinatario.nombre,
+    numeroSolicitud: numero,
+    otNumero: ot.numeroOT,
+    lineas,
+  });
+
+  await consolidada.update({
+    estado: resultadoCorreo.success ? "SENT" : "ERROR",
+  });
+
+  if (resultadoCorreo.success) {
+    for (const sa of pendientes) {
+      await sa.update({ estado: "SENT" });
+    }
+  }
+
+  return {
+    success: resultadoCorreo.success,
+    numeroSolicitud: numero,
+    procesadas: pendientes.length,
+    correoEnviado: resultadoCorreo.success,
+    destinatario: destinatario.correo,
+    errorCorreo: resultadoCorreo.success ? null : resultadoCorreo.error,
+  };
 }
 
 /* =========================================================
@@ -1514,7 +1707,7 @@ async function generarSolicitudCompraOT(ordenTrabajoId) {
   }
 
   const solicitudes = await SolicitudCompra.findAll({
-    where: { ordenTrabajoId, esConsolidada: false },
+    where: { ordenTrabajoId, esConsolidada: false, esCopia: true },
     include: [{ model: SolicitudCompraLinea, as: "lineas" }],
   });
 
@@ -1628,7 +1821,7 @@ async function generarSolicitudAlmacenOT(ordenTrabajoId, { destinatarioId }) {
   }
 
   const solicitudes = await SolicitudAlmacen.findAll({
-    where: { ordenTrabajoId, esConsolidada: false },
+    where: { ordenTrabajoId, esConsolidada: false, esCopia: true },
     include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
   });
 
@@ -1689,7 +1882,10 @@ async function generarSolicitudAlmacenOT(ordenTrabajoId, { destinatarioId }) {
 }
 
 
-async function _consolidarSolicitudesAlmacen(ordenTrabajoId, ot, destinatarioId) {
+async function _consolidarSolicitudesAlmacen(ordenTrabajoId, ot, destinatarioId, ccEmails = []) {
+  // Normalizar CC
+  const ccArray = Array.isArray(ccEmails) ? ccEmails.filter(Boolean) : [];
+
   // ── Verificar si ya existe una consolidada ──────────
   const yaExiste = await SolicitudAlmacen.findOne({
     where: { ordenTrabajoId, esConsolidada: true },
@@ -1698,27 +1894,30 @@ async function _consolidarSolicitudesAlmacen(ordenTrabajoId, ot, destinatarioId)
       { model: PersonalCorreo, as: "destinatario" },
     ],
   });
- 
+
   if (yaExiste) {
-    // Actualizar destinatario si cambió
+    // Actualizar destinatario y CC si cambiaron
+    const updateData = {};
     if (destinatarioId && yaExiste.destinatario_id !== destinatarioId) {
-      await yaExiste.update({ destinatario_id: destinatarioId });
+      updateData.destinatario_id = destinatarioId;
     }
+    if (ccArray.length > 0) updateData.ccEmails = ccArray;
+    if (Object.keys(updateData).length) await yaExiste.update(updateData);
+
     const dest = await PersonalCorreo.findByPk(
       destinatarioId || yaExiste.destinatario_id
     );
- 
+
     let resultadoCorreo = { success: false, error: "Sin destinatario" };
     if (dest?.correo) {
-      resultadoCorreo = await enviarCorreoSolicitudAlmacen({
-        destinatarioCorreo: dest.correo,
-        destinatarioNombre: dest.nombre,
-        numeroSolicitud: yaExiste.numeroSolicitud,
-        otNumero: ot.numeroOT,
-        lineas: yaExiste.lineas || [],
+      resultadoCorreo = await enviarCorreo({
+        to: dest.correo,
+        cc: ccArray.length > 0 ? ccArray : (yaExiste.ccEmails || []),
+        subject: `Solicitud de Almacén ${yaExiste.numeroSolicitud} - OT ${ot.numeroOT}`,
+        html: buildHtmlBloque([{ ...yaExiste.toJSON(), lineas: yaExiste.lineas }]),
       });
     }
- 
+
     return {
       solicitud: yaExiste,
       resultadoCorreo,
@@ -1726,9 +1925,9 @@ async function _consolidarSolicitudesAlmacen(ordenTrabajoId, ot, destinatarioId)
     };
   }
  
-  // ── Traer todas las solicitudes de almacén DRAFT ────
+  // ── Traer solo las copias OT (esCopia: true) DRAFT — excluir el original del tratamiento ──
   const solicitudes = await SolicitudAlmacen.findAll({
-    where: { ordenTrabajoId, esConsolidada: false },
+    where: { ordenTrabajoId, esConsolidada: false, esCopia: true },
     include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
     order: [["createdAt", "ASC"]],
   });
@@ -1774,6 +1973,7 @@ async function _consolidarSolicitudesAlmacen(ordenTrabajoId, ot, destinatarioId)
     requiredDate: base.requiredDate || null,
     usuario_id: base.usuario_id || null,
     destinatario_id: destinatarioId || null,
+    ccEmails: ccArray,
     estado: "DRAFT",
   });
  
@@ -1799,12 +1999,16 @@ async function _consolidarSolicitudesAlmacen(ordenTrabajoId, ot, destinatarioId)
   if (destinatarioId) {
     destinatario = await PersonalCorreo.findByPk(destinatarioId);
     if (destinatario?.correo) {
-      resultadoCorreo = await enviarCorreoSolicitudAlmacen({
-        destinatarioCorreo: destinatario.correo,
-        destinatarioNombre: destinatario.nombre,
-        numeroSolicitud: numero,
-        otNumero: ot.numeroOT,
-        lineas: todasLasLineas,
+      resultadoCorreo = await enviarCorreo({
+        to: destinatario.correo,
+        cc: ccArray,
+        subject: `Solicitud de Almacén ${numero} - OT ${ot.numeroOT}`,
+        html: buildHtmlBloque([{
+          numeroSolicitud: numero,
+          requester: base.requester,
+          requiredDate: base.requiredDate,
+          lineas: todasLasLineas,
+        }]),
       });
     }
   }
@@ -1865,7 +2069,7 @@ async function verificarSolicitudesParaLiberar(ordenTrabajoId) {
    POST /ordenes-trabajo/:id/liberar
    Body: { destinatarioId?: string }
 ========================================================= */
-async function liberarOrdenTrabajo(id, { destinatarioId = null } = {}) {
+async function liberarOrdenTrabajo(id, { destinatarioId = null, ccEmails = [] } = {}) {
   const ot = await OrdenTrabajo.findByPk(id);
   if (!ot) throw new Error("OT no encontrada");
   if (ot.estado !== "CREADO")
@@ -1890,7 +2094,7 @@ async function liberarOrdenTrabajo(id, { destinatarioId = null } = {}) {
  
   /* ─── COMPRA → SAP ──────────────────────────────────── */
   const solicitudesCompraDraft = await SolicitudCompra.findAll({
-    where: { ordenTrabajoId: id, esConsolidada: false },
+    where: { ordenTrabajoId: id, esConsolidada: false, esCopia: true },
     include: [{ model: SolicitudCompraLinea, as: "lineas" }],
   });
  
@@ -1995,7 +2199,7 @@ async function liberarOrdenTrabajo(id, { destinatarioId = null } = {}) {
  
   /* ─── ALMACÉN → CORREO ──────────────────────────────── */
   const solicitudesAlmacenDraft = await SolicitudAlmacen.findAll({
-    where: { ordenTrabajoId: id, esConsolidada: false },
+    where: { ordenTrabajoId: id, esConsolidada: false, esCopia: true },
     include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
   });
  
@@ -2007,7 +2211,8 @@ async function liberarOrdenTrabajo(id, { destinatarioId = null } = {}) {
     const resultadoAlmacen = await _consolidarSolicitudesAlmacen(
       id,
       ot,
-      destinatarioId
+      destinatarioId,
+      ccEmails
     );
  
     if (resultadoAlmacen) {
@@ -2156,6 +2361,7 @@ module.exports = {
   liberarOrdenTrabajo,
   actualizarOTACierreTecnicoSiCompleta,
   syncSolicitudesCompraOT,
+  syncSolicitudesAlmacenOT,
   obtenerSolicitudesPorOT,
   previewSolicitudesOT,
   generarSolicitudCompraOT,

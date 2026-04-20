@@ -88,8 +88,10 @@ if (!data.tratamiento_id && !data.ordenTrabajoId) {
     return "Una solicitud individual debe tener equipo_id o ubicacion_tecnica_id";
   }
 
+  // requester/email solo es obligatorio cuando no hay contexto de OT o tratamiento
+  const tieneContexto = data.ordenTrabajoId || data.tratamiento_id;
   const requester = String(data.requester || data.email || "").trim();
-  if (!requester) {
+  if (!tieneContexto && !requester) {
     return "requester o email es obligatorio";
   }
 
@@ -239,7 +241,8 @@ if (data.tratamiento_id) {
     }
 
     const requester = String(data.requester || data.email || "").trim();
-    if (!requester) {
+    // requester solo es obligatorio cuando no hay contexto de OT o tratamiento
+    if (!requester && !data.ordenTrabajoId && !data.tratamiento_id) {
       throw new Error("requester o email es obligatorio");
     }
 
@@ -481,9 +484,63 @@ const getSolicitudCompraById = async (id) => {
   });
 };
 
+/* =========================================================
+   GET ALL (con paginación y búsqueda por numeroSolicitud)
+========================================================= */
+
+const getAllSolicitudesCompra = async (page = 1, limit = 20, search = "") => {
+  const offset = (page - 1) * limit;
+
+  const where = search
+    ? { numeroSolicitud: { [Op.iLike]: `%${search}%` } }
+    : {};
+
+  const response = await SolicitudCompra.findAndCountAll({
+    where,
+    attributes: ["id", "numeroSolicitud", "estado", "requiredDate", "docDate", "docCurrency", "esGeneral", "origen", "createdAt"],
+    include: [
+      {
+        model: SolicitudCompraLinea,
+        as: "lineas",
+        attributes: ["id", "itemCode", "description", "quantity", "warehouseCode", "costingCode", "projectCode"],
+        required: false,
+      },
+      {
+        model: OrdenTrabajo,
+        as: "ordenTrabajo",
+        attributes: ["id", "numeroOT"],
+        required: false,
+      },
+      {
+        model: Equipo,
+        as: "equipo",
+        attributes: ["id", "nombre"],
+        required: false,
+      },
+      {
+        model: UbicacionTecnica,
+        as: "ubicacionTecnica",
+        attributes: ["id", "nombre"],
+        required: false,
+      },
+    ],
+    order: [["createdAt", "DESC"]],
+    limit,
+    offset,
+  });
+
+  return {
+    data: response.rows,
+    totalCount: response.count,
+    totalPages: Math.ceil(response.count / limit),
+    currentPage: page,
+  };
+};
+
 module.exports = {
   createSolicitudCompra,
   updateSolicitudCompra,
   enviarSolicitudGeneral,
   getSolicitudCompraById,
+  getAllSolicitudesCompra,
 };

@@ -1,34 +1,53 @@
-
 const socketIo = require("socket.io");
 
-// Mapa para almacenar los sockets de los usuarios
+// Mapa: alias -> { socket, connectedAt }
 const userSockets = new Map();
 
-let io; // Declaramos io como variable global en este módulo
+let io;
 
-function initializeSocket(server) {
-    io = socketIo(server);
-
-    io.on("connection", (socket) => {
-        console.log(`Nuevo cliente conectado: ${socket.id}`);
-
-        // Evento de registro: asociamos el socket con el usuario
-        socket.on("register", (userName) => {
-            console.log("registro:",userName);
-            userSockets.set(userName, socket); // Asocia el ID de usuario con el socket
-        });
-
-        // Desconexión: eliminamos el socket del mapa
-        socket.on("disconnect", () => {
-            userSockets.forEach((value, key) => {
-                console.log("DESCONECTO PAPI");
-                if (value.id === socket.id) {
-                    userSockets.delete(key); // Elimina el socket asociado al userName
-                }
-            });
-            console.log(`Cliente desconectado: ${socket.id}`);
-        });
-    });
+function broadcastConnectedUsers() {
+  const list = getConnectedUsers();
+  io.emit("connectedUsers", list);
 }
 
-module.exports = { initializeSocket, userSockets };
+function getConnectedUsers() {
+  return Array.from(userSockets.entries()).map(([alias, data]) => ({
+    alias,
+    connectedAt: data.connectedAt,
+    socketId: data.socket.id,
+  }));
+}
+
+function initializeSocket(server) {
+  io = socketIo(server, {
+    cors: { origin: "*" },
+  });
+
+  io.on("connection", (socket) => {
+    console.log(`Nuevo cliente conectado: ${socket.id}`);
+
+    // El frontend emite "register" con el alias del usuario luego de loguearse
+    socket.on("register", (alias) => {
+      console.log("register:", alias);
+      userSockets.set(alias, { socket, connectedAt: new Date() });
+      broadcastConnectedUsers();
+    });
+
+    // El frontend puede pedir la lista en cualquier momento
+    socket.on("getConnectedUsers", () => {
+      socket.emit("connectedUsers", getConnectedUsers());
+    });
+
+    socket.on("disconnect", () => {
+      userSockets.forEach((data, alias) => {
+        if (data.socket.id === socket.id) {
+          userSockets.delete(alias);
+        }
+      });
+      console.log(`Cliente desconectado: ${socket.id}`);
+      broadcastConnectedUsers();
+    });
+  });
+}
+
+module.exports = { initializeSocket, userSockets, getConnectedUsers };

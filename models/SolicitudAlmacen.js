@@ -25,7 +25,7 @@ module.exports = (sequelize) => {
 
       requiredDate: {
         type: DataTypes.DATEONLY,
-        allowNull: false,
+        allowNull: true,
       },
 
 
@@ -59,7 +59,7 @@ module.exports = (sequelize) => {
 
       tratamiento_id: {
         type: DataTypes.UUID,
-        allowNull: false,
+        allowNull: true,
       },
 
       equipo_id: {
@@ -110,6 +110,14 @@ origenSolicitudId: {
 esConsolidada: {
   type: DataTypes.BOOLEAN,
   defaultValue: false,
+},
+
+// Correos en copia (CC) para el envío de la solicitud de almacén
+// Array de strings: ["correo1@empresa.com", "correo2@empresa.com"]
+ccEmails: {
+  type: DataTypes.JSONB,
+  allowNull: true,
+  defaultValue: [],
 },
     },
     {

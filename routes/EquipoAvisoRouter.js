@@ -1,13 +1,6 @@
 const express = require("express");
 const router = express.Router();
-
-const auth = require("../middlewares/auth");   
 const EquipoAvisoHandler = require("../handlers/EquipoAvisoHandler");
-const e = require("express");
-// Rutas para gestionar la relación entre Equipos y Avisos
-router.get(
-  "/:avisoId/equipos-disponibles", auth, EquipoAvisoHandler.getEquiposDisponiblesHandler
-);
-
-
+const roleAuth = require("../checkers/roleAuth");
+router.get("/:avisoId/equipos-disponibles", roleAuth(["all_access","read_equipos","read_avisos"]), EquipoAvisoHandler.getEquiposDisponiblesHandler);
 module.exports = router;

@@ -1,19 +1,10 @@
 const { Router } = require("express");
-const {
-  crearPais,
-  listarPaises,
-  obtenerPais,
-  actualizarPais,
-  eliminarPais,
-} = require("../handlers/paisHandler");
-
+const { crearPais, listarPaises, obtenerPais, actualizarPais, eliminarPais } = require("../handlers/paisHandler");
+const roleAuth = require("../checkers/roleAuth");
 const router = Router();
-const auth = require("../middlewares/auth")
-
-router.post("/",auth ,crearPais);
-router.get("/",auth, listarPaises);
-router.get("/:id",auth, obtenerPais);
-router.put("/:id",auth, actualizarPais);
-router.delete("/:id",auth, eliminarPais);
-
+router.post("/", roleAuth(["all_access","create_paises"]), crearPais);
+router.get("/", roleAuth(["all_access","read_paises"]), listarPaises);
+router.get("/:id", roleAuth(["all_access","read_paises"]), obtenerPais);
+router.put("/:id", roleAuth(["all_access","update_paises"]), actualizarPais);
+router.delete("/:id", roleAuth(["all_access","delete_paises"]), eliminarPais);
 module.exports = router;

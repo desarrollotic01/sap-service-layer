@@ -48,7 +48,7 @@ module.exports = (sequelize) => {
 
       rubroId: {
         type: DataTypes.UUID,
-        allowNull: false,
+        allowNull: true,
       },
 
       paqueteTrabajoId: {

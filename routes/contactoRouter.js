@@ -1,23 +1,11 @@
 const express = require("express");
 const router = express.Router();
-
-const {
-  crearContactoHandler,
-  obtenerContactosHandler,
-  obtenerContactosPorClienteHandler,
-  obtenerContactoPorIdHandler,
-  actualizarContactoHandler,
-  eliminarContactoHandler,
-} = require("../handlers/contactoHandler");
-
-const auth = require("../middlewares/auth");
-
-
-router.post("/", auth, crearContactoHandler);
-router.get("/", auth, obtenerContactosHandler);
-router.get("/cliente/:clienteId", auth, obtenerContactosPorClienteHandler);
-router.get("/:id", auth, obtenerContactoPorIdHandler);
-router.put("/:id", auth, actualizarContactoHandler);
-router.delete("/:id", auth, eliminarContactoHandler);
-
+const { crearContactoHandler, obtenerContactosHandler, obtenerContactosPorClienteHandler, obtenerContactoPorIdHandler, actualizarContactoHandler, eliminarContactoHandler } = require("../handlers/contactoHandler");
+const roleAuth = require("../checkers/roleAuth");
+router.post("/", roleAuth(["all_access","create_contactos"]), crearContactoHandler);
+router.get("/", roleAuth(["all_access","read_contactos"]), obtenerContactosHandler);
+router.get("/cliente/:clienteId", roleAuth(["all_access","read_contactos"]), obtenerContactosPorClienteHandler);
+router.get("/:id", roleAuth(["all_access","read_contactos"]), obtenerContactoPorIdHandler);
+router.put("/:id", roleAuth(["all_access","update_contactos"]), actualizarContactoHandler);
+router.delete("/:id", roleAuth(["all_access","delete_contactos"]), eliminarContactoHandler);
 module.exports = router;

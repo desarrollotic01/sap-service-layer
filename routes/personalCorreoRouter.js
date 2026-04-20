@@ -1,12 +1,10 @@
 const { Router } = require("express");
 const controller = require("../controllers/personalCorreoController");
-
+const roleAuth = require("../checkers/roleAuth");
 const router = Router();
-
-router.get("/", controller.getAll);
-router.get("/:id", controller.getById);
-router.post("/", controller.create);
-router.put("/:id", controller.update);
-router.delete("/:id", controller.remove);
-
+router.get("/", roleAuth(["all_access","read_personal_correo"]), controller.getAll);
+router.get("/:id", roleAuth(["all_access","read_personal_correo"]), controller.getById);
+router.post("/", roleAuth(["all_access","create_personal_correo"]), controller.create);
+router.put("/:id", roleAuth(["all_access","update_personal_correo"]), controller.update);
+router.delete("/:id", roleAuth(["all_access","delete_personal_correo"]), controller.remove);
 module.exports = router;

@@ -1,43 +1,17 @@
 const express = require("express");
 const router = express.Router();
-
-const {
-  CreateSedeHandler,
-  GetAllSedesHandler,
-  GetSedeByIdHandler,
-  GetSedesByClienteIdHandler,
-  UpdateSedeHandler,
-  DeleteSedeHandler,
-  AsignarEquiposASedeHandler,
-  QuitarEquipoDeSedeHandler,
-  GetEquiposPorSedeHandler,
-  AsignarUbicacionesTecnicasASedeHandler,
-  QuitarUbicacionTecnicaDeSedeHandler,
-  GetUbicacionesTecnicasPorSedeHandler,
-} = require("../handlers/sedeHandler");
-
-router.post("/", CreateSedeHandler);
-router.get("/", GetAllSedesHandler);
-router.get("/cliente/:clienteId", GetSedesByClienteIdHandler);
-router.get("/:id", GetSedeByIdHandler);
-router.put("/:id", UpdateSedeHandler);
-router.delete("/:id", DeleteSedeHandler);
-
-router.put("/:sedeId/asignar-equipos", AsignarEquiposASedeHandler);
-router.put("/:sedeId/quitar-equipo/:equipoId", QuitarEquipoDeSedeHandler);
-router.get("/:sedeId/equipos", GetEquiposPorSedeHandler);
-
-router.put(
-  "/:sedeId/asignar-ubicaciones-tecnicas",
-  AsignarUbicacionesTecnicasASedeHandler
-);
-router.put(
-  "/:sedeId/quitar-ubicacion-tecnica/:ubicacionId",
-  QuitarUbicacionTecnicaDeSedeHandler
-);
-router.get(
-  "/:sedeId/ubicaciones-tecnicas",
-  GetUbicacionesTecnicasPorSedeHandler
-);
-
+const { CreateSedeHandler, GetAllSedesHandler, GetSedeByIdHandler, GetSedesByClienteIdHandler, UpdateSedeHandler, DeleteSedeHandler, AsignarEquiposASedeHandler, QuitarEquipoDeSedeHandler, GetEquiposPorSedeHandler, AsignarUbicacionesTecnicasASedeHandler, QuitarUbicacionTecnicaDeSedeHandler, GetUbicacionesTecnicasPorSedeHandler } = require("../handlers/sedeHandler");
+const roleAuth = require("../checkers/roleAuth");
+router.post("/", roleAuth(["all_access","create_sedes"]), CreateSedeHandler);
+router.get("/", roleAuth(["all_access","read_sedes"]), GetAllSedesHandler);
+router.get("/cliente/:clienteId", roleAuth(["all_access","read_sedes"]), GetSedesByClienteIdHandler);
+router.get("/:id", roleAuth(["all_access","read_sedes"]), GetSedeByIdHandler);
+router.put("/:id", roleAuth(["all_access","update_sedes"]), UpdateSedeHandler);
+router.delete("/:id", roleAuth(["all_access","delete_sedes"]), DeleteSedeHandler);
+router.put("/:sedeId/asignar-equipos", roleAuth(["all_access","update_sedes"]), AsignarEquiposASedeHandler);
+router.put("/:sedeId/quitar-equipo/:equipoId", roleAuth(["all_access","update_sedes"]), QuitarEquipoDeSedeHandler);
+router.get("/:sedeId/equipos", roleAuth(["all_access","read_sedes"]), GetEquiposPorSedeHandler);
+router.put("/:sedeId/asignar-ubicaciones-tecnicas", roleAuth(["all_access","update_sedes"]), AsignarUbicacionesTecnicasASedeHandler);
+router.put("/:sedeId/quitar-ubicacion-tecnica/:ubicacionId", roleAuth(["all_access","update_sedes"]), QuitarUbicacionTecnicaDeSedeHandler);
+router.get("/:sedeId/ubicaciones-tecnicas", roleAuth(["all_access","read_sedes"]), GetUbicacionesTecnicasPorSedeHandler);
 module.exports = router;

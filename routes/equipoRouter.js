@@ -1,25 +1,14 @@
 const { Router } = require("express");
-const {
-  crearEquipo,
-  listarEquipos,
-  obtenerEquipo,
-  actualizarEquipo,
-  eliminarEquipo,
-  obtenerPlanesMantenimientoEquipo,
-  getEquiposByClienteIdHandler,
-  actualizarAdjuntosPortalEquipoHandler
-} = require("../handlers/equipoHandler");
+const { crearEquipo, listarEquipos, obtenerEquipo, actualizarEquipo, eliminarEquipo, obtenerPlanesMantenimientoEquipo, getEquiposByClienteIdHandler, actualizarAdjuntosPortalEquipoHandler } = require("../handlers/equipoHandler");
 const uploadEquipoAdjuntos = require("../middlewares/uploadEquipoAdjuntos");
-
+const roleAuth = require("../checkers/roleAuth");
 const router = Router();
-
-router.post("/", uploadEquipoAdjuntos.array("adjuntos"), crearEquipo);
-router.get("/", listarEquipos);
-router.get("/:id", obtenerEquipo);
-router.put("/:id", uploadEquipoAdjuntos.array("adjuntos"), actualizarEquipo);
-router.delete("/:id", eliminarEquipo);
-router.get("/:id/planes-mantenimiento", obtenerPlanesMantenimientoEquipo);
-router.get("/cliente/:clienteId", getEquiposByClienteIdHandler);
-router.put("/:equipoId/adjuntos-portal", actualizarAdjuntosPortalEquipoHandler);
-
+router.post("/", roleAuth(["all_access","create_equipos"]), uploadEquipoAdjuntos.array("adjuntos"), crearEquipo);
+router.get("/", roleAuth(["all_access","read_equipos"]), listarEquipos);
+router.get("/cliente/:clienteId", roleAuth(["all_access","read_equipos"]), getEquiposByClienteIdHandler);
+router.get("/:id", roleAuth(["all_access","read_equipos"]), obtenerEquipo);
+router.put("/:id", roleAuth(["all_access","update_equipos"]), uploadEquipoAdjuntos.array("adjuntos"), actualizarEquipo);
+router.delete("/:id", roleAuth(["all_access","delete_equipos"]), eliminarEquipo);
+router.get("/:id/planes-mantenimiento", roleAuth(["all_access","read_equipos","read_planes"]), obtenerPlanesMantenimientoEquipo);
+router.put("/:equipoId/adjuntos-portal", roleAuth(["all_access","update_equipos"]), actualizarAdjuntosPortalEquipoHandler);
 module.exports = router;

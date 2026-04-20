@@ -2,21 +2,13 @@ const express = require("express");
 const router = express.Router();
 const handler = require("../handlers/solicitudCompraHttpHandler");
 const update = require("../handlers/solicitudCompraHandler");
-const auth = require("../middlewares/auth");
-
-const {
-  enviarSolicitudCompraASAPHandler,
-} = require("../handlers/enviarSolicitudCompraSAPHandler");
-
+const { enviarSolicitudCompraASAPHandler } = require("../handlers/enviarSolicitudCompraSAPHandler");
+const roleAuth = require("../checkers/roleAuth");
 router.post("/:id/enviar-sap", enviarSolicitudCompraASAPHandler);
-
-router.post("/", auth, handler.createSolicitudHandler);
-router.get("/", auth, handler.getSolicitudesHandler);
-router.post("/general/enviar", auth, handler.enviarSolicitudGeneralHandler);
-
-router.post("/:id/sync", auth, handler.syncSolicitudHandler);
-router.put("/:id", auth, update.updateSolicitudHandler);
-router.get("/:id", auth, update.getSolicitudCompraByIdHandler);
-
-
+router.post("/", roleAuth(["all_access","create_solicitudes_compra"]), handler.createSolicitudHandler);
+router.get("/", roleAuth(["all_access","read_solicitudes_compra"]), handler.getSolicitudesHandler);
+router.post("/general/enviar", roleAuth(["all_access","create_solicitudes_compra"]), handler.enviarSolicitudGeneralHandler);
+router.post("/:id/sync", roleAuth(["all_access","update_solicitudes_compra"]), handler.syncSolicitudHandler);
+router.put("/:id", roleAuth(["all_access","update_solicitudes_compra"]), update.updateSolicitudHandler);
+router.get("/:id", roleAuth(["all_access","read_solicitudes_compra"]), update.getSolicitudCompraByIdHandler);
 module.exports = router;

@@ -509,7 +509,7 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       })),
     ].filter((x) => x.equipoId || x.ubicacionId);
 
-    if (!targets.length) {
+    if (!targets.length && aviso.tipoAviso !== "venta") {
       throw new Error("El aviso no tiene equipos ni ubicaciones técnicas asociadas");
     }
 
@@ -525,11 +525,16 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       Object.keys(solicitudesCompraPorEquipo).length > 0 ||
       Object.keys(solicitudesAlmacenPorEquipo).length > 0;
 
+    const requerimientos = tratamiento.descripcionVenta
+      ? { descripcionVenta: tratamiento.descripcionVenta }
+      : null;
+
     const nuevoTratamiento = await Tratamiento.create(
       {
         aviso_id: avisoId,
         creado_por: usuarioId,
         estado: tieneSolicitudes ? "CON_SOLICITUD" : "SIN_SOLICITUD",
+        requerimientos,
       },
       { transaction: t }
     );

@@ -22,25 +22,31 @@ async function crearAvisoHandler(req, res) {
 
     errors.push(...validarAviso(req.body));
 
-    const { equipos = [], ubicaciones = [] } = req.body;
-
-    if (equipos && !Array.isArray(equipos)) {
-      errors.push("Equipos debe ser un arreglo");
-    }
-
-    if (ubicaciones && !Array.isArray(ubicaciones)) {
-      errors.push("Ubicaciones debe ser un arreglo");
-    }
+    // Normalizar a array: FormData envía string cuando hay 1 elemento, array cuando hay varios
+    const equipos = req.body.equipos
+      ? (Array.isArray(req.body.equipos) ? req.body.equipos : [req.body.equipos])
+      : [];
+    const ubicaciones = req.body.ubicaciones
+      ? (Array.isArray(req.body.ubicaciones) ? req.body.ubicaciones : [req.body.ubicaciones])
+      : [];
 
     const tieneEquipos = equipos.length > 0;
     const tieneUbicaciones = ubicaciones.length > 0;
+    const esVenta = req.body.tipoAviso === "venta";
 
-    if (!tieneEquipos && !tieneUbicaciones) {
-      errors.push("Debe enviar equipos o ubicaciones técnicas");
-    }
-
-    if (tieneEquipos && tieneUbicaciones) {
-      errors.push("No puede tener ambos");
+    if (!esVenta) {
+      // Para mantenimiento e instalacion: se requiere equipo o ubicacion (no ambos)
+      if (!tieneEquipos && !tieneUbicaciones) {
+        errors.push("Debe enviar equipos o ubicaciones técnicas");
+      }
+      if (tieneEquipos && tieneUbicaciones) {
+        errors.push("No puede tener ambos");
+      }
+    } else {
+      // Para venta: solo equipos permitidos, y son opcionales
+      if (tieneUbicaciones) {
+        errors.push("Tipo venta solo permite equipos, no ubicaciones técnicas");
+      }
     }
 
     if (errors.length > 0) {
@@ -75,6 +81,8 @@ async function crearAvisoHandler(req, res) {
 
     const dataFinal = {
       ...req.body,
+      equipos,
+      ubicaciones,
       documentos,
       documentoFinal,
     };
@@ -88,6 +96,13 @@ async function crearAvisoHandler(req, res) {
 
   } catch (error) {
     console.error("ERROR CREAR AVISO:", error);
+
+    // Número de aviso duplicado
+    if (error.name === "SequelizeUniqueConstraintError") {
+      return res.status(400).json({
+        errors: ["El número de aviso ya existe. Por favor usa uno diferente."],
+      });
+    }
 
     return res.status(500).json({
       errors: ["Error interno al crear el aviso"],
@@ -158,7 +173,12 @@ async function eliminarAvisoHandler(req, res) {
 async function actualizarEstadoAvisoHandler(req, res) {
   try {
     const { id } = req.params;
-    const { estado } = req.body;
+    // El frontend envía "estadoAviso"; también aceptamos "estado" por compatibilidad
+    const estado = req.body.estadoAviso ?? req.body.estado;
+
+    if (!estado) {
+      return res.status(400).json({ message: "Se requiere el campo estadoAviso" });
+    }
 
     const aviso = await avisosController.actualizarEstadoAviso(id, estado);
 

@@ -10,6 +10,10 @@ module.exports = (sequelize) => {
     },
     nombre: DataTypes.STRING,
     correo: DataTypes.STRING,
+    activo: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
   });
 
   return PersonalCorreo; // 🔥 IMPORTANTE

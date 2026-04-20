@@ -42,6 +42,7 @@ module.exports = (sequelize) => {
           prioridad: "",
           tipoMantenimiento: "",
           solicitante: "",
+          estado: "",
         },
       },
     },

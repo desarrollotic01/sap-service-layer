@@ -1,20 +1,10 @@
 const { Router } = require("express");
-const {
-  crearFamilia,
-  listarFamilias,
-  obtenerFamilia,
-  actualizarFamilia,
-  eliminarFamilia,
-} = require("../handlers/familiaHandler");
-
+const { crearFamilia, listarFamilias, obtenerFamilia, actualizarFamilia, eliminarFamilia } = require("../handlers/familiaHandler");
+const roleAuth = require("../checkers/roleAuth");
 const router = Router();
-const auth = require("../middlewares/auth")
-
-
-router.post("/", auth,crearFamilia);
-router.get("/",auth, listarFamilias);
-router.get("/:id",auth ,obtenerFamilia);
-router.put("/:id",auth, actualizarFamilia);
-router.delete("/:id",auth, eliminarFamilia);
-
+router.post("/", roleAuth(["all_access","create_familias"]), crearFamilia);
+router.get("/", roleAuth(["all_access","read_familias"]), listarFamilias);
+router.get("/:id", roleAuth(["all_access","read_familias"]), obtenerFamilia);
+router.put("/:id", roleAuth(["all_access","update_familias"]), actualizarFamilia);
+router.delete("/:id", roleAuth(["all_access","delete_familias"]), eliminarFamilia);
 module.exports = router;

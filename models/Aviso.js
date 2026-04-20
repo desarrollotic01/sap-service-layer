@@ -20,7 +20,8 @@ module.exports = (sequelize) => {
       tipoAviso: {
         type: DataTypes.ENUM(
           "mantenimiento",
-          "instalacion"
+          "instalacion",
+          "venta"
         ),
         allowNull: false,
       },

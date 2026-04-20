@@ -1,8 +1,8 @@
 const { Router } = require("express");
 const router = Router();
 const solicitudCompraRutas = require("./solicitudCompraRouter")
-const authRutas = require("./authRouter")
 const usuarioRutas = require("./usuarioRouter")
+const rolPermisoRutas = require("./rolPermisoRouter")
 const userViewConfigRutas = require("./userViewConfig.routes")
 const AvisoRouter = require("./avisoRouter");
 const tratamiento = require("./tratamientoRouter");
@@ -28,7 +28,11 @@ const solicitudAlmacenRouter = require("./solicitudAlmacenRouter")
 const sapCatalogoRouter = require("./sapCatalogoRouter")
 const ordenPDFRouter = require("./ordenPDFRouter")
 const personalCorreoRouter = require("./personalCorreoRouter")
+const excelRouter = require("./excelRouter")
+const importMasivoRouter = require("./importMasivoRouter")
 
+router.use("/excel", excelRouter);
+router.use("/import-masivo", importMasivoRouter);
 router.use("/orden-pdf", ordenPDFRouter);
 router.use("/sap", sapCatalogoRouter);
 router.use("/personal-correo",personalCorreoRouter)
@@ -48,8 +52,8 @@ router.use("/orden-trabajo", ordenTrabajoRouter);
 router.use("/trabajador", trabajadorRouter);    
 router.use("/tratamiento", tratamiento);
 router.use("/solicitudCompra", solicitudCompraRutas);
-router.use("/auth" , authRutas)
-router.use("/usuario",usuarioRutas)
+router.use("/usuario", usuarioRutas)
+router.use("/admin", rolPermisoRutas)
 router.use("/view-config", userViewConfigRutas)
 router.use("/avisos", AvisoRouter);
 router.use("/cliente", clienteRouter);

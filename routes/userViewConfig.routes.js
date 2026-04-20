@@ -1,24 +1,8 @@
 const express = require("express");
 const router = express.Router();
-
-const auth = require("../middlewares/auth");
-const {
-  getConfigHandler,
-  saveConfigHandler,
-  resetFiltrosHandler,
-} = require("../handlers/userViewConfigHandler");
-
-/* =============================
-   ROUTES
-============================= */
-
-// Obtener config por vista
-router.get("/:view", auth, getConfigHandler);
-
-// Guardar config (filtros, columnas, campos)
-router.put("/:view", auth, saveConfigHandler);
-
-// Reset SOLO filtros
-router.post("/:view/reset-filtros", auth, resetFiltrosHandler);
-
+const { getConfigHandler, saveConfigHandler, resetFiltrosHandler } = require("../handlers/userViewConfigHandler");
+const roleAuth = require("../checkers/roleAuth");
+router.get("/:view", roleAuth(["all_access","read_view_config"]), getConfigHandler);
+router.put("/:view", roleAuth(["all_access","update_view_config"]), saveConfigHandler);
+router.post("/:view/reset-filtros", roleAuth(["all_access","update_view_config"]), resetFiltrosHandler);
 module.exports = router;

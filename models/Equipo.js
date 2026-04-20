@@ -29,8 +29,8 @@ module.exports = (sequelize) => {
 
       clienteId: {
         type: DataTypes.UUID,
-        allowNull: false,
-      },  
+        allowNull: true,
+      },
 
  
       id_cliente: {
@@ -89,10 +89,10 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
-     paisId: {
-  type: DataTypes.UUID,
-  allowNull: false,
-},
+      paisId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
 
       fechaEntregaPrevista: {
         type: DataTypes.DATEONLY,
@@ -107,7 +107,7 @@ module.exports = (sequelize) => {
           "Operativo",
           "Inoperativo",
           "No instalado"
-        ),
+        ), 
         defaultValue: "No instalado",
       },
 

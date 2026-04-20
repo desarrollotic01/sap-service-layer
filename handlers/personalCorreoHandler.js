@@ -17,7 +17,7 @@ const getById = async (id) => {
 
 // CREATE
 const create = async (payload) => {
-  return await PersonalCorreo.create(payload);
+  return await PersonalCorreo.create({ ...payload, activo: true });
 };
 
 // UPDATE

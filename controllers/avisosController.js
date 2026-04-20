@@ -11,6 +11,8 @@ const {
   Pais,
   GuiaMantenimiento,
   GuiaMantenimientoProgramacion,
+  Cliente,
+  Trabajador,
 } = require("../db_connection");
 
 const ESTADOS_AVISO_VALIDOS = [
@@ -23,7 +25,7 @@ const ESTADOS_AVISO_VALIDOS = [
   "facturado",
 ];
 
-const TIPOS_AVISO_VALIDOS = ["mantenimiento", "instalacion"];
+const TIPOS_AVISO_VALIDOS = ["mantenimiento", "instalacion", "venta"];
 const PRIORIDADES_VALIDAS = ["Baja", "Media", "Alta"];
 const TIPOS_MANTENIMIENTO_VALIDOS = [
   "Preventivo",
@@ -126,6 +128,12 @@ const buildWhereAvisosPorOrigen = (origenAviso, filtros = {}) => {
 const buildIncludeAvisos = () => {
   return [
     {
+      model: Cliente,
+      as: "clienteData",
+      attributes: ["id", "razonSocial", "sapCode"],
+      required: false,
+    },
+    {
       model: Usuario,
       as: "creador",
       attributes: ["id", "nombreApellido"],
@@ -135,6 +143,12 @@ const buildIncludeAvisos = () => {
       model: Usuario,
       as: "solicitante",
       attributes: ["id", "nombreApellido"],
+      required: false,
+    },
+    {
+      model: Trabajador,
+      as: "supervisor",
+      attributes: ["id", "nombre", "apellido"],
       required: false,
     },
     {
@@ -218,6 +232,29 @@ async function crearAviso(data, userId) {
 
   try {
     const { equipos = [], ubicaciones = [], ...avisoData } = data;
+
+    // Generar numeroAviso atómicamente para evitar race conditions
+    const prefijo = avisoData.ordenVenta || avisoData.centroCosto;
+    if (prefijo) {
+      const ultimoAviso = await Aviso.findOne({
+        where: {
+          numeroAviso: { [Op.like]: `${prefijo}AV%` },
+        },
+        order: [["numeroAviso", "DESC"]],
+        lock: t.LOCK.UPDATE,
+        transaction: t,
+        attributes: ["numeroAviso"],
+      });
+
+      let siguiente = 1;
+      if (ultimoAviso?.numeroAviso) {
+        const partes = ultimoAviso.numeroAviso.split("AV");
+        const num = parseInt(partes.at(-1), 10) || 0;
+        siguiente = num + 1;
+      }
+
+      avisoData.numeroAviso = `${prefijo}AV${String(siguiente).padStart(3, "0")}`;
+    }
 
     const aviso = await Aviso.create(
       {

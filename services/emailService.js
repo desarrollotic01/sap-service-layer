@@ -1,17 +1,61 @@
 const nodemailer = require("nodemailer");
- 
+
+// Crear transporter según el proveedor configurado en .env
+// Para Gmail:  EMAIL_HOST=smtp.gmail.com  EMAIL_PORT=465  EMAIL_SECURE=true
+//              EMAIL_USER=tu@gmail.com    EMAIL_PASS=<app-password-de-16-chars>
+// Para Office365 con auth básica habilitada:
+//              EMAIL_HOST=smtp.office365.com  EMAIL_PORT=587  EMAIL_SECURE=false
+// NOTA: Office 365 deshabilita auth básica por defecto. Si usas Office 365,
+//       el admin debe habilitarla para el buzón o usar OAuth2.
 const transporter = nodemailer.createTransport({
-  host: process.env.MAIL_HOST || "smtp.office365.com",
-  port: Number(process.env.MAIL_PORT) || 587,
-  secure: false, // TLS
+  host: process.env.EMAIL_HOST || "smtp.gmail.com",
+  port: Number(process.env.EMAIL_PORT) || 465,
+  secure: process.env.EMAIL_SECURE !== "false", // true para 465, false para 587
   auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-  },
-  tls: {
-    ciphers: "SSLv3",
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
 });
+
+/**
+ * Función genérica de envío de correo.
+ * @param {object} params
+ * @param {string}          params.to       - Destinatario principal (TO)
+ * @param {string|string[]} [params.cc]     - Destinatarios en copia (CC), separados por coma o array
+ * @param {string}          params.subject  - Asunto
+ * @param {string}          params.html     - Cuerpo HTML
+ * @param {string}          [params.text]   - Cuerpo texto plano (fallback)
+ * @returns {Promise<{ success: boolean, messageId?: string, error?: string }>}
+ */
+async function enviarCorreo({ to, cc, subject, html, text }) {
+  try {
+    // Normalizar CC: puede ser string, array o undefined
+    let ccNormalizado;
+    if (Array.isArray(cc) && cc.length > 0) {
+      ccNormalizado = cc.filter(Boolean).join(", ");
+    } else if (typeof cc === "string" && cc.trim()) {
+      ccNormalizado = cc.trim();
+    }
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || `"Sistema de Mantenimiento" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    };
+
+    if (text) mailOptions.text = text;
+    if (ccNormalizado) mailOptions.cc = ccNormalizado;
+
+    const info = await transporter.sendMail(mailOptions);
+
+    console.log(`✅ Correo enviado a ${to}${ccNormalizado ? ` (CC: ${ccNormalizado})` : ""} — MessageId: ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("❌ Error enviando correo:", error.message);
+    return { success: false, error: error.message };
+  }
+}
  
 /**
  * Envía el correo de solicitud de almacén al destinatario.
@@ -114,7 +158,7 @@ async function enviarCorreoSolicitudAlmacen({
  
   try {
     const info = await transporter.sendMail({
-      from: `"Sistema de Mantenimiento" <${process.env.MAIL_USER}>`,
+      from: process.env.EMAIL_FROM || `"Sistema de Mantenimiento" <${process.env.EMAIL_USER}>`,
       to: destinatarioCorreo,
       subject: `Solicitud de Almacén ${numeroSolicitud} - OT ${otNumero}`,
       text,
@@ -129,5 +173,5 @@ async function enviarCorreoSolicitudAlmacen({
   }
 }
  
-module.exports = { enviarCorreoSolicitudAlmacen };
+module.exports = { enviarCorreoSolicitudAlmacen, enviarCorreo };
  

@@ -1,12 +1,10 @@
 const router = require("express").Router();
 const h = require("../handlers/ubicaciontecnicaHandler");
-const auth = require("../middlewares/auth");
-
-
-router.get("/", auth, h.listarUbicaciones);
-router.get("/:id", auth, h.obtenerUbicacion);
-router.post("/", auth, h.crearUbicacion);
-router.put("/:id", auth, h.actualizarUbicacion);
-router.delete("/:id", auth, h.eliminarUbicacion);
-router.get("/cliente/:clienteId", h.getUbicacionesByClienteIdHandler);
+const roleAuth = require("../checkers/roleAuth");
+router.get("/", roleAuth(["all_access","read_ubicaciones_tecnicas"]), h.listarUbicaciones);
+router.get("/cliente/:clienteId", roleAuth(["all_access","read_ubicaciones_tecnicas"]), h.getUbicacionesByClienteIdHandler);
+router.get("/:id", roleAuth(["all_access","read_ubicaciones_tecnicas"]), h.obtenerUbicacion);
+router.post("/", roleAuth(["all_access","create_ubicaciones_tecnicas"]), h.crearUbicacion);
+router.put("/:id", roleAuth(["all_access","update_ubicaciones_tecnicas"]), h.actualizarUbicacion);
+router.delete("/:id", roleAuth(["all_access","delete_ubicaciones_tecnicas"]), h.eliminarUbicacion);
 module.exports = router;

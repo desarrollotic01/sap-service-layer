@@ -1,39 +1,16 @@
 const { Router } = require("express");
-const {
-  crearPlanHandler,
-  obtenerPlanesHandler,
-  obtenerPlanPorIdHandler,
-  obtenerPlanesPorEquipoHandler,
-  obtenerMejorPlanPorEquipoHandler,
-  obtenerPlanesPorUbicacionTecnicaHandler,
-  obtenerMejorPlanPorUbicacionTecnicaHandler,
-  actualizarPlanesMantenimientoEquipo,
-  actualizarPlanesMantenimientoUbicacionTecnica,
-  cambiarEstadoPlanHandler,
-} = require("../handlers/planMantenimientoHandler");
+const { crearPlanHandler, obtenerPlanesHandler, obtenerPlanPorIdHandler, obtenerPlanesPorEquipoHandler, obtenerMejorPlanPorEquipoHandler, obtenerPlanesPorUbicacionTecnicaHandler, obtenerMejorPlanPorUbicacionTecnicaHandler, actualizarPlanesMantenimientoEquipo, actualizarPlanesMantenimientoUbicacionTecnica, cambiarEstadoPlanHandler } = require("../handlers/planMantenimientoHandler");
 const uploadPlanAdjuntos = require("../middlewares/uploadPlanAdjuntos");
-
+const roleAuth = require("../checkers/roleAuth");
 const router = Router();
-
-router.post("/", uploadPlanAdjuntos.any(), crearPlanHandler);
-
-router.get("/", obtenerPlanesHandler);
-
-router.get("/equipo/:equipoId", obtenerPlanesPorEquipoHandler);
-router.get("/equipo/:equipoId/mejor", obtenerMejorPlanPorEquipoHandler);
-router.put("/equipo/:id/planes", actualizarPlanesMantenimientoEquipo);
-
-router.get("/ubicacion-tecnica/:ubicacionTecnicaId", obtenerPlanesPorUbicacionTecnicaHandler);
-router.get(
-  "/ubicacion-tecnica/:ubicacionTecnicaId/mejor",
-  obtenerMejorPlanPorUbicacionTecnicaHandler
-);
-router.put(
-  "/ubicacion-tecnica/:id/planes",
-  actualizarPlanesMantenimientoUbicacionTecnica
-);
-
-router.patch("/:id/estado", cambiarEstadoPlanHandler);
-router.get("/:id", obtenerPlanPorIdHandler);
-
+router.post("/", roleAuth(["all_access","create_planes"]), uploadPlanAdjuntos.any(), crearPlanHandler);
+router.get("/", roleAuth(["all_access","read_planes"]), obtenerPlanesHandler);
+router.get("/equipo/:equipoId", roleAuth(["all_access","read_planes"]), obtenerPlanesPorEquipoHandler);
+router.get("/equipo/:equipoId/mejor", roleAuth(["all_access","read_planes"]), obtenerMejorPlanPorEquipoHandler);
+router.put("/equipo/:id/planes", roleAuth(["all_access","update_planes"]), actualizarPlanesMantenimientoEquipo);
+router.get("/ubicacion-tecnica/:ubicacionTecnicaId", roleAuth(["all_access","read_planes"]), obtenerPlanesPorUbicacionTecnicaHandler);
+router.get("/ubicacion-tecnica/:ubicacionTecnicaId/mejor", roleAuth(["all_access","read_planes"]), obtenerMejorPlanPorUbicacionTecnicaHandler);
+router.put("/ubicacion-tecnica/:id/planes", roleAuth(["all_access","update_planes"]), actualizarPlanesMantenimientoUbicacionTecnica);
+router.patch("/:id/estado", roleAuth(["all_access","update_planes"]), cambiarEstadoPlanHandler);
+router.get("/:id", roleAuth(["all_access","read_planes"]), obtenerPlanPorIdHandler);
 module.exports = router;

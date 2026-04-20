@@ -144,11 +144,17 @@ const createSolicitudAlmacenHandler = async (req, res) => {
 
 const enviarBloqueHandler = async (req, res) => {
   try {
-    const { bloqueId, ordenTrabajoId } = req.body;
+    const { bloqueId, ordenTrabajoId, destinatarioId, ccEmails } = req.body;
+
+    if (!bloqueId || !ordenTrabajoId) {
+      return res.status(400).json({ error: "bloqueId y ordenTrabajoId son obligatorios" });
+    }
 
     const resultado = await SolicitudAlmacenController.enviarBloqueSolicitudes({
       bloqueId,
       ordenTrabajoId,
+      destinatarioId: destinatarioId || null,
+      ccEmails: ccEmails || [],
     });
 
     res.json(resultado);
@@ -200,6 +206,20 @@ const generarSolicitudAlmacenHandler = async (req, res) => {
   }
 };
 
+const getAllSolicitudesAlmacenHandler = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.pageSize) || 20;
+    const search = req.query.search || "";
+
+    const result = await SolicitudAlmacenController.getAllSolicitudesAlmacen(page, limit, search);
+    return res.json({ message: "Solicitudes de almacén obtenidas", ...result });
+  } catch (error) {
+    console.error("Error en getAllSolicitudesAlmacenHandler:", error);
+    return res.status(500).json({ message: "Error al obtener solicitudes de almacén" });
+  }
+};
+
 module.exports = {
     createSolicitudAlmacenHandler,
   getSolicitudAlmacenById,
@@ -209,4 +229,5 @@ module.exports = {
   previewSolicitudesHandler,
   generarSolicitudCompraHandler,
   generarSolicitudAlmacenHandler,
+  getAllSolicitudesAlmacenHandler,
 };

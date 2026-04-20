@@ -1,47 +1,17 @@
 const { Router } = require("express");
-
-const {
-  CreateGuiaMantenimientoHandler,
-  GetAllGuiaMantenimientoHandler,
-  GetGuiaMantenimientoByIdHandler,
-  UpdateGuiaMantenimientoHandler,
-  DeleteGuiaMantenimientoHandler,
-  DeleteAdjuntoGuiaMantenimientoHandler,
-} = require("../handlers/guiaMantenimientoHandler");
-
-const {
-  EjecutarProgramacionGuiaMantenimientoHandler,
-  CancelarProgramacionGuiaMantenimientoHandler,
-  JobMarcarVencidasProgramacionesGuiaMantenimientoHandler,
-} = require("../handlers/guiaMantenimientoProgramacionHandler");
-
-const {
-  JobCrearAvisosDesdeAlertasGuiaMantenimientoHandler,
-} = require("../handlers/guiaMantenimientoAlertaJobHandler");
-
+const { CreateGuiaMantenimientoHandler, GetAllGuiaMantenimientoHandler, GetGuiaMantenimientoByIdHandler, UpdateGuiaMantenimientoHandler, DeleteGuiaMantenimientoHandler, DeleteAdjuntoGuiaMantenimientoHandler } = require("../handlers/guiaMantenimientoHandler");
+const { EjecutarProgramacionGuiaMantenimientoHandler, CancelarProgramacionGuiaMantenimientoHandler, JobMarcarVencidasProgramacionesGuiaMantenimientoHandler } = require("../handlers/guiaMantenimientoProgramacionHandler");
+const { JobCrearAvisosDesdeAlertasGuiaMantenimientoHandler } = require("../handlers/guiaMantenimientoAlertaJobHandler");
+const roleAuth = require("../checkers/roleAuth");
 const router = Router();
-
-/* GUIAS */
-router.post("/", CreateGuiaMantenimientoHandler);
-router.get("/", GetAllGuiaMantenimientoHandler);
-router.get("/:id", GetGuiaMantenimientoByIdHandler);
-router.put("/:id", UpdateGuiaMantenimientoHandler);
-router.delete("/:id", DeleteGuiaMantenimientoHandler);
-router.delete("/adjuntos/:adjuntoId", DeleteAdjuntoGuiaMantenimientoHandler);
-
-/* PROGRAMACIONES */
-router.post("/programaciones/:id/ejecutar", EjecutarProgramacionGuiaMantenimientoHandler);
-router.post("/programaciones/:id/cancelar", CancelarProgramacionGuiaMantenimientoHandler);
-
-/* JOBS */
-router.post(
-  "/programaciones/jobs/marcar-vencidas",
-  JobMarcarVencidasProgramacionesGuiaMantenimientoHandler
-);
-
-router.post(
-  "/programaciones/jobs/crear-avisos-alerta",
-  JobCrearAvisosDesdeAlertasGuiaMantenimientoHandler
-);
-
+router.post("/", roleAuth(["all_access","create_guias"]), CreateGuiaMantenimientoHandler);
+router.get("/", roleAuth(["all_access","read_guias"]), GetAllGuiaMantenimientoHandler);
+router.get("/:id", roleAuth(["all_access","read_guias"]), GetGuiaMantenimientoByIdHandler);
+router.put("/:id", roleAuth(["all_access","update_guias"]), UpdateGuiaMantenimientoHandler);
+router.delete("/:id", roleAuth(["all_access","delete_guias"]), DeleteGuiaMantenimientoHandler);
+router.delete("/adjuntos/:adjuntoId", roleAuth(["all_access","update_guias"]), DeleteAdjuntoGuiaMantenimientoHandler);
+router.post("/programaciones/:id/ejecutar", roleAuth(["all_access","update_guias"]), EjecutarProgramacionGuiaMantenimientoHandler);
+router.post("/programaciones/:id/cancelar", roleAuth(["all_access","update_guias"]), CancelarProgramacionGuiaMantenimientoHandler);
+router.post("/programaciones/jobs/marcar-vencidas", roleAuth(["all_access","update_guias"]), JobMarcarVencidasProgramacionesGuiaMantenimientoHandler);
+router.post("/programaciones/jobs/crear-avisos-alerta", roleAuth(["all_access","update_guias"]), JobCrearAvisosDesdeAlertasGuiaMantenimientoHandler);
 module.exports = router;

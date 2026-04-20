@@ -41,7 +41,10 @@ module.exports = (sequelize) => {
     defaultValue: "CREADO",
   },
 
-  supervisorId: DataTypes.STRING,
+ supervisorId: {
+  type: DataTypes.UUID,
+  allowNull: true, 
+},
 
   fechaProgramadaInicio: DataTypes.DATE,
   fechaProgramadaFin: DataTypes.DATE,
@@ -93,6 +96,11 @@ module.exports = (sequelize) => {
 OrdenTrabajo.hasMany(models.SolicitudAlmacen, {
   foreignKey: "ordenTrabajoId",
   as: "solicitudesAlmacen",
+});
+
+OrdenTrabajo.belongsTo(models.Trabajador, {
+  foreignKey: "supervisorId",
+  as: "supervisor",
 });
 };
 

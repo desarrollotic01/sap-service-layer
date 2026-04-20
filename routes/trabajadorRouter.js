@@ -1,13 +1,10 @@
 const express = require("express");
 const router = express.Router();
-
 const TrabajadorHandler = require("../handlers/trabajadorHandler");
-
-// CRUD
-router.post("/", TrabajadorHandler.crearTrabajador);
-router.get("/", TrabajadorHandler.listarTrabajadores);
-router.get("/:id", TrabajadorHandler.obtenerTrabajador);
-router.put("/:id", TrabajadorHandler.actualizarTrabajador);
-router.delete("/:id", TrabajadorHandler.desactivarTrabajador);
-
+const roleAuth = require("../checkers/roleAuth");
+router.post("/", roleAuth(["all_access","create_trabajadores"]), TrabajadorHandler.crearTrabajador);
+router.get("/", roleAuth(["all_access","read_trabajadores"]), TrabajadorHandler.listarTrabajadores);
+router.get("/:id", roleAuth(["all_access","read_trabajadores"]), TrabajadorHandler.obtenerTrabajador);
+router.put("/:id", roleAuth(["all_access","update_trabajadores"]), TrabajadorHandler.actualizarTrabajador);
+router.delete("/:id", roleAuth(["all_access","delete_trabajadores"]), TrabajadorHandler.desactivarTrabajador);
 module.exports = router;

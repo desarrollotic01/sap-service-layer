@@ -3,33 +3,45 @@ const validator = require("./solicitudCompraHandler");
 
 // Crear solicitud (DRAFT)
 const createSolicitudHandler = async (req, res) => {
-  const errors = validator.validarCreateSolicitud(req.body);
+  try {
+    const errors = validator.validarCreateSolicitud(req.body);
 
-  if (errors.length > 0) {
-    return res.status(400).json({ errors });
+    if (errors.length > 0) {
+      return res.status(400).json({ errors });
+    }
+
+    const solicitud = await controller.createSolicitudCompra(
+      req.user.id,
+      req.body
+    );
+
+    if (!solicitud) {
+      return res.status(500).json({ errors: ["No se pudo crear la solicitud"] });
+    }
+
+    res.status(201).json(solicitud);
+  } catch (error) {
+    console.error("ERROR crear solicitud compra:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Error al crear solicitud de compra",
+    });
   }
-
-  const solicitud = await controller.createSolicitudCompra(
-    req.user.id,
-    req.body
-  );
-
-  if (!solicitud) {
-    return res.status(500).json({ errors: ["No se pudo crear la solicitud"] });
-  }
-
-  res.status(201).json(solicitud);
 };
 
-// Listar solicitudes del usuario
+// Listar todas las solicitudes (con paginación y búsqueda)
 const getSolicitudesHandler = async (req, res) => {
-  const solicitudes = await controller.getSolicitudesByUsuario(req.user.id);
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.pageSize) || 20;
+    const search = req.query.search || "";
 
-  if (!solicitudes) {
+    const result = await controller.getAllSolicitudesCompra(page, limit, search);
+    return res.json({ message: "Solicitudes de compra obtenidas", ...result });
+  } catch (error) {
+    console.error("Error en getSolicitudesHandler:", error);
     return res.status(500).json({ errors: ["Error al obtener solicitudes"] });
   }
-
-  res.json(solicitudes);
 };
 
 // Sincronizar con SAP
