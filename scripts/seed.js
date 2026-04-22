@@ -167,98 +167,98 @@ const run = async () => {
     }
 
 
-    // =========================
-    // RUBROS
-    // =========================
-    const rubros = [];
-    for (let i = 1; i <= 5; i++) {
-      rubros.push({
-        id: uuidv4(),
-        codigo: `R${i}`,
-        descripcion: `Rubro ${i}`,
-        activo: true,
-      });
-    }
-    await SapRubro.bulkCreate(rubros);
+    // // =========================
+    // // RUBROS
+    // // =========================
+    // const rubros = [];
+    // for (let i = 1; i <= 5; i++) {
+    //   rubros.push({
+    //     id: uuidv4(),
+    //     codigo: `R${i}`,
+    //     descripcion: `Rubro ${i}`,
+    //     activo: true,
+    //   });
+    // }
+    // await SapRubro.bulkCreate(rubros);
 
-    // =========================
-    // PAQUETES
-    // =========================
-    const paquetes = [];
-    for (let i = 1; i <= 5; i++) {
-      paquetes.push({
-        id: uuidv4(),
-        codigo: `P${i}`,
-        descripcion: `Paquete ${i}`,
-        activo: true,
-      });
-    }
-    await SapPaqueteTrabajo.bulkCreate(paquetes);
+    // // =========================
+    // // PAQUETES
+    // // =========================
+    // const paquetes = [];
+    // for (let i = 1; i <= 5; i++) {
+    //   paquetes.push({
+    //     id: uuidv4(),
+    //     codigo: `P${i}`,
+    //     descripcion: `Paquete ${i}`,
+    //     activo: true,
+    //   });
+    // }
+    // await SapPaqueteTrabajo.bulkCreate(paquetes);
 
-    // =========================
-    // CLIENTES
-    // =========================
-    const clientes = [];
-    for (let i = 1; i <= 3; i++) {
-      clientes.push({
-        id: uuidv4(),
-        sapCode: `C00${i}`,
-        razonSocial: `Cliente ${i}`,
-        ruc: `2010000000${i}`,
-        direccion: `Direccion ${i}`,
-        telefono: `99900000${i}`,
-        correo: `cliente${i}@mail.com`,
-        tipoCliente: "Empresa",
-        activoSAP: true,
-        estado: "Activo",
-      });
-    }
+    // // =========================
+    // // CLIENTES
+    // // =========================
+    // const clientes = [];
+    // for (let i = 1; i <= 3; i++) {
+    //   clientes.push({
+    //     id: uuidv4(),
+    //     sapCode: `C00${i}`,
+    //     razonSocial: `Cliente ${i}`,
+    //     ruc: `2010000000${i}`,
+    //     direccion: `Direccion ${i}`,
+    //     telefono: `99900000${i}`,
+    //     correo: `cliente${i}@mail.com`,
+    //     tipoCliente: "Empresa",
+    //     activoSAP: true,
+    //     estado: "Activo",
+    //   });
+    // }
 
-    const clientesCreados = await Cliente.bulkCreate(clientes);
+    // const clientesCreados = await Cliente.bulkCreate(clientes);
 
-    // =========================
-    // CONTACTOS
-    // =========================
-    const contactos = [];
+    // // =========================
+    // // CONTACTOS
+    // // =========================
+    // const contactos = [];
 
-    clientesCreados.forEach((cliente, index) => {
-      for (let j = 1; j <= 2; j++) {
-        contactos.push({
-          id: uuidv4(),
-          clienteId: cliente.id,
-          nombre: `Contacto ${j} Cliente ${index + 1}`,
-          correo: `contacto${j}_c${index + 1}@mail.com`,
-          telefono: `9880000${j}${index}`,
-          cargo: "Administrador",
-          activo: true,
-        });
-      }
-    });
+    // clientesCreados.forEach((cliente, index) => {
+    //   for (let j = 1; j <= 2; j++) {
+    //     contactos.push({
+    //       id: uuidv4(),
+    //       clienteId: cliente.id,
+    //       nombre: `Contacto ${j} Cliente ${index + 1}`,
+    //       correo: `contacto${j}_c${index + 1}@mail.com`,
+    //       telefono: `9880000${j}${index}`,
+    //       cargo: "Administrador",
+    //       activo: true,
+    //     });
+    //   }
+    // });
 
-    await Contacto.bulkCreate(contactos);
+    // await Contacto.bulkCreate(contactos);
 
-    // =========================
-    // ITEMS
-    // =========================
-    const items = [];
+    // // =========================
+    // // ITEMS
+    // // =========================
+    // const items = [];
 
-    for (let i = 1; i <= 20; i++) {
-      const rubro = rubros[i % rubros.length];
+    // for (let i = 1; i <= 20; i++) {
+    //   const rubro = rubros[i % rubros.length];
 
-      items.push({
-        id: uuidv4(),
-        sapCode: `ITEM${i}`,
-        nombre: `Item ${i}`,
-        rubroSapCode: null,
-        rubroNombre: rubro.descripcion,
-        unidadCompra: "UND",
-        unidadInventario: "UND",
-        unidadVenta: "UND",
-        activoSAP: true,
-      });
-    }
+    //   items.push({
+    //     id: uuidv4(),
+    //     sapCode: `ITEM${i}`,
+    //     nombre: `Item ${i}`,
+    //     rubroSapCode: null,
+    //     rubroNombre: rubro.descripcion,
+    //     unidadCompra: "UND",
+    //     unidadInventario: "UND",
+    //     unidadVenta: "UND",
+    //     activoSAP: true,
+    //   });
+    // }
 
-    await Item.bulkCreate(items);
+    // await Item.bulkCreate(items);
 
     console.log("✅ Seed completado correctamente");
     process.exit(0);
