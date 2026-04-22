@@ -31,7 +31,7 @@ app.get("/", (req, res) => {
 
 server.listen(PORT, "0.0.0.0",() => {
   console.log(`ALSUD Server is running on port ${PORT}`);
-  sequelize.sync({force:true}) // cambiar de alter a force para que se borren las tablas y se creen de nuevo, hasta que queden bien diseñadas
+  sequelize.sync({alter:true}) // cambiar de alter a force para que se borren las tablas y se creen de nuevo, hasta que queden bien diseñadas
     .then(async () => {
       console.log("Database is connected");
       setIo(getIo());
