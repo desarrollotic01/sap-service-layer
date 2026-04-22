@@ -46,6 +46,21 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
+      requester: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+
+      department: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+
+      comments: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+
       // === CONTROL ===
       estado: {
         type: DataTypes.ENUM("DRAFT", "SENT", "ERROR"),

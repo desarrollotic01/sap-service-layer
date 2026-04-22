@@ -497,7 +497,7 @@ const getAllSolicitudesCompra = async (page = 1, limit = 20, search = "") => {
 
   const response = await SolicitudCompra.findAndCountAll({
     where,
-    attributes: ["id", "numeroSolicitud", "estado", "requiredDate", "docDate", "docCurrency", "esGeneral", "origen", "createdAt"],
+    attributes: ["id", "numeroSolicitud", "estado", "requiredDate", "docDate", "docCurrency", "requester", "esGeneral", "origen", "createdAt"],
     include: [
       {
         model: SolicitudCompraLinea,

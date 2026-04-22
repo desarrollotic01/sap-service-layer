@@ -4,13 +4,14 @@ const http = require("http");
 const { sequelize } = require("./db_connection");
 const router = require("./routes/index");
 const { PORT } = process.env;
-const { initializeSocket, userSockets, getConnectedUsers } = require("./sockets");
+const { initializeSocket, userSockets, getConnectedUsers, getIo } = require("./sockets");
 const loginMiddleware = require("./checkers/validateToken");
 const usuariosRouter = require("./routes/loginRouter");
 const cors = require("cors");
 const path = require("path");
 
-const { initCronJobs } = require("./cron/guiaMantenimientoCron");
+const { initCronJobs, setIo } = require("./cron/guiaMantenimientoCron");
+const { initContadores } = require("./utils/contadores");
 
 const app = express();
 app.use(cors());
@@ -31,9 +32,11 @@ app.get("/", (req, res) => {
 server.listen(PORT, "0.0.0.0",() => {
   console.log(`ALSUD Server is running on port ${PORT}`);
   sequelize.sync({alter:true}) // cambiar de alter a force para que se borren las tablas y se creen de nuevo, hasta que queden bien diseñadas
-    .then(() => {
+    .then(async () => {
       console.log("Database is connected");
+      setIo(getIo());
       initCronJobs();
+      await initContadores();
     })
     .catch(err => console.error("Error connecting to the database:", err));
 });

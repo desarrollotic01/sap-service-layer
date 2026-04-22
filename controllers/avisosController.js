@@ -1,4 +1,5 @@
 const { Op } = require("sequelize");
+const { siguienteNumero } = require("../utils/contadores");
 const {
   sequelize,
   Aviso,
@@ -13,6 +14,7 @@ const {
   GuiaMantenimientoProgramacion,
   Cliente,
   Trabajador,
+  OrdenTrabajo,
 } = require("../db_connection");
 
 const ESTADOS_AVISO_VALIDOS = [
@@ -195,6 +197,12 @@ const buildIncludeAvisos = () => {
       as: "programacionGuia",
       required: false,
     },
+    {
+      model: OrdenTrabajo,
+      as: "ordenesTrabajo",
+      required: false,
+      attributes: ["id", "numeroOT", "estado", "fechaCierre"],
+    },
   ];
 };
 
@@ -233,28 +241,8 @@ async function crearAviso(data, userId) {
   try {
     const { equipos = [], ubicaciones = [], ...avisoData } = data;
 
-    // Generar numeroAviso atómicamente para evitar race conditions
-    const prefijo = avisoData.ordenVenta || avisoData.centroCosto;
-    if (prefijo) {
-      const ultimoAviso = await Aviso.findOne({
-        where: {
-          numeroAviso: { [Op.like]: `${prefijo}AV%` },
-        },
-        order: [["numeroAviso", "DESC"]],
-        lock: t.LOCK.UPDATE,
-        transaction: t,
-        attributes: ["numeroAviso"],
-      });
-
-      let siguiente = 1;
-      if (ultimoAviso?.numeroAviso) {
-        const partes = ultimoAviso.numeroAviso.split("AV");
-        const num = parseInt(partes.at(-1), 10) || 0;
-        siguiente = num + 1;
-      }
-
-      avisoData.numeroAviso = `${prefijo}AV${String(siguiente).padStart(3, "0")}`;
-    }
+    // Correlativo global AV001, AV002, ...
+    avisoData.numeroAviso = await siguienteNumero("AV", "AV", 3, t);
 
     const aviso = await Aviso.create(
       {

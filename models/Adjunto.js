@@ -73,6 +73,17 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
+      descripcion: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+
+      grupo: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: 0,
+      },
+
       mostrarEnPortal: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

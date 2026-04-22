@@ -18,6 +18,10 @@ function getConnectedUsers() {
   }));
 }
 
+function getIo() {
+  return io;
+}
+
 function initializeSocket(server) {
   io = socketIo(server, {
     cors: { origin: "*" },
@@ -50,4 +54,4 @@ function initializeSocket(server) {
   });
 }
 
-module.exports = { initializeSocket, userSockets, getConnectedUsers };
+module.exports = { initializeSocket, userSockets, getConnectedUsers, getIo };

@@ -10,6 +10,7 @@ const {
   Equipo,
   UbicacionTecnica,
   PlanMantenimiento,
+  Aviso,
 } = require("../db_connection");
 
 // ===============================
@@ -156,6 +157,13 @@ const getNotificacionForPdfDB = async (id) => {
       {
         model: OrdenTrabajo,
         as: "ordenTrabajo",
+        include: [
+          {
+            model: Aviso,
+            as: "aviso",
+            attributes: ["correoContacto", "numeroContacto", "nombreContacto"],
+          },
+        ],
       },
       {
         model: OrdenTrabajoEquipo,

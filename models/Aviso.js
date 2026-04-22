@@ -150,7 +150,7 @@ module.exports = (sequelize) => {
 
       supervisorId: {
         type: DataTypes.UUID,
-        allowNull:false,
+        allowNull: true,
       },
 
       estadoAviso: {
@@ -257,6 +257,11 @@ Aviso.belongsTo(db.GuiaMantenimiento, {
 Aviso.belongsTo(db.GuiaMantenimientoProgramacion, {
   foreignKey: "guiaMantenimientoProgramacionId",
   as: "programacionGuia",
+});
+
+Aviso.hasMany(db.OrdenTrabajo, {
+  foreignKey: "avisoId",
+  as: "ordenesTrabajo",
 });
 
 Aviso.belongsTo(db.Cliente, {

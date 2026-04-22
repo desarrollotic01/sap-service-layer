@@ -20,4 +20,6 @@ router.post("/:id/solicitud-almacen/general", roleAuth(["all_access","create_sol
 router.post("/:id/sync-sap", roleAuth(["all_access","update_ordenes_trabajo"]), handler.syncSAPOrdenTrabajoHandler);
 router.post("/:id/sync-almacen", roleAuth(["all_access","update_ordenes_trabajo"]), handler.syncAlmacenOrdenTrabajoHandler);
 router.get("/:id/solicitudes-tratamiento", roleAuth(["all_access","read_ordenes_trabajo"]), handler.getDetalleSolicitudesTratamientoPorOrdenTrabajoHandler);
+router.patch("/:id/estado", roleAuth(["all_access","update_ordenes_trabajo"]), handler.actualizarEstadoOrdenTrabajoHandler);
+router.patch("/:id/cerrar", roleAuth(["all_access","update_ordenes_trabajo"]), handler.cerrarOrdenTrabajoHandler);
 module.exports = router;

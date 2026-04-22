@@ -7,30 +7,8 @@ const {
   AvisoEquipo,
   AvisoUbicacion,
 } = require("../db_connection");
-
-const BuildNumeroAviso = async (t) => {
-  const year = new Date().getFullYear();
-  const prefix = `AV-${year}-`;
-
-  const last = await Aviso.findOne({
-    where: {
-      numeroAviso: {
-        [Op.like]: `${prefix}%`,
-      },
-    },
-    order: [["createdAt", "DESC"]],
-    transaction: t,
-  });
-
-  let nextN = 1;
-
-  if (last?.numeroAviso) {
-    const num = parseInt(String(last.numeroAviso).replace(prefix, ""), 10);
-    if (Number.isFinite(num)) nextN = num + 1;
-  }
-
-  return `${prefix}${String(nextN).padStart(5, "0")}`;
-};
+const { getIo } = require("../sockets");
+const { siguienteNumero } = require("../utils/contadores");
 
 const BuildPrioridadFromcreticidad = (creticidad) => {
   if (creticidad === "A") return "Alta";
@@ -45,7 +23,7 @@ const JobCrearAvisosDesdeAlertasGuiaMantenimientoHandler = async (req, res) => {
     const programaciones = await GuiaMantenimientoProgramacion.findAll({
       where: {
         state: true,
-        estado: "PENDIENTE",
+        estado: { [Op.in]: ["PENDIENTE", "VENCIDO"] },
         alertaDisparada: false,
         fechaAlertaCalculada: {
           [Op.lte]: now,
@@ -69,7 +47,7 @@ const JobCrearAvisosDesdeAlertasGuiaMantenimientoHandler = async (req, res) => {
         if (!guia || guia.state === false) continue;
         if (!guia.alertaActiva) continue;
 
-        const numeroAviso = await BuildNumeroAviso(t);
+        const numeroAviso = await siguienteNumero("AV", "AV", 3, t);
 
         const aviso = await Aviso.create(
           {
@@ -125,6 +103,11 @@ const JobCrearAvisosDesdeAlertasGuiaMantenimientoHandler = async (req, res) => {
         creados++;
       }
     });
+
+    if (creados > 0) {
+      const io = getIo();
+      if (io) io.emit("nuevas_alertas_guia", { count: creados });
+    }
 
     return res.status(200).json({
       message: "Job de alertas ejecutado correctamente.",

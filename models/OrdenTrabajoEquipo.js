@@ -109,10 +109,10 @@ module.exports = (sequelize) => {
         soloUnTarget() {
           const tieneEquipo = !!this.equipoId;
           const tieneUbicacion = !!this.ubicacionTecnicaId;
-
-          if ((tieneEquipo && tieneUbicacion) || (!tieneEquipo && !tieneUbicacion)) {
+          // Allow both null (general entry for instalación avisos)
+          if (tieneEquipo && tieneUbicacion) {
             throw new Error(
-              "Debe enviar solo equipoId o solo ubicacionTecnicaId"
+              "No puede tener equipoId y ubicacionTecnicaId a la vez"
             );
           }
         },

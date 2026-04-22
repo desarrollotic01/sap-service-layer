@@ -4,25 +4,20 @@ const {
   sequelize,
   GuiaMantenimientoProgramacion,
   GuiaMantenimiento,
+  PlanMantenimiento,
   Aviso,
   AvisoEquipo,
   AvisoUbicacion,
 } = require("../db_connection");
+const { siguienteNumero } = require("../utils/contadores");
+const { AddFrequency } = require("../utils/guiaMantenimientoFechas");
+const { SubtractAnticipacion } = require("../utils/guiaMantenimientoAlertas");
 
-const buildNumeroAviso = async (t) => {
-  const year = new Date().getFullYear();
-  const prefix = `AV-${year}-`;
-  const last = await Aviso.findOne({
-    where: { numeroAviso: { [Op.like]: `${prefix}%` } },
-    order: [["createdAt", "DESC"]],
-    transaction: t,
-  });
-  let nextN = 1;
-  if (last?.numeroAviso) {
-    const num = parseInt(String(last.numeroAviso).replace(prefix, ""), 10);
-    if (Number.isFinite(num)) nextN = num + 1;
-  }
-  return `${prefix}${String(nextN).padStart(5, "0")}`;
+// io se inyecta una vez que el servidor arranca
+let _io = null;
+const setIo = (io) => { _io = io; };
+const emitNuevasAlertas = (count) => {
+  if (_io && count > 0) _io.emit("nuevas_alertas_guia", { count });
 };
 
 const prioridadFromCreticidad = (c) =>
@@ -55,26 +50,58 @@ const jobMarcarVencidas = async () => {
 const jobCrearAvisosAlerta = async () => {
   try {
     const now = new Date();
+    console.log(`[CRON] jobCrearAvisosAlerta ejecutando a ${now.toISOString()}`);
+
+    // Diagnóstico: ver cuántas programaciones hay sin filtro de fecha
+    const totalPendientes = await GuiaMantenimientoProgramacion.count({
+      where: { state: true, alertaDisparada: false, estado: { [Op.in]: ["PENDIENTE", "VENCIDO"] } },
+    });
+    console.log(`[CRON] Programaciones pendientes sin filtro de fecha: ${totalPendientes}`);
+
     const programaciones = await GuiaMantenimientoProgramacion.findAll({
       where: {
         state: true,
-        estado: "PENDIENTE",
+        estado: { [Op.in]: ["PENDIENTE", "VENCIDO"] },
         alertaDisparada: false,
         fechaAlertaCalculada: { [Op.lte]: now },
       },
-      include: [{ model: GuiaMantenimiento, as: "guia" }],
+      include: [
+        {
+          model: GuiaMantenimiento,
+          as: "guia",
+          include: [{ model: PlanMantenimiento, as: "planMantenimiento" }],
+        },
+      ],
       order: [["fechaAlertaCalculada", "ASC"]],
     });
 
-    if (!programaciones.length) return;
+    console.log(`[CRON] Programaciones con fechaAlerta <= ahora: ${programaciones.length}`);
+
+    if (!programaciones.length) {
+      // Mostrar las próximas fechas para diagnóstico
+      const proximas = await GuiaMantenimientoProgramacion.findAll({
+        where: { state: true, alertaDisparada: false },
+        attributes: ["id", "fechaAlertaCalculada", "fechaProgramada", "estado"],
+        order: [["fechaAlertaCalculada", "ASC"]],
+        limit: 5,
+      });
+      if (proximas.length) {
+        console.log(`[CRON] Próximas alertas pendientes:`);
+        proximas.forEach(p => console.log(`  - fechaAlerta: ${p.fechaAlertaCalculada} | fechaProgramada: ${p.fechaProgramada} | estado: ${p.estado}`));
+      }
+      return;
+    }
 
     let creados = 0;
     await sequelize.transaction(async (t) => {
       for (const prog of programaciones) {
         const guia = prog.guia;
-        if (!guia || !guia.state || !guia.alertaActiva) continue;
+        if (!guia || !guia.state || !guia.alertaActiva) {
+          console.log(`[CRON] Saltando prog ${prog.id}: guia.state=${guia?.state} alertaActiva=${guia?.alertaActiva}`);
+          continue;
+        }
 
-        const numeroAviso = await buildNumeroAviso(t);
+        const numeroAviso = await siguienteNumero("AV", "AV", 3, t);
         const aviso = await Aviso.create(
           {
             tipoAviso: "mantenimiento",
@@ -99,30 +126,60 @@ const jobCrearAvisosAlerta = async () => {
         );
 
         if (guia.equipoId) {
-          await AvisoEquipo.create(
-            { avisoId: aviso.id, equipoId: guia.equipoId },
-            { transaction: t }
-          );
+          await AvisoEquipo.create({ avisoId: aviso.id, equipoId: guia.equipoId }, { transaction: t });
         }
         if (guia.ubicacionTecnicaId) {
-          await AvisoUbicacion.create(
-            { avisoId: aviso.id, ubicacionId: guia.ubicacionTecnicaId },
-            { transaction: t }
-          );
+          await AvisoUbicacion.create({ avisoId: aviso.id, ubicacionId: guia.ubicacionTecnicaId }, { transaction: t });
         }
 
+        // Marcar programación actual como disparada y ejecutada
         await prog.update(
-          { alertaDisparada: true, avisoId: aviso.id },
+          { alertaDisparada: true, avisoId: aviso.id, estado: "EJECUTADO" },
           { transaction: t }
         );
+
+        // ─── Generar la siguiente programación del ciclo ─────────────────────
+        const plan = guia.planMantenimiento;
+        if (plan && guia.periodoActivo) {
+          try {
+            const nextFechaProgramada = AddFrequency(
+              prog.fechaProgramada,
+              plan.frecuencia,
+              plan.frecuenciaHoras
+            );
+            const nextFechaAlerta =
+              guia.tipoAnticipacionAlerta && guia.valorAnticipacionAlerta
+                ? SubtractAnticipacion(nextFechaProgramada, guia.tipoAnticipacionAlerta, guia.valorAnticipacionAlerta)
+                : null;
+
+            await GuiaMantenimientoProgramacion.create(
+              {
+                guiaMantenimientoId: guia.id,
+                fechaProgramada: nextFechaProgramada,
+                fechaAlertaCalculada: nextFechaAlerta,
+                alertaDisparada: false,
+                estado: "PENDIENTE",
+                state: true,
+              },
+              { transaction: t }
+            );
+            console.log(`[CRON] Nueva programación creada para guia ${guia.id}: ${nextFechaProgramada.toISOString()}`);
+          } catch (err) {
+            console.warn(`[CRON] No se pudo crear siguiente programación para guia ${guia.id}: ${err.message}`);
+          }
+        }
+
         creados++;
+        console.log(`[CRON] Aviso ${numeroAviso} creado para guia ${guia.id} (prog ${prog.id})`);
       }
     });
 
-    if (creados > 0)
-      console.log(`[CRON] Creados ${creados} avisos desde alertas de guías`);
+    if (creados > 0) {
+      console.log(`[CRON] ✓ Creados ${creados} avisos desde alertas de guías`);
+      emitNuevasAlertas(creados);
+    }
   } catch (err) {
-    console.error("[CRON] Error en jobCrearAvisosAlerta:", err.message);
+    console.error("[CRON] Error en jobCrearAvisosAlerta:", err.message, err.stack);
   }
 };
 
@@ -146,4 +203,4 @@ const initCronJobs = () => {
   jobCrearAvisosAlerta();
 };
 
-module.exports = { initCronJobs };
+module.exports = { initCronJobs, setIo };

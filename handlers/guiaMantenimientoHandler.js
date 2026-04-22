@@ -338,18 +338,9 @@ const CreateGuiaMantenimientoHandler = async (req, res) => {
       const plan = await PlanMantenimiento.findByPk(planMantenimientoId, { transaction: t });
       if (!plan) throw new Error("PlanMantenimiento no existe.");
 
-      const fechaFinGuia = AddPeriodoGuia(guia.fechaInicioAlerta, guia.periodo);
-      const primeraFecha = AddFrequency(
-        guia.fechaInicioAlerta,
-        plan.frecuencia,
-        plan.frecuenciaHoras
-      );
-
-      if (primeraFecha > fechaFinGuia) {
-        throw new Error(
-          "La guía no puede generar programaciones dentro del periodo (frecuencia supera la duración del periodo)."
-        );
-      }
+      // La primera fecha de mantenimiento ES la fechaInicioAlerta que indica el usuario.
+      // Las siguientes se generan automáticamente en el cron sumando la frecuencia del plan.
+      const primeraFecha = new Date(guia.fechaInicioAlerta);
 
       const fechaAlertaCalculada =
         guia.alertaActiva &&

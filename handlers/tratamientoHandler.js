@@ -250,14 +250,6 @@ const validarActividadManual = (actividad, index, targetKey) => {
   }
 
   if (
-    actividad.tipoTrabajo !== undefined &&
-    actividad.tipoTrabajo !== null &&
-    !["REPARACION", "CAMBIO"].includes(actividad.tipoTrabajo)
-  ) {
-    return `La actividad manual ${index + 1} del target ${targetKey} tiene un tipoTrabajo inválido`;
-  }
-
-  if (
     !actividad.rolTecnico ||
     typeof actividad.rolTecnico !== "string" ||
     !actividad.rolTecnico.trim()

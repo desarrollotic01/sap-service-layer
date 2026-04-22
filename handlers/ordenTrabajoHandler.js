@@ -263,12 +263,10 @@ async function crearOrdenTrabajoHandler(req, res) {
         const tieneEquipoId = !!equipo.equipoId;
         const tieneUbicacionTecnicaId = !!equipo.ubicacionTecnicaId;
 
-        if (
-          (tieneEquipoId && tieneUbicacionTecnicaId) ||
-          (!tieneEquipoId && !tieneUbicacionTecnicaId)
-        ) {
+        // Allow entries with both null (general entry for instalación avisos)
+        if (tieneEquipoId && tieneUbicacionTecnicaId) {
           errors.push(
-            `El equipo en posición ${index} debe tener solo equipoId o solo ubicacionTecnicaId`
+            `El equipo en posición ${index} no puede tener equipoId y ubicacionTecnicaId a la vez`
           );
         }
 
@@ -314,6 +312,7 @@ async function crearOrdenTrabajoHandler(req, res) {
             }
             if (
               actividad.tipoTrabajo !== undefined &&
+              actividad.tipoTrabajo !== null &&
               !TIPOS_TRABAJO_VALIDOS.includes(actividad.tipoTrabajo)
             ) errors.push(`tipoTrabajo no válido en actividad posición ${aIndex} del equipo ${index}`);
 
@@ -706,6 +705,42 @@ async function liberarOrdenTrabajoHandler(req, res) {
 }
  
 /* =========================================================
+   PATCH ESTADO OT (solo cambia el campo estado)
+========================================================= */
+async function actualizarEstadoOrdenTrabajoHandler(req, res) {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body || {};
+    const ESTADOS_VALIDOS = ["CREADO", "LIBERADO", "CIERRE_TECNICO", "CERRADO", "CANCELADO"];
+    if (!id) return res.status(400).json({ success: false, message: "id es obligatorio" });
+    if (!estado || !ESTADOS_VALIDOS.includes(estado))
+      return res.status(400).json({ success: false, message: "estado no válido" });
+
+    const data = await ordenTrabajoController.actualizarOrdenTrabajoCompleta(id, { estado }, req.user?.id);
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error("ERROR ACTUALIZAR ESTADO OT:", error);
+    return res.status(400).json({ success: false, message: error.message });
+  }
+}
+
+/* =========================================================
+   PATCH CERRAR OT
+========================================================= */
+async function cerrarOrdenTrabajoHandler(req, res) {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: "id es obligatorio" });
+
+    const data = await ordenTrabajoController.cerrarOrdenTrabajo(id);
+    return res.json({ success: true, ...data });
+  } catch (error) {
+    console.error("ERROR CERRAR OT:", error);
+    return res.status(400).json({ success: false, message: error.message });
+  }
+}
+
+/* =========================================================
    EXPORTS
 ========================================================= */
 module.exports = {
@@ -729,4 +764,6 @@ module.exports = {
   crearSolicitudAlmacenGeneralHandler,
   verificarLiberacionHandler,
   syncAlmacenOrdenTrabajoHandler,
+  cerrarOrdenTrabajoHandler,
+  actualizarEstadoOrdenTrabajoHandler,
 };

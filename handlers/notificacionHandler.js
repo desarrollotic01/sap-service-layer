@@ -20,7 +20,7 @@ const {
   getNotificacionesByOTDB,
 } = require("../controllers/notificacionController");
 
-const { renderNotificacionPdfBuffer } = require("../services/notificacionPdfService");
+const { renderNotificacionPdfBuffer, mergePdfBuffers, renderResumenOTPdfBuffer } = require("../services/notificacionPdfService");
 
 const parseJsonField = (value, fallback) => {
   if (value === undefined || value === null || value === "") return fallback;
@@ -102,6 +102,7 @@ const crearNotificacion = async (req, res) => {
 
     const tecnicos = parseJsonField(req.body.tecnicos, []);
     const planes = parseJsonField(req.body.planes, []);
+    const adjuntosBody = parseJsonField(req.body.adjuntos, []);
     const usePrecargarPlanes = String(precargarPlanes) === "true";
 
     if (!fechaInicio || !fechaFin) {
@@ -254,12 +255,18 @@ const crearNotificacion = async (req, res) => {
       });
     }
 
-    const adjuntosGeneralesFiles = [
-      ...(filesByField.adjuntosGenerales || []),
-      ...(filesByField.actas || []),
-      ...(filesByField.informes || []),
-      ...(filesByField.checklists || []),
-    ];
+    // Recoger TODOS los archivos que no sean de planes específicos
+    // Los campos de planes siguen el patrón planAdjuntos_0, planAdjuntos_1, etc.
+    const planesValidosCount = Array.isArray(planes)
+      ? planes.filter((p) => p?.ordenTrabajoActividadId && p?.estado).length
+      : 0;
+    const planAdjuntoFieldNames = new Set(
+      Array.from({ length: planesValidosCount }, (_, i) => `planAdjuntos_${i}`)
+    );
+
+    const adjuntosGeneralesFiles = Object.entries(filesByField)
+      .filter(([fieldname]) => !planAdjuntoFieldNames.has(fieldname))
+      .flatMap(([, files]) => files);
 
     if (adjuntosGeneralesFiles.length > 0) {
       const adjuntosGenerales = adjuntosGeneralesFiles.map((file) => {
@@ -278,6 +285,34 @@ const crearNotificacion = async (req, res) => {
       });
 
       await bulkCreateAdjuntosDB(adjuntosGenerales, transaction);
+    }
+
+    // Adjuntos pre-subidos que el frontend envía como JSON en el body
+    console.log("[ADJUNTOS] adjuntosBody recibidos:", adjuntosBody.length,
+      adjuntosBody.map(a => ({ cat: a.categoria, grupo: a.grupo, desc: a.descripcion, url: a.url?.slice(-20) }))
+    );
+
+    if (Array.isArray(adjuntosBody) && adjuntosBody.length > 0) {
+      const adjuntosDeBody = adjuntosBody
+        .filter((adj) => adj?.url)
+        .map((adj) => ({
+          nombre: adj.nombre || "archivo",
+          url: adj.url,
+          extension: adj.extension || "",
+          categoria: adj.categoria || "OTRO",
+          descripcion: adj.descripcion || null,
+          grupo: adj.grupo != null ? Number(adj.grupo) : 0,
+          notificacionId: notificacion.id,
+          ordenTrabajoId: adj.ordenTrabajoId || ordenTrabajoId,
+          ordenTrabajoEquipoId: adj.ordenTrabajoEquipoId || ordenTrabajoEquipoId,
+          equipoId: equipoOT.equipoId || null,
+        }));
+
+      console.log("[ADJUNTOS] guardando en DB:", adjuntosDeBody.map(a => ({ cat: a.categoria, grupo: a.grupo, desc: a.descripcion })));
+
+      if (adjuntosDeBody.length > 0) {
+        await bulkCreateAdjuntosDB(adjuntosDeBody, transaction);
+      }
     }
 
     await actualizarOTACierreTecnicoSiCompleta(ordenTrabajoId, transaction);
@@ -467,6 +502,73 @@ const listarNotificacionesPorOT = async (req, res) => {
   }
 };
 
+const combinarPdfsOT = async (req, res) => {
+  try {
+    const { ordenTrabajoId } = req.params;
+
+    const notificaciones = await getNotificacionesByOTDB(ordenTrabajoId);
+    if (!notificaciones || notificaciones.length === 0) {
+      return res.status(404).json({ message: "No hay notificaciones para esta OT" });
+    }
+
+    const buffers = [];
+    let otNumero = null;
+
+    for (const notifResumen of notificaciones) {
+      const notif = await getNotificacionForPdfDB(notifResumen.id);
+      if (!notif) continue;
+      if (!otNumero) otNumero = notif?.ordenTrabajo?.numeroOT || null;
+      const buf = await renderNotificacionPdfBuffer(notif);
+      buffers.push(buf);
+    }
+
+    if (buffers.length === 0) {
+      return res.status(404).json({ message: "No se pudieron generar PDFs" });
+    }
+
+    // Tabla resumen al final
+    const resumenBuf = await renderResumenOTPdfBuffer(notificaciones, otNumero);
+    buffers.push(resumenBuf);
+
+    const merged = await mergePdfBuffers(buffers);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename=informe_completo_OT_${ordenTrabajoId}.pdf`
+    );
+    return res.send(merged);
+  } catch (error) {
+    console.error("ERROR PDF combinado:", error);
+    return res.status(500).json({ message: "Error al combinar PDFs", error: error.message });
+  }
+};
+
+const generarPdfResumen = async (req, res) => {
+  try {
+    const { ordenTrabajoId } = req.params;
+    const { grupos } = req.body || {};
+
+    const notificaciones = await getNotificacionesByOTDB(ordenTrabajoId);
+    if (!notificaciones || notificaciones.length === 0) {
+      return res.status(404).json({ message: "No hay notificaciones para esta OT" });
+    }
+
+    const otNumero = notificaciones[0]?.ordenTrabajoId
+      ? (await getNotificacionForPdfDB(notificaciones[0].id))?.ordenTrabajo?.numeroOT
+      : null;
+
+    const pdfBuffer = await renderResumenOTPdfBuffer(notificaciones, otNumero, grupos);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename=resumen_OT_${ordenTrabajoId}.pdf`);
+    return res.send(pdfBuffer);
+  } catch (error) {
+    console.error("ERROR PDF resumen:", error);
+    return res.status(500).json({ message: "Error al generar PDF resumen", error: error.message });
+  }
+};
+
 module.exports = {
   crearNotificacion,
   obtenerNotificacion,
@@ -475,4 +577,6 @@ module.exports = {
   generarNotificacionesPorOT,
   generarPdfNotificacion,
   listarNotificacionesPorOT,
+  combinarPdfsOT,
+  generarPdfResumen,
 };

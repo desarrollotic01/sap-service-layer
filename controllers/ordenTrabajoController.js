@@ -16,7 +16,10 @@ const {
   Equipo,
   UbicacionTecnica,
   PersonalCorreo,
+  GuiaMantenimiento,
+  GuiaMantenimientoProgramacion,
 } = require("../db_connection");
+const { siguienteNumero } = require("../utils/contadores");
 
 const {
   enviarSolicitudCompraASAPDesdeObjeto,
@@ -411,6 +414,11 @@ async function copiarActividadesATargetsOT({
         where[Op.or].push({ equipoId: { [Op.in]: equipoIds } });
       if (ubicacionIds.length)
         where[Op.or].push({ ubicacionTecnicaId: { [Op.in]: ubicacionIds } });
+      // Also include "general" treatment entry (both IDs null) for instalación
+      const hasGeneralTarget = targetsOT.some((x) => !x.equipoId && !x.ubicacionTecnicaId);
+      if (hasGeneralTarget) {
+        where[Op.or].push({ equipoId: null, ubicacionTecnicaId: null });
+      }
 
       if (where[Op.or].length > 0) {
         const tes = await TratamientoEquipo.findAll({
@@ -527,25 +535,20 @@ async function crearOTInterna(
   },
   t
 ) {
-  const countOT = await OrdenTrabajo.count({
-    where: { avisoId: aviso.id },
-    transaction: t,
-  });
-
-  const correlativo = String(countOT + 1).padStart(3, "0");
+  const numeroOT = await siguienteNumero("OT", "OT", 3, t);
 
   const ot = await OrdenTrabajo.create(
     {
       ...otDataBase,
       avisoId: aviso.id,
-      numeroOT: `${aviso.numeroAviso}-OT${correlativo}`,
+      numeroOT,
     },
     { transaction: t }
   );
 
   const targetsOT = await OrdenTrabajoEquipo.bulkCreate(
     equipos.map((x) => {
-      ensureValidTarget(x);
+      if (x.equipoId || x.ubicacionTecnicaId) ensureValidTarget(x);
       return {
         ordenTrabajoId: ot.id,
         equipoId: x.equipoId || null,
@@ -619,15 +622,8 @@ async function crearOTInterna(
   if (adjuntos?.length) {
     await Adjunto.bulkCreate(
       adjuntos.map((a) => ({
-        nombre: a.nombre,
-        url: a.url,
-        extension: a.extension || null,
-        categoria: a.categoria || null,
-        mostrarEnPortal: a.mostrarEnPortal ?? false,
-        tituloPortal: a.tituloPortal || null,
-        descripcionPortal: a.descripcionPortal || null,
-        ordenPortal: a.ordenPortal ?? 0,
-        ordenTrabajoId: ot.id,
+        ...a,
+  ordenTrabajoId: ot.id,
       })),
       { transaction: t }
     );
@@ -644,15 +640,8 @@ async function crearOTInterna(
     ) {
       await Adjunto.bulkCreate(
         payloadEquipo.adjuntos.map((a) => ({
-          nombre: a.nombre,
-          url: a.url,
-          extension: a.extension || null,
-          categoria: a.categoria || null,
-          mostrarEnPortal: a.mostrarEnPortal ?? false,
-          tituloPortal: a.tituloPortal || null,
-          descripcionPortal: a.descripcionPortal || null,
-          ordenPortal: a.ordenPortal ?? 0,
-          ordenTrabajoEquipoId: equipoCreado.id,
+          ...a,
+  ordenTrabajoEquipoId: equipoCreado.id,
         })),
         { transaction: t }
       );
@@ -713,11 +702,13 @@ async function crearOrdenTrabajo(data) {
     if (!aviso) throw new Error("Aviso no encontrado");
 
     const esVenta = aviso.tipoAviso === "venta";
+    const esInstalacion = aviso.tipoAviso === "instalacion";
 
-    if (!esVenta && !equipos.length)
+    if (!esVenta && !esInstalacion && !equipos.length)
       throw new Error("Debe enviar al menos un equipo o ubicación técnica");
 
-    equipos.forEach(ensureValidTarget);
+    // For instalación, allow a "general" entry (both IDs null); skip validation on those
+    equipos.filter((e) => e.equipoId || e.ubicacionTecnicaId).forEach(ensureValidTarget);
 
     if (aviso.tipoAviso === "mantenimiento") {
       if (!aviso.tipoMantenimiento)
@@ -727,8 +718,8 @@ async function crearOrdenTrabajo(data) {
       otData.tipoMantenimiento = null;
     }
 
-    if (!esVenta) await validarTargetsDelAviso(aviso.id, equipos, t);
-    validarActividadesPayload(equipos, otData.tipoMantenimiento);
+    if (!esVenta && !esInstalacion) await validarTargetsDelAviso(aviso.id, equipos, t);
+    if (!esInstalacion) validarActividadesPayload(equipos, otData.tipoMantenimiento);
 
     // Obtener tratamientoId si existe
     const tratamiento = await Tratamiento.findOne({
@@ -1425,11 +1416,7 @@ async function syncSolicitudesCompraOT(id) {
   } else {
     // Crear nueva consolidada
     const ordenVenta = await _obtenerOVdeOT(id);
-    const numero = await _generarNumeroSolicitudOT({
-      modelo: SolicitudCompra,
-      prefijo: "SC",
-      ordenVenta,
-    });
+    const numero = await _generarNumeroSolicitudOT({ prefijo: "SC" });
     const base = pendientes[0];
     consolidada = await SolicitudCompra.create({
       numeroSolicitud: numero,
@@ -1525,11 +1512,7 @@ async function syncSolicitudesAlmacenOT(id, { destinatarioId }) {
 
   // Generar nuevo número SA-OV-XXX
   const ordenVenta = await _obtenerOVdeOT(id);
-  const numero = await _generarNumeroSolicitudOT({
-    modelo: SolicitudAlmacen,
-    prefijo: "SA",
-    ordenVenta,
-  });
+  const numero = await _generarNumeroSolicitudOT({ prefijo: "SA" });
 
   const base = pendientes[0];
 
@@ -1678,12 +1661,16 @@ async function _obtenerOVdeOT(ordenTrabajoId) {
   return String(ov).trim();
 }
 
-async function _generarNumeroSolicitudOT({ modelo, prefijo, ordenVenta }) {
-  const total = await modelo.count({
-    where: { numeroSolicitud: { [Op.like]: `${prefijo}-${ordenVenta}-%` } },
-  });
-  const correlativo = String(total + 1).padStart(3, "0");
-  return `${prefijo}-${ordenVenta}-${correlativo}`;
+async function _generarNumeroSolicitudOT({ prefijo }) {
+  const t = await sequelize.transaction();
+  try {
+    const numero = await siguienteNumero(prefijo, prefijo, 3, t);
+    await t.commit();
+    return numero;
+  } catch (err) {
+    await t.rollback();
+    throw err;
+  }
 }
 
 /* =========================================================
@@ -1718,9 +1705,7 @@ async function generarSolicitudCompraOT(ordenTrabajoId) {
 
   const ordenVenta = await _obtenerOVdeOT(ordenTrabajoId);
   const numero = await _generarNumeroSolicitudOT({
-    modelo: SolicitudCompra,
     prefijo: "SC",
-    ordenVenta,
   });
 
   const base = solicitudes[0];
@@ -1833,11 +1818,7 @@ async function generarSolicitudAlmacenOT(ordenTrabajoId, { destinatarioId }) {
     throw new Error("No hay líneas válidas para generar la solicitud");
 
   const ordenVenta = await _obtenerOVdeOT(ordenTrabajoId);
-  const numero = await _generarNumeroSolicitudOT({
-    modelo: SolicitudAlmacen,
-    prefijo: "SA",
-    ordenVenta,
-  });
+  const numero = await _generarNumeroSolicitudOT({ prefijo: "SA" });
 
   const base = solicitudes[0];
 
@@ -2349,6 +2330,101 @@ async function crearSolicitudAlmacenGeneralEnOT(ordenTrabajoId, { requiredDate, 
 }
 
 /* =========================================================
+   HELPERS — GUIA MANTENIMIENTO
+========================================================= */
+function calcularSiguienteFecha(fechaBase, periodo) {
+  const d = new Date(fechaBase);
+  switch (periodo) {
+    case "DIARIO":      d.setDate(d.getDate() + 1); break;
+    case "SEMANAL":     d.setDate(d.getDate() + 7); break;
+    case "MENSUAL":     d.setMonth(d.getMonth() + 1); break;
+    case "BIMESTRAL":   d.setMonth(d.getMonth() + 2); break;
+    case "TRIMESTRAL":  d.setMonth(d.getMonth() + 3); break;
+    case "SEIS_MESES":  d.setMonth(d.getMonth() + 6); break;
+    case "ANUAL":       d.setFullYear(d.getFullYear() + 1); break;
+    case "CINCO_ANIOS": d.setFullYear(d.getFullYear() + 5); break;
+    case "DIEZ_ANIOS":  d.setFullYear(d.getFullYear() + 10); break;
+  }
+  return d;
+}
+
+function calcularFechaAlerta(fechaProgramada, tipo, valor) {
+  if (!tipo || !valor) return new Date(fechaProgramada);
+  const d = new Date(fechaProgramada);
+  switch (tipo) {
+    case "MINUTOS": d.setMinutes(d.getMinutes() - valor); break;
+    case "HORAS":   d.setHours(d.getHours() - valor); break;
+    case "DIAS":    d.setDate(d.getDate() - valor); break;
+    case "SEMANAS": d.setDate(d.getDate() - valor * 7); break;
+  }
+  return d;
+}
+
+/* =========================================================
+   CERRAR OT
+   PATCH /orden-trabajo/:id/cerrar
+   — Cierra la OT (desde CIERRE_TECNICO → CERRADO)
+   — Si el aviso es de origen "guia": lo finaliza y genera
+     la siguiente programación con fecha basada en el cierre real
+========================================================= */
+async function cerrarOrdenTrabajo(id) {
+  const ot = await OrdenTrabajo.findByPk(id, {
+    include: [{ model: Aviso, as: "aviso" }],
+  });
+  if (!ot) throw new Error("OT no encontrada");
+  if (ot.estado !== "CIERRE_TECNICO")
+    throw new Error("Solo se puede cerrar una OT en estado CIERRE_TECNICO");
+
+  const ahora = new Date();
+
+  await sequelize.transaction(async (t) => {
+    await ot.update({ estado: "CERRADO", fechaCierre: ahora }, { transaction: t });
+
+    const aviso = ot.aviso;
+    if (!aviso || aviso.origenAviso !== "guia") return;
+
+    await aviso.update({ estadoAviso: "finalizado" }, { transaction: t });
+
+    if (aviso.guiaMantenimientoProgramacionId) {
+      const prog = await GuiaMantenimientoProgramacion.findByPk(
+        aviso.guiaMantenimientoProgramacionId
+      );
+      if (prog) {
+        await prog.update(
+          { estado: "EJECUTADO", fechaEjecucionReal: ahora },
+          { transaction: t }
+        );
+      }
+    }
+
+    if (aviso.guiaMantenimientoId) {
+      const guia = await GuiaMantenimiento.findByPk(aviso.guiaMantenimientoId);
+      if (guia && guia.state && guia.periodoActivo) {
+        const siguienteFecha = calcularSiguienteFecha(ahora, guia.periodo);
+        const fechaAlerta = calcularFechaAlerta(
+          siguienteFecha,
+          guia.tipoAnticipacionAlerta,
+          guia.valorAnticipacionAlerta
+        );
+        await GuiaMantenimientoProgramacion.create(
+          {
+            guiaMantenimientoId: guia.id,
+            fechaProgramada: siguienteFecha,
+            fechaAlertaCalculada: fechaAlerta,
+            estado: "PENDIENTE",
+            alertaDisparada: false,
+            state: true,
+          },
+          { transaction: t }
+        );
+      }
+    }
+  });
+
+  return { message: "OT cerrada correctamente" };
+}
+
+/* =========================================================
    EXPORTS
 ========================================================= */
 module.exports = {
@@ -2371,4 +2447,5 @@ module.exports = {
   asignarSolicitudGeneralAOT,
   crearSolicitudCompraGeneralEnOT,
   crearSolicitudAlmacenGeneralEnOT,
+  cerrarOrdenTrabajo,
 };

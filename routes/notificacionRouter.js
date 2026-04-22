@@ -1,13 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const uploadAdjuntosNotificacion = require("../middlewares/uploadAdjuntosNotificacion");
-const { crearNotificacion, obtenerNotificacion, listarNotificaciones, finalizarNotificacion, generarNotificacionesPorOT, generarPdfNotificacion, listarNotificacionesPorOT } = require("../handlers/notificacionHandler");
+const { crearNotificacion, obtenerNotificacion, listarNotificaciones, finalizarNotificacion, generarNotificacionesPorOT, generarPdfNotificacion, listarNotificacionesPorOT, combinarPdfsOT, generarPdfResumen } = require("../handlers/notificacionHandler");
 const roleAuth = require("../checkers/roleAuth");
 router.post("/", roleAuth(["all_access","create_notificaciones"]), uploadAdjuntosNotificacion.any(), crearNotificacion);
 router.get("/", roleAuth(["all_access","read_notificaciones"]), listarNotificaciones);
 router.get("/ot/:ordenTrabajoId", roleAuth(["all_access","read_notificaciones"]), listarNotificacionesPorOT);
 router.post("/ot/:ordenTrabajoId/generar", roleAuth(["all_access","create_notificaciones"]), generarNotificacionesPorOT);
 router.get("/:id/pdf", roleAuth(["all_access","read_notificaciones"]), generarPdfNotificacion);
+router.get("/ot/:ordenTrabajoId/pdf-completo", roleAuth(["all_access","read_notificaciones"]), combinarPdfsOT);
+router.post("/ot/:ordenTrabajoId/pdf-resumen", roleAuth(["all_access","read_notificaciones"]), generarPdfResumen);
 router.post("/:id/finalizar", roleAuth(["all_access","update_notificaciones"]), finalizarNotificacion);
 router.get("/:id", roleAuth(["all_access","read_notificaciones"]), obtenerNotificacion);
 module.exports = router;

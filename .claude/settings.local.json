@@ -27,7 +27,9 @@
       "Bash(grep -iE \"\\\\.\\(jsx|js\\)$\")",
       "Bash(npx vite *)",
       "Bash(npx tsc *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(grep -B 3 -A 15 \"numeroOT.*\\\\${\" \"C:\\\\Users\\\\Marco\\\\OneDrive\\\\Escritorio\\\\sap-service-layer\\\\controllers\\\\ordenTrabajoController.js\")",
+      "Bash(grep -B 20 \"numeroOT: \\\\`\\\\${aviso.numeroAviso}-OT\" \"C:\\\\Users\\\\Marco\\\\OneDrive\\\\Escritorio\\\\sap-service-layer\\\\controllers\\\\ordenTrabajoController.js\")"
     ]
   }
 }

@@ -14,6 +14,7 @@ const {
   UbicacionTecnica,
 } = require("../db_connection");
 const { Op } = require("sequelize");
+const { siguienteNumero } = require("../utils/contadores");
 
 const TIPOS_TRABAJO_CORRECTIVO = ["REPARACION", "CAMBIO"];
 
@@ -137,24 +138,6 @@ const obtenerOrdenVentaParaTarget = async ({
   return ovGeneral;
 };
 
-const generarNumeroSolicitud = async ({
-  modelo,
-  prefijo,
-  ordenVenta,
-  transaction,
-}) => {
-  const total = await modelo.count({
-    where: {
-      numeroSolicitud: {
-        [Op.like]: `${prefijo}-${ordenVenta}-%`,
-      },
-    },
-    transaction,
-  });
-
-  const correlativo = String(total + 1).padStart(3, "0");
-  return `${prefijo}-${ordenVenta}-${correlativo}`;
-};
 
 /* ===============================
    HELPERS SOLICITUD OPCIONAL
@@ -327,12 +310,7 @@ const crearSolicitudCompra = async ({
     transaction: t,
   });
 
-  const numeroSolicitud = await generarNumeroSolicitud({
-    modelo: SolicitudCompra,
-    prefijo: "SC",
-    ordenVenta,
-    transaction: t,
-  });
+  const numeroSolicitud = await siguienteNumero("SC", "SC", 3, t);
 
   const solicitud = await SolicitudCompra.create(
     {
@@ -388,12 +366,7 @@ const crearSolicitudAlmacen = async ({
     transaction: t,
   });
 
-  const numeroSolicitud = await generarNumeroSolicitud({
-    modelo: SolicitudAlmacen,
-    prefijo: "SA",
-    ordenVenta,
-    transaction: t,
-  });
+  const numeroSolicitud = await siguienteNumero("SA", "SA", 3, t);
 
   const solicitud = await SolicitudAlmacen.create(
     {
@@ -509,7 +482,7 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
       })),
     ].filter((x) => x.equipoId || x.ubicacionId);
 
-    if (!targets.length && aviso.tipoAviso !== "venta") {
+    if (!targets.length && !["venta", "instalacion"].includes(aviso.tipoAviso)) {
       throw new Error("El aviso no tiene equipos ni ubicaciones técnicas asociadas");
     }
 
@@ -768,29 +741,10 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
           );
         }
 
-        if (manuales.length === 0) {
-          throw new Error(
-            `Debe agregar actividades manuales para ${
-              target.equipoId ? "equipo" : "ubicación técnica"
-            } ${targetKey}`
-          );
-        }
-
         for (const act of manuales) {
           if (!act.tarea || !String(act.tarea).trim()) {
             throw new Error(
               `Actividad manual sin tarea para ${
-                target.equipoId ? "equipo" : "ubicación técnica"
-              } ${targetKey}`
-            );
-          }
-
-          if (
-            act.tipoTrabajo &&
-            !TIPOS_TRABAJO_CORRECTIVO.includes(act.tipoTrabajo)
-          ) {
-            throw new Error(
-              `TipoTrabajo inválido (solo REPARACION o CAMBIO) para ${
                 target.equipoId ? "equipo" : "ubicación técnica"
               } ${targetKey}`
             );
@@ -840,6 +794,43 @@ const crearTratamiento = async ({ avisoId, body, usuarioId }) => {
               unidadDuracion: unidad,
               duracionEstimadaMin: min,
 
+              observaciones: act.observaciones || null,
+              origen: "MANUAL",
+              estado: "PENDIENTE",
+            },
+            { transaction: t }
+          );
+        }
+      }
+    }
+
+    // Handle instalación general activities (not tied to specific equipo/ubicación)
+    if (aviso.tipoAviso === "instalacion") {
+      const actividadesGenerales = tratamiento.actividadesManuales?.["__general__"] || [];
+      if (actividadesGenerales.length > 0) {
+        const teGeneral = await TratamientoEquipo.create(
+          { tratamientoId: nuevoTratamiento.id, equipoId: null, ubicacionTecnicaId: null },
+          { transaction: t }
+        );
+        for (const act of actividadesGenerales) {
+          const unidad = act.unidadDuracion || "min";
+          const min = act.duracionEstimadaMin ?? toMinutes(act.duracionEstimadaValor, unidad);
+          await TratamientoEquipoActividad.create(
+            {
+              tratamientoEquipoId: teGeneral.id,
+              planMantenimientoActividadId: null,
+              codigoActividad: null,
+              sistema: act.sistema || null,
+              subsistema: act.subsistema || null,
+              componente: act.componente || null,
+              tarea: String(act.tarea).trim(),
+              descripcion: act.descripcion || null,
+              tipoTrabajo: act.tipoTrabajo || null,
+              rolTecnico: act.rolTecnico || null,
+              cantidadTecnicos: Number(act.cantidadTecnicos) || 1,
+              duracionEstimadaValor: act.duracionEstimadaValor ?? null,
+              unidadDuracion: unidad,
+              duracionEstimadaMin: min,
               observaciones: act.observaciones || null,
               origen: "MANUAL",
               estado: "PENDIENTE",
@@ -1037,12 +1028,7 @@ const upsertSolicitud = async ({
       transaction: t,
     });
 
-    const numeroSolicitud = await generarNumeroSolicitud({
-      modelo: SolicitudCompra,
-      prefijo: "SC",
-      ordenVenta,
-      transaction: t,
-    });
+    const numeroSolicitud = await siguienteNumero("SC", "SC", 3, t);
 
     solicitud = await SolicitudCompra.create(
       { ...header, numeroSolicitud },
