@@ -48,7 +48,7 @@ module.exports = (sequelize) => {
           "tecnico_mecanico",
           "supervisor"
         ),
-        allowNull: false,
+        allowNull: true,
       },
 
       // ✅ guardar solo minutos reales

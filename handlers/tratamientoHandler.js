@@ -249,13 +249,7 @@ const validarActividadManual = (actividad, index, targetKey) => {
     return `La actividad manual ${index + 1} del target ${targetKey} debe tener una tarea válida`;
   }
 
-  if (
-    !actividad.rolTecnico ||
-    typeof actividad.rolTecnico !== "string" ||
-    !actividad.rolTecnico.trim()
-  ) {
-    return `La actividad manual ${index + 1} del target ${targetKey} debe tener rolTecnico`;
-  }
+  
 
   if (
     actividad.cantidadTecnicos === undefined ||

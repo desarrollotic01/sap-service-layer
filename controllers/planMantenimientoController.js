@@ -382,9 +382,6 @@ const crearPlan = async (data, files = []) => {
         throw new Error(`Actividad ${index + 1}: tipoTrabajo obligatorio`);
       }
 
-      if (!actividadData.rolTecnico) {
-        throw new Error(`Actividad ${index + 1}: rolTecnico obligatorio`);
-      }
 
       const codigoActividad = generarCodigoActividad(codigoPlan, index);
 
