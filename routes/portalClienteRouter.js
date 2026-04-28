@@ -4,6 +4,7 @@ const {
   obtenerPortalClientePorTokenHandler,
   listarLinksPortalPorClienteHandler,
   desactivarLinkPortalClienteHandler,
+  obtenerNotificacionPdfPortalHandler,
 } = require("../handlers/portalClienteHandler");
 
 const router = Router();
@@ -15,5 +16,6 @@ router.patch("/desactivar/:id", desactivarLinkPortalClienteHandler);
 
 /* PORTAL EXTERNO */
 router.get("/acceso/:token", obtenerPortalClientePorTokenHandler);
+router.get("/:token/notificacion/:id/pdf", obtenerNotificacionPdfPortalHandler);
 
 module.exports = router;

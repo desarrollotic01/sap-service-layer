@@ -1,5 +1,6 @@
 const {
   crearPlan,
+  actualizarPlan,
   obtenerPlanes,
   obtenerPlanPorId,
   obtenerPlanesPorEquipo,
@@ -77,6 +78,23 @@ const obtenerMejorPlanPorEquipoHandler = async (req, res) => {
     const plan = await obtenerMejorPlanPorEquipo(req.params.equipoId);
     return res.json(plan);
   } catch (error) {
+    console.error(error);
+    return res.status(400).json({ error: error.message });
+  }
+};
+
+/* =========================================================
+   ACTUALIZAR PLAN COMPLETO
+========================================================= */
+const actualizarPlanHandler = async (req, res) => {
+  try {
+    const plan = await actualizarPlan(req.params.id, req.body, req.files || []);
+    return res.json(plan);
+  } catch (error) {
+    deleteUploadedFiles(req.files || []);
+    if (error.message?.toLowerCase().includes("no encontrado")) {
+      return res.status(404).json({ error: error.message });
+    }
     console.error(error);
     return res.status(400).json({ error: error.message });
   }
@@ -170,6 +188,7 @@ const actualizarPlanesMantenimientoUbicacionTecnica = async (req, res) => {
 
 module.exports = {
   crearPlanHandler,
+  actualizarPlanHandler,
   obtenerPlanesHandler,
   obtenerPlanPorIdHandler,
   obtenerPlanesPorEquipoHandler,

@@ -617,6 +617,175 @@ const actualizarPlanesDeEquipo = async (equipoId, planesMantenimientoIds) => {
 };
 
 /* =========================================================
+   ACTUALIZAR PLAN COMPLETO
+========================================================= */
+
+const actualizarPlan = async (id, data, files = []) => {
+  if (!id) throw new Error("El id es obligatorio");
+
+  const plan = await PlanMantenimiento.findByPk(id);
+  if (!plan) throw new Error("Plan no encontrado");
+
+  const transaction = await sequelize.transaction();
+
+  try {
+    const {
+      actividades: actividadesRaw = [],
+      itemsPlan: itemsPlanRaw = [],
+      equiposIds: equiposIdsRaw = [],
+      ubicacionesTecnicasIds: ubicacionesTecnicasIdsRaw = [],
+      ...planDataRaw
+    } = data || {};
+
+    const actividades = parseJSON(actividadesRaw, []);
+    const itemsPlan = parseJSON(itemsPlanRaw, []);
+    const equiposIds = parseJSON(equiposIdsRaw, []);
+    const ubicacionesTecnicasIds = parseJSON(ubicacionesTecnicasIdsRaw, []);
+
+    const planData = { ...planDataRaw };
+
+    planData.nombre = planData.nombre?.trim();
+    planData.contextoObjetivo = normalize(planData.contextoObjetivo);
+    planData.tipo = normalize(planData.tipo);
+    planData.frecuencia = normalize(planData.frecuencia);
+    planData.familiaId = normalize(planData.familiaId);
+    planData.tipoEquipo = normalize(planData.tipoEquipo);
+    planData.modeloEquipo = normalize(planData.modeloEquipo);
+    planData.equipoObjetivoId = normalize(planData.equipoObjetivoId);
+    planData.ubicacionTecnicaObjetivoId = normalize(planData.ubicacionTecnicaObjetivoId);
+    planData.frecuenciaHoras = normalize(planData.frecuenciaHoras);
+    planData.esEspecifico = planData.esEspecifico === true || planData.esEspecifico === "true";
+
+    if (!planData.nombre) throw new Error("El nombre del plan es obligatorio");
+    if (!planData.contextoObjetivo) throw new Error("El contextoObjetivo es obligatorio");
+    if (!planData.tipo) throw new Error("El tipo de plan es obligatorio");
+    if (!planData.frecuencia) throw new Error("La frecuencia del plan es obligatoria");
+    if (!Array.isArray(actividades) || actividades.length === 0) {
+      throw new Error("El plan debe tener al menos una actividad");
+    }
+
+    // Actualizar campos del plan (NO regenerar codigoPlan)
+    await plan.update(
+      {
+        nombre: planData.nombre,
+        contextoObjetivo: planData.contextoObjetivo,
+        tipo: planData.tipo,
+        frecuencia: planData.frecuencia,
+        frecuenciaHoras: planData.frecuencia === "POR_HORA" ? Number(planData.frecuenciaHoras) : null,
+        familiaId: planData.contextoObjetivo === "EQUIPO" ? planData.familiaId : null,
+        tipoEquipo: planData.contextoObjetivo === "EQUIPO" ? planData.tipoEquipo : null,
+        modeloEquipo: planData.contextoObjetivo === "EQUIPO" ? planData.modeloEquipo : null,
+        equipoObjetivoId: planData.contextoObjetivo === "EQUIPO" ? planData.equipoObjetivoId : null,
+        ubicacionTecnicaObjetivoId: planData.contextoObjetivo === "UBICACION_TECNICA" ? planData.ubicacionTecnicaObjetivoId : null,
+        esEspecifico: planData.esEspecifico,
+      },
+      { transaction }
+    );
+
+    // Reemplazar actividades: eliminar las antiguas y crear las nuevas
+    const actividadesAntiguas = await PlanMantenimientoActividad.findAll({
+      where: { planMantenimientoId: id },
+      transaction,
+    });
+    const idsAntiguos = actividadesAntiguas.map((a) => a.id);
+
+    if (idsAntiguos.length > 0) {
+      await PlanActividadItem.destroy({ where: { actividadId: idsAntiguos }, transaction });
+      await PlanMantenimientoActividad.destroy({ where: { planMantenimientoId: id }, transaction });
+    }
+
+    for (const [index, actividad] of actividades.entries()) {
+      const { items = [], ...actividadDataRaw } = actividad || {};
+      const actividadData = { ...actividadDataRaw };
+
+      actividadData.sistema = normalize(actividadData.sistema);
+      actividadData.subsistema = normalize(actividadData.subsistema);
+      actividadData.componente = normalize(actividadData.componente);
+      actividadData.tarea = actividadData.tarea?.trim();
+
+      if (!actividadData.tarea) throw new Error(`Actividad ${index + 1}: tarea obligatoria`);
+      if (!actividadData.tipoTrabajo) throw new Error(`Actividad ${index + 1}: tipoTrabajo obligatorio`);
+
+      const codigoActividad = generarCodigoActividad(plan.codigoPlan, index);
+      const unidad = actividadData.unidadDuracion || "min";
+      const valorIngresado = actividad.duracionValor ?? actividadData.duracionMinutos;
+      const duracionMinutosReal = toMinutos(valorIngresado, unidad);
+      if (duracionMinutosReal === null) throw new Error(`Actividad ${index + 1}: duración inválida`);
+
+      const cantTec = Number(actividadData.cantidadTecnicos);
+      if (!Number.isFinite(cantTec) || cantTec <= 0) throw new Error(`Actividad ${index + 1}: cantidadTecnicos debe ser > 0`);
+
+      const nuevaActividad = await PlanMantenimientoActividad.create(
+        {
+          ...actividadData,
+          codigoActividad,
+          planMantenimientoId: id,
+          duracionMinutos: duracionMinutosReal,
+          unidadDuracion: unidad,
+          cantidadTecnicos: cantTec,
+          orden: actividadData.orden ?? index + 1,
+        },
+        { transaction }
+      );
+
+      if (Array.isArray(items) && items.length > 0) {
+        await PlanActividadItem.bulkCreate(
+          items.map((it, idx) => {
+            if (!it?.itemCode?.trim()) throw new Error(`Actividad ${index + 1} Item ${idx + 1}: itemCode obligatorio`);
+            const quantity = Number(it.quantity ?? it.cantidad);
+            if (!Number.isFinite(quantity) || quantity <= 0) throw new Error(`Actividad ${index + 1} Item ${idx + 1}: quantity debe ser > 0`);
+            return {
+              actividadId: nuevaActividad.id,
+              itemId: normalize(it.itemId),
+              itemCode: String(it.itemCode).trim(),
+              description: normalize(it.description ?? it.item ?? null),
+              quantity,
+              warehouseCode: String(it.warehouseCode || "01").trim(),
+              costingCode: normalize(it.costingCode ?? null),
+              projectCode: normalize(it.projectCode ?? null),
+              rubroSapCode: it.rubroSapCode ? Number(it.rubroSapCode) : null,
+              paqueteTrabajo: normalize(it.paqueteTrabajo ?? null),
+              observacion: normalize(it.observacion ?? null),
+            };
+          }),
+          { transaction }
+        );
+      }
+    }
+
+    // Reemplazar ítems del plan
+    await PlanMantenimientoItem.destroy({ where: { planMantenimientoId: id }, transaction });
+    if (Array.isArray(itemsPlan) && itemsPlan.length > 0) {
+      const itemsValidos = itemsPlan.filter((x) => (x.itemCode || "").trim());
+      if (itemsValidos.length > 0) {
+        await PlanMantenimientoItem.bulkCreate(
+          itemsValidos.map((it) => ({
+            planMantenimientoId: id,
+            itemId: normalize(it.itemId),
+            itemCode: String(it.itemCode).trim(),
+            description: normalize(it.description ?? it.item ?? null),
+            quantity: Number(it.quantity ?? it.cantidad) || 1,
+            warehouseCode: String(it.warehouseCode || "01").trim(),
+            rubroSapCode: it.rubroSapCode ? Number(it.rubroSapCode) : null,
+            paqueteTrabajo: normalize(it.paqueteTrabajo ?? null),
+            observacion: normalize(it.observacion ?? null),
+          })),
+          { transaction }
+        );
+      }
+    }
+
+    await transaction.commit();
+
+    const planActualizado = await PlanMantenimiento.findByPk(id, { include: includePlanCompleto });
+    return withDuracionValor(planActualizado);
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+};
+
+/* =========================================================
    CAMBIAR ESTADO PLAN
 ========================================================= */
 
@@ -733,6 +902,7 @@ const actualizarPlanesDeUbicacionTecnica = async (
 
 module.exports = {
   crearPlan,
+  actualizarPlan,
   obtenerPlanes,
   obtenerPlanPorId,
   obtenerPlanesPorEquipo,
@@ -741,5 +911,5 @@ module.exports = {
   cambiarEstadoPlan,
   obtenerPlanesPorUbicacionTecnica,
   obtenerMejorPlanPorUbicacionTecnica,
-  actualizarPlanesDeUbicacionTecnica, 
+  actualizarPlanesDeUbicacionTecnica,
 };

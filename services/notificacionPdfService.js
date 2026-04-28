@@ -250,6 +250,43 @@ function buildHtml(notificacion) {
       : `<div class="empty-box">Sin trabajadores registrados</div>`;
 
   const aviso = ot?.aviso || null;
+  const tipoAviso = aviso?.tipoAviso || ot?.tipoAviso || "";
+  const esInstalacionPdf = tipoAviso === "instalacion";
+  const esVentaPdf = tipoAviso === "venta";
+  const esMantenimientoPdf = !esInstalacionPdf && !esVentaPdf;
+
+  // Etiquetas según tipo
+  const tituloDoc = esInstalacionPdf
+    ? "INFORME DE INSTALACIÓN"
+    : esVentaPdf
+    ? "INFORME DE ENTREGA"
+    : "INFORME TÉCNICO";
+  const labelTipo = esInstalacionPdf ? "Instalación" : esVentaPdf ? "Entrega" : "Mantenimiento";
+  const labelSeccionInfo = esInstalacionPdf
+    ? "Información de la instalación"
+    : esVentaPdf
+    ? "Información de la entrega"
+    : "Información del mantenimiento";
+  const labelFotoSeccion = esInstalacionPdf
+    ? "Evidencia fotográfica — Instalación"
+    : esVentaPdf
+    ? "Evidencia fotográfica — Entrega"
+    : "Evidencia fotográfica — Antes y Después";
+  const labelDescripcion = esInstalacionPdf
+    ? "Descripción de la instalación"
+    : esVentaPdf
+    ? "Descripción de la entrega"
+    : "Descripción del mantenimiento";
+  const footerLabel = esInstalacionPdf
+    ? "INFORME DE INSTALACIÓN — ALSUD"
+    : esVentaPdf
+    ? "INFORME DE ENTREGA — ALSUD"
+    : "INFORME TÉCNICO — ALSUD";
+
+  const supervisorNombrePdf =
+    ot?.supervisor?.nombre ||
+    ot?.supervisorNombre ||
+    (ot?.supervisorId ? `ID: ${ot.supervisorId}` : "—");
 
   const clienteNombre =
     ot?.cliente?.razonSocial || n?.cliente?.razonSocial || n?.clienteNombre || "—";
@@ -629,6 +666,12 @@ function buildHtml(notificacion) {
       gap: 10px;
     }
 
+    .footer-box-simple {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
     .operativo-si { color: #0e5d0e; font-size: 18px; font-weight: 700; }
     .operativo-no { color: #a11d1d; font-size: 18px; font-weight: 700; }
 
@@ -649,7 +692,7 @@ function buildHtml(notificacion) {
   <div class="header">
     ${logoHtml}
     <div class="header-right">
-      <div class="title">INFORME TÉCNICO</div>
+      <div class="title">${tituloDoc}</div>
       <div class="meta">
         <div>Notificación: <b>${esc(n.id || "—")}</b></div>
         <div><b>OT:</b> ${esc(ot?.numeroOT ?? "—")}</div>
@@ -672,7 +715,7 @@ function buildHtml(notificacion) {
   </div>
 
   <!-- EQUIPO -->
-  <div class="section-title">Información del equipo</div>
+  <div class="section-title">${esInstalacionPdf ? "Información del equipo instalado" : esVentaPdf ? "Información del equipo entregado" : "Información del equipo"}</div>
   <div class="box">
     <div class="grid-3">
       ${renderSimpleInfoField(
@@ -680,10 +723,10 @@ function buildHtml(notificacion) {
         esEquipo ? equipo?.nombre : ubicacion?.nombre
       )}
       ${renderSimpleInfoField("Código", esEquipo ? equipo?.codigo : ubicacion?.codigo)}
-      ${renderSimpleInfoField("Id - Cliente", n?.numeroEquipo || "—")}
-      ${esEquipo ? renderSimpleInfoField("Horómetro", n?.horometro || "—") : ""}
-      ${esEquipo ? renderSimpleInfoField("Número de misiones", n?.numeroMisiones || "—") : ""}
-      ${renderSimpleInfoField("Plan de mantenimiento", planOT?.nombre || planOT?.codigoPlan || "—")}
+      ${esMantenimientoPdf ? renderSimpleInfoField("Id - Cliente", n?.numeroEquipo || "—") : ""}
+      ${esMantenimientoPdf && esEquipo ? renderSimpleInfoField("Horómetro", n?.horometro || "—") : ""}
+      ${esMantenimientoPdf && esEquipo ? renderSimpleInfoField("Número de misiones", n?.numeroMisiones || "—") : ""}
+      ${esMantenimientoPdf ? renderSimpleInfoField("Plan de mantenimiento", planOT?.nombre || planOT?.codigoPlan || "—") : ""}
     </div>
   </div>
 
@@ -697,20 +740,22 @@ function buildHtml(notificacion) {
     <div class="worker-list">${trabajadoresHtml}</div>
   </div>
 
-  <!-- MANTENIMIENTO INFO -->
-  <div class="section-title">Información del mantenimiento</div>
+  <!-- INFO SEGUN TIPO -->
+  <div class="section-title">${labelSeccionInfo}</div>
   <div class="box">
     <div class="grid-3">
-      ${renderSimpleInfoField("Tipo de mantenimiento", tipoMantenimiento)}
-      ${renderSimpleInfoField("Fecha inicio", fmtDate(n?.fechaInicio))}
-      ${renderSimpleInfoField("Fecha fin", fmtDate(n?.fechaFin))}
-      ${renderSimpleInfoField("Último mantenimiento preventivo", fmtDate(n?.fechaUltimoMantenimientoPreventivo))}
-      ${renderSimpleInfoField("Estado general equipo", n?.estadoGeneralEquipo || "—")}
+      ${renderSimpleInfoField("Supervisor", supervisorNombrePdf)}
+      ${esMantenimientoPdf ? renderSimpleInfoField("Tipo de mantenimiento", tipoMantenimiento) : ""}
+      ${renderSimpleInfoField(esInstalacionPdf ? "Fecha de inicio de instalación" : esVentaPdf ? "Fecha de entrega" : "Fecha inicio", fmtDate(n?.fechaInicio))}
+      ${renderSimpleInfoField(esInstalacionPdf ? "Fecha de fin de instalación" : esVentaPdf ? "Fecha de recepción" : "Fecha fin", fmtDate(n?.fechaFin))}
+      ${esMantenimientoPdf ? renderSimpleInfoField("Último mant. preventivo", fmtDate(n?.fechaUltimoMantenimientoPreventivo)) : ""}
+      ${esMantenimientoPdf ? renderSimpleInfoField("Estado general del equipo", n?.estadoGeneralEquipo || "—") : ""}
     </div>
   </div>
 
-  <!-- LISTA DE ACTIVIDADES -->
-  <div class="section-title">Lista de actividades</div>
+  <!-- LISTA DE ACTIVIDADES (solo mantenimiento e instalación) -->
+  ${!esVentaPdf ? `
+  <div class="section-title">${esInstalacionPdf ? "Actividades de instalación" : "Lista de actividades"}</div>
   <table class="actividad-table">
     <thead>
       <tr>
@@ -726,30 +771,32 @@ function buildHtml(notificacion) {
     <tbody>${actividadesResumenHtml}</tbody>
   </table>
 
-  <!-- DETALLE DE ACTIVIDADES (sin fotos) -->
-  <div class="section-title">Detalle de actividades</div>
+  <!-- DETALLE DE ACTIVIDADES -->
+  <div class="section-title">${esInstalacionPdf ? "Detalle de actividades de instalación" : "Detalle de actividades"}</div>
   ${actividadesDetalleHtml}
+  ` : ""}
 
   <!-- DESCRIPCIÓN -->
-  <div class="section-title">Descripción</div>
+  <div class="section-title">${labelDescripcion}</div>
   <div class="box">
     ${esc(n.descripcionMantenimiento || n.descripcionGeneral || "—")}
   </div>
 
-  <!-- EVIDENCIA FOTOGRÁFICA: ANTES Y DESPUÉS -->
-  <div class="section-title">Evidencia fotográfica — Antes y Después</div>
+  <!-- EVIDENCIA FOTOGRÁFICA -->
+  <div class="section-title">${labelFotoSeccion}</div>
   ${
     hayFotos
       ? gruposAntesDespues.map((g, gi) => `
   <div class="antes-despues-grupo" ${gi > 0 ? 'style="margin-top:20px;border-top:2px solid #e2e8f0;padding-top:16px;"' : ''}>
     <div class="grupo-descripcion">${g.descripcion ? esc(g.descripcion) : '<span style="color:#94a3b8;font-style:italic;font-weight:400;">Sin descripción</span>'}</div>
     <div class="photo-section-pair">
+      ${!esVentaPdf ? `
       <div class="photo-group">
         <div class="photo-group-title">ANTES</div>
         ${renderPhotoGrid(g.antes)}
-      </div>
+      </div>` : ""}
       <div class="photo-group">
-        <div class="photo-group-title">DESPUÉS</div>
+        <div class="photo-group-title">${esVentaPdf ? "ENTREGA" : "DESPUÉS"}</div>
         ${renderPhotoGrid(g.despues)}
       </div>
     </div>
@@ -791,22 +838,23 @@ function buildHtml(notificacion) {
   }
 
   <!-- CIERRE -->
-  <div class="section-title">Cierre</div>
-  <div class="footer-box">
+  <div class="section-title">${esInstalacionPdf ? "Cierre de instalación" : esVentaPdf ? "Cierre de entrega" : "Cierre"}</div>
+  <div class="${esMantenimientoPdf ? "footer-box" : "footer-box-simple"}">
     <div class="box">
       <h3 style="margin:0 0 8px 0;font-size:12px;">Observaciones</h3>
       <div>${esc(n.observaciones || "—")}</div>
     </div>
     <div class="box">
-      <h3 style="margin:0 0 8px 0;font-size:12px;">Recomendaciones</h3>
+      <h3 style="margin:0 0 8px 0;font-size:12px;">${esInstalacionPdf ? "Recomendaciones post-instalación" : esVentaPdf ? "Notas de entrega" : "Recomendaciones"}</h3>
       <div>${esc(n.recomendaciones || "—")}</div>
     </div>
+    ${esMantenimientoPdf ? `
     <div class="box">
       <h3 style="margin:0 0 8px 0;font-size:12px;">Equipo operativo</h3>
       <div class="${equipoOperativo === "SI" ? "operativo-si" : "operativo-no"}">
         ${esc(equipoOperativo)}
       </div>
-    </div>
+    </div>` : ""}
   </div>
 </body>
 </html>
@@ -819,6 +867,15 @@ async function renderNotificacionPdfBuffer(notificacion) {
   if (!notificacion) {
     throw new Error("Notificación no encontrada para PDF");
   }
+
+  const ot = notificacion?.ordenTrabajo || {};
+  const aviso = ot?.aviso || null;
+  const tipoAviso = aviso?.tipoAviso || ot?.tipoAviso || "";
+  const pdfFooterLabel = tipoAviso === "instalacion"
+    ? "INFORME DE INSTALACIÓN — ALSUD"
+    : tipoAviso === "venta"
+    ? "INFORME DE ENTREGA — ALSUD"
+    : "INFORME TÉCNICO — ALSUD";
 
   const browser = await puppeteer.launch({
     headless: "new",
@@ -840,7 +897,7 @@ async function renderNotificacionPdfBuffer(notificacion) {
       headerTemplate: `<div></div>`,
       footerTemplate: `
         <div style="font-size:9px;width:100%;padding:0 12mm;color:#444;display:flex;justify-content:space-between;">
-          <span>INFORME TÉCNICO — ALSUD</span>
+          <span>${pdfFooterLabel}</span>
           <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
         </div>
       `,

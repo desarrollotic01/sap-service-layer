@@ -10,7 +10,14 @@ const {
   Adjunto,
   UbicacionTecnica,
   Sede,
+  Notificacion,
+  OrdenTrabajoEquipo,
+  OrdenTrabajo,
+  Aviso,
 } = require("../db_connection");
+
+const { getNotificacionForPdfDB } = require("./notificacionController");
+const { renderNotificacionPdfBuffer } = require("../services/notificacionPdfService");
 
 const generarTokenSeguro = () => crypto.randomBytes(32).toString("hex");
 
@@ -22,7 +29,9 @@ const includeAdjuntosPortal = {
   as: "adjuntos",
   required: false,
   where: {
-    mostrarEnPortal: true,
+    notificacionId: null,
+    ordenTrabajoId: null,
+    ordenTrabajoEquipoId: null,
   },
   attributes: [
     "id",
@@ -226,6 +235,72 @@ const obtenerPortalClientePorToken = async (token) => {
     order: [["createdAt", "DESC"]],
   });
 
+  // Collect all equipo IDs to batch-fetch historial
+  const allEquipoIds = [];
+  for (const sede of sedes) {
+    for (const equipo of sede.equipos || []) {
+      allEquipoIds.push(equipo.id);
+    }
+  }
+  for (const equipo of equiposSinSede) {
+    allEquipoIds.push(equipo.id);
+  }
+
+  const historialPorEquipo = {};
+  if (allEquipoIds.length > 0) {
+    const notificaciones = await Notificacion.findAll({
+      where: { estado: "FINALIZADO" },
+      include: [
+        {
+          model: OrdenTrabajoEquipo,
+          as: "equipoOT",
+          where: { equipoId: { [Op.in]: allEquipoIds } },
+          required: true,
+          attributes: ["id", "equipoId"],
+        },
+        {
+          model: OrdenTrabajo,
+          as: "ordenTrabajo",
+          attributes: ["id", "numeroOT"],
+          include: [
+            {
+              model: Aviso,
+              as: "aviso",
+              attributes: ["tipoAviso"],
+            },
+          ],
+        },
+      ],
+      attributes: ["id", "fechaFin"],
+      order: [["fechaFin", "DESC"]],
+    });
+
+    for (const notif of notificaciones) {
+      const equipoId = notif.equipoOT?.equipoId;
+      if (!equipoId) continue;
+      if (!historialPorEquipo[equipoId]) historialPorEquipo[equipoId] = [];
+      historialPorEquipo[equipoId].push({
+        id: notif.id,
+        fechaFin: notif.fechaFin,
+        numeroOT: notif.ordenTrabajo?.numeroOT || null,
+        tipoAviso: notif.ordenTrabajo?.aviso?.tipoAviso || null,
+      });
+    }
+  }
+
+  const addHistorial = (equipo) => ({
+    ...equipo,
+    historialCierres: historialPorEquipo[equipo.id] || [],
+  });
+
+  const sedesJSON = sedes.map((sede) => {
+    const sj = sede.toJSON();
+    sj.equipos = (sj.equipos || []).map(addHistorial);
+    return sj;
+  });
+
+  const equiposSinSedeJSON = equiposSinSede.map((e) => addHistorial(e.toJSON()));
+
   return {
     cliente: acceso.cliente,
     acceso: {
@@ -236,8 +311,8 @@ const obtenerPortalClientePorToken = async (token) => {
       createdAt: acceso.createdAt,
       updatedAt: acceso.updatedAt,
     },
-    sedes,
-    equiposSinSede,
+    sedes: sedesJSON,
+    equiposSinSede: equiposSinSedeJSON,
     ubicacionesTecnicasSinSede,
   };
 };
@@ -309,9 +384,54 @@ const desactivarLinkPortalCliente = async (id) => {
   };
 };
 
+/* =========================================================
+   OBTENER PDF NOTIFICACION PARA PORTAL (autenticado por token)
+========================================================= */
+const obtenerNotificacionPdfPortal = async (token, notificacionId) => {
+  const acceso = await PortalClienteToken.findOne({
+    where: {
+      token,
+      activo: true,
+      [Op.or]: [
+        { expiraEn: null },
+        { expiraEn: { [Op.gt]: new Date() } },
+      ],
+    },
+  });
+
+  if (!acceso) throw new Error("Link inválido o expirado");
+
+  const notifCheck = await Notificacion.findByPk(notificacionId, {
+    include: [
+      {
+        model: OrdenTrabajoEquipo,
+        as: "equipoOT",
+        required: true,
+        attributes: ["id", "equipoId"],
+        include: [
+          {
+            model: Equipo,
+            as: "equipo",
+            where: { clienteId: acceso.clienteId },
+            required: true,
+            attributes: ["id"],
+          },
+        ],
+      },
+    ],
+    attributes: ["id"],
+  });
+
+  if (!notifCheck) throw new Error("Notificación no encontrada o sin acceso");
+
+  const fullNotif = await getNotificacionForPdfDB(notificacionId);
+  return await renderNotificacionPdfBuffer(fullNotif);
+};
+
 module.exports = {
   generarLinkPortalCliente,
   obtenerPortalClientePorToken,
   listarLinksPortalPorCliente,
   desactivarLinkPortalCliente,
+  obtenerNotificacionPdfPortal,
 };

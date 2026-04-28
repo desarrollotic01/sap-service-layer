@@ -1,5 +1,5 @@
 const { Router } = require("express");
-const { crearPlanHandler, obtenerPlanesHandler, obtenerPlanPorIdHandler, obtenerPlanesPorEquipoHandler, obtenerMejorPlanPorEquipoHandler, obtenerPlanesPorUbicacionTecnicaHandler, obtenerMejorPlanPorUbicacionTecnicaHandler, actualizarPlanesMantenimientoEquipo, actualizarPlanesMantenimientoUbicacionTecnica, cambiarEstadoPlanHandler } = require("../handlers/planMantenimientoHandler");
+const { crearPlanHandler, actualizarPlanHandler, obtenerPlanesHandler, obtenerPlanPorIdHandler, obtenerPlanesPorEquipoHandler, obtenerMejorPlanPorEquipoHandler, obtenerPlanesPorUbicacionTecnicaHandler, obtenerMejorPlanPorUbicacionTecnicaHandler, actualizarPlanesMantenimientoEquipo, actualizarPlanesMantenimientoUbicacionTecnica, cambiarEstadoPlanHandler } = require("../handlers/planMantenimientoHandler");
 const uploadPlanAdjuntos = require("../middlewares/uploadPlanAdjuntos");
 const roleAuth = require("../checkers/roleAuth");
 const router = Router();
@@ -12,5 +12,6 @@ router.get("/ubicacion-tecnica/:ubicacionTecnicaId", roleAuth(["all_access","rea
 router.get("/ubicacion-tecnica/:ubicacionTecnicaId/mejor", roleAuth(["all_access","read_planes"]), obtenerMejorPlanPorUbicacionTecnicaHandler);
 router.put("/ubicacion-tecnica/:id/planes", roleAuth(["all_access","update_planes"]), actualizarPlanesMantenimientoUbicacionTecnica);
 router.patch("/:id/estado", roleAuth(["all_access","update_planes"]), cambiarEstadoPlanHandler);
+router.put("/:id", roleAuth(["all_access","update_planes"]), uploadPlanAdjuntos.any(), actualizarPlanHandler);
 router.get("/:id", roleAuth(["all_access","read_planes"]), obtenerPlanPorIdHandler);
 module.exports = router;

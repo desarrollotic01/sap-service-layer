@@ -3,6 +3,7 @@ const {
   obtenerPortalClientePorToken,
   listarLinksPortalPorCliente,
   desactivarLinkPortalCliente,
+  obtenerNotificacionPdfPortal,
 } = require("../controllers/portalClienteController");
 
 /* =========================================================
@@ -188,9 +189,40 @@ const desactivarLinkPortalClienteHandler = async (req, res) => {
   }
 };
 
+/* =========================================================
+   PDF NOTIFICACION PORTAL (público por token)
+========================================================= */
+const obtenerNotificacionPdfPortalHandler = async (req, res) => {
+  try {
+    const { token, id } = req.params;
+
+    const pdfBuffer = await obtenerNotificacionPdfPortal(token, id);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename=informe_${id}.pdf`);
+    return res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Error en obtenerNotificacionPdfPortalHandler:", error);
+
+    if (
+      error.message === "Link inválido o expirado" ||
+      error.message === "Notificación no encontrada o sin acceso"
+    ) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Error al generar PDF",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   generarLinkPortalClienteHandler,
   obtenerPortalClientePorTokenHandler,
   listarLinksPortalPorClienteHandler,
   desactivarLinkPortalClienteHandler,
+  obtenerNotificacionPdfPortalHandler,
 };

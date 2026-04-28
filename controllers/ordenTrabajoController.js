@@ -28,7 +28,7 @@ const {
   fusionarSolicitudesParaSap,
 } = require("../controllers/ordenTrabajoDetalleController");
 const { Op } = require("sequelize");
-
+const { v4: uuidv4 } = require("uuid");
 
 const { enviarCorreoSolicitudAlmacen, enviarCorreo } = require("../services/emailService");
 const { buildHtmlBloque } = require("../utils/emailTemplates");
@@ -1877,6 +1877,9 @@ async function _consolidarSolicitudesAlmacen(ordenTrabajoId, ot, destinatarioId,
   });
 
   if (yaExiste) {
+    // Asegurar bloque_id (puede estar null si fue creado antes del fix)
+    if (!yaExiste.bloque_id) await yaExiste.update({ bloque_id: uuidv4() });
+
     // Actualizar destinatario y CC si cambiaron
     const updateData = {};
     if (destinatarioId && yaExiste.destinatario_id !== destinatarioId) {
@@ -1956,6 +1959,7 @@ async function _consolidarSolicitudesAlmacen(ordenTrabajoId, ot, destinatarioId,
     destinatario_id: destinatarioId || null,
     ccEmails: ccArray,
     estado: "DRAFT",
+    bloque_id: uuidv4(),
   });
  
   await SolicitudAlmacenLinea.bulkCreate(
@@ -2155,64 +2159,28 @@ async function liberarOrdenTrabajo(id, { destinatarioId = null, ccEmails = [] } 
     if (consolidadaCompra) {
       resultado.compra.consolidada = consolidadaCompra;
       resultado.compra.numeroSolicitud = consolidadaCompra.numeroSolicitud;
- 
-      // Enviar a SAP
-      const resultadoSAP = await enviarSolicitudCompraASAPDesdeObjeto(
-        consolidadaCompra.toJSON()
-      );
- 
-      await consolidadaCompra.update({
-        estado: resultadoSAP.success ? "SENT" : "ERROR",
-        sapDocNum: resultadoSAP.success ? resultadoSAP.data?.DocNum : null,
-      });
- 
-      resultado.compra.resultadoSAP = resultadoSAP;
-      resultado.compra.enviada = resultadoSAP.success;
- 
-      // Marcar solicitudes originales
-      if (resultadoSAP.success) {
-        for (const sc of solicitudesCompraDraft) {
-          await sc.update({ estado: "SENT" });
-        }
-      }
+      resultado.compra.enviada = false; // Se envía manualmente desde LIBERADO
     }
   }
- 
-  /* ─── ALMACÉN → CORREO ──────────────────────────────── */
+
+  /* ─── ALMACÉN → CONSOLIDAR SIN ENVIAR ──────────────── */
   const solicitudesAlmacenDraft = await SolicitudAlmacen.findAll({
     where: { ordenTrabajoId: id, esConsolidada: false, esCopia: true },
     include: [{ model: SolicitudAlmacenLinea, as: "lineas" }],
   });
- 
+
   const hayLineasAlmacen = solicitudesAlmacenDraft.some(
     (s) => (s.lineas?.length || 0) > 0
   );
- 
+
   if (hayLineasAlmacen) {
-    const resultadoAlmacen = await _consolidarSolicitudesAlmacen(
-      id,
-      ot,
-      destinatarioId,
-      ccEmails
-    );
- 
+    // Consolidar sin enviar correo (destinatarioId=null → sin envío)
+    const resultadoAlmacen = await _consolidarSolicitudesAlmacen(id, ot, null, []);
+
     if (resultadoAlmacen) {
-      const { solicitud, resultadoCorreo, destinatario } = resultadoAlmacen;
- 
-      resultado.almacen.consolidada = solicitud;
-      resultado.almacen.numeroSolicitud = solicitud?.numeroSolicitud || null;
-      resultado.almacen.correoEnviado = resultadoCorreo.success;
-      resultado.almacen.destinatario = destinatario?.correo || null;
-      resultado.almacen.errorCorreo = resultadoCorreo.success
-        ? null
-        : resultadoCorreo.error;
- 
-      if (resultadoCorreo.success) {
-        await solicitud.update({ estado: "SENT" });
-        for (const sa of solicitudesAlmacenDraft) {
-          await sa.update({ estado: "SENT" });
-        }
-      }
+      resultado.almacen.consolidada = resultadoAlmacen.solicitud;
+      resultado.almacen.numeroSolicitud = resultadoAlmacen.solicitud?.numeroSolicitud || null;
+      resultado.almacen.correoEnviado = false; // Se envía manualmente desde LIBERADO
     }
   }
  
