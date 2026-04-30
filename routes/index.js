@@ -19,7 +19,6 @@ const  notificacionRouter = require("./notificacionRouter");
 const familiaRouter = require ("./familiaRouter")
 const paisRouter = require("./paisRouter")
 const guiaMantenimientoRouter = require("./guiaMantenimientoRouter")
-const portalClienteRouter = require("./portalClienteRouter")
 const encuestaRouter = require("./encuestaRouter")
 const itemRouter = require("./itemRouter")
 const rubroRouter = require("./rubroRouter")
@@ -40,7 +39,6 @@ router.use("/solicitudalmacen", solicitudAlmacenRouter);
 router.use("/rubros", rubroRouter);
 router.use("/items", itemRouter);
 router.use("/encuesta", encuestaRouter);
-router.use("/portal-cliente", portalClienteRouter);
 router.use("/guia-mantenimiento", guiaMantenimientoRouter);
 router.use("/pais",paisRouter)
 router.use("/familia",familiaRouter)

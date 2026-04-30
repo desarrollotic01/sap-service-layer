@@ -11,7 +11,9 @@ const {
   UbicacionTecnica,
   PlanMantenimiento,
   Aviso,
+  Cliente,
 } = require("../db_connection");
+const { Op } = require("sequelize");
 
 // ===============================
 // CREAR
@@ -161,7 +163,19 @@ const getNotificacionForPdfDB = async (id) => {
           {
             model: Aviso,
             as: "aviso",
-            attributes: ["correoContacto", "numeroContacto", "nombreContacto"],
+            attributes: ["tipoAviso", "correoContacto", "numeroContacto", "nombreContacto"],
+            include: [
+              {
+                model: Cliente,
+                as: "clienteData",
+                attributes: ["razonSocial", "ruc"],
+              },
+            ],
+          },
+          {
+            model: Trabajador,
+            as: "supervisor",
+            attributes: ["id", "nombre", "apellido"],
           },
         ],
       },
@@ -242,6 +256,23 @@ const getNotificacionesByOTDB = async (ordenTrabajoId) => {
   });
 };
 
+// Obtiene el tipo de aviso de una OT (para saber si es "venta")
+const getOTAvisoTipoDb = async (ordenTrabajoId, transaction) => {
+  return await OrdenTrabajo.findByPk(ordenTrabajoId, {
+    include: [{ model: Aviso, as: "aviso", attributes: ["tipoAviso"] }],
+    attributes: ["id"],
+    transaction,
+  });
+};
+
+// Busca notificación de OT sin equipo asociado (caso venta)
+const getNotificacionByOTSinEquipoDB = async (ordenTrabajoId, transaction) => {
+  return await Notificacion.findOne({
+    where: { ordenTrabajoId, ordenTrabajoEquipoId: null },
+    transaction,
+  });
+};
+
 module.exports = {
   createNotificacionDB,
   setTecnicosDB,
@@ -256,5 +287,7 @@ module.exports = {
   getNotificacionByEquipoOTDB,
   precargarPlanesPorEquipoOTDB,
   getNotificacionForPdfDB,
-  getNotificacionesByOTDB
+  getNotificacionesByOTDB,
+  getOTAvisoTipoDb,
+  getNotificacionByOTSinEquipoDB,
 };

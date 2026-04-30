@@ -1056,6 +1056,7 @@ async function obtenerOrdenTrabajoPorId(id) {
       },
       { association: "adjuntos" },
       { association: "solicitudesCompra" },
+      { association: "supervisor", attributes: ["id", "nombre", "apellido", "rol", "empresa"] },
     ],
   });
 }
@@ -2220,6 +2221,13 @@ async function crearSolicitudCompraGeneralEnOT(ordenTrabajoId, { requiredDate, l
     where: { aviso_id: ot.avisoId },
   });
 
+  const baseOV = ot.aviso?.ordenVenta || ot.aviso?.numeroOV || ot.numeroOT || "OT";
+  const ovLimpio = String(baseOV).replace(/\s+/g, "").replace(/[\/\\]/g, "-").replace(/[^a-zA-Z0-9\-_]/g, "") || "OT";
+  const totalSC = await SolicitudCompra.count({
+    where: { numeroSolicitud: { [Op.like]: `SC-${ovLimpio}-%` } },
+  });
+  const numeroSolicitud = `SC-${ovLimpio}-${String(totalSC + 1).padStart(3, "0")}`;
+
   const sc = await SolicitudCompra.create({
     tratamiento_id: tratamiento?.id || null,
     ordenTrabajoId,
@@ -2230,6 +2238,8 @@ async function crearSolicitudCompraGeneralEnOT(ordenTrabajoId, { requiredDate, l
     requiredDate,
     usuario_id: usuarioId,
     estado: "DRAFT",
+    numeroSolicitud,
+    origen: "OT",
   });
 
   await SolicitudCompraLinea.bulkCreate(
@@ -2265,6 +2275,13 @@ async function crearSolicitudAlmacenGeneralEnOT(ordenTrabajoId, { requiredDate, 
     where: { aviso_id: ot.avisoId },
   });
 
+  const baseOV = ot.aviso?.ordenVenta || ot.aviso?.numeroOV || ot.numeroOT || "OT";
+  const ovLimpio = String(baseOV).replace(/\s+/g, "").replace(/[\/\\]/g, "-").replace(/[^a-zA-Z0-9\-_]/g, "") || "OT";
+  const totalSA = await SolicitudAlmacen.count({
+    where: { numeroSolicitud: { [Op.like]: `SA-${ovLimpio}-%` } },
+  });
+  const numeroSolicitud = `SA-${ovLimpio}-${String(totalSA + 1).padStart(3, "0")}`;
+
   const sa = await SolicitudAlmacen.create({
     tratamiento_id: tratamiento?.id || null,
     ordenTrabajoId,
@@ -2275,6 +2292,9 @@ async function crearSolicitudAlmacenGeneralEnOT(ordenTrabajoId, { requiredDate, 
     requiredDate,
     usuario_id: usuarioId,
     estado: "DRAFT",
+    numeroSolicitud,
+    bloque_id: uuidv4(),
+    origen: "OT",
   });
 
   await SolicitudAlmacenLinea.bulkCreate(

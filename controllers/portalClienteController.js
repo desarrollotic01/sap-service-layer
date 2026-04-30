@@ -249,7 +249,6 @@ const obtenerPortalClientePorToken = async (token) => {
   const historialPorEquipo = {};
   if (allEquipoIds.length > 0) {
     const notificaciones = await Notificacion.findAll({
-      where: { estado: "FINALIZADO" },
       include: [
         {
           model: OrdenTrabajoEquipo,
@@ -261,18 +260,21 @@ const obtenerPortalClientePorToken = async (token) => {
         {
           model: OrdenTrabajo,
           as: "ordenTrabajo",
+          required: true,
           attributes: ["id", "numeroOT"],
           include: [
             {
               model: Aviso,
               as: "aviso",
+              required: true,
+              where: { tipoAviso: "mantenimiento" },
               attributes: ["tipoAviso"],
             },
           ],
         },
       ],
-      attributes: ["id", "fechaFin"],
-      order: [["fechaFin", "DESC"]],
+      attributes: ["id", "fechaFin", "createdAt"],
+      order: [["createdAt", "DESC"]],
     });
 
     for (const notif of notificaciones) {
@@ -282,6 +284,7 @@ const obtenerPortalClientePorToken = async (token) => {
       historialPorEquipo[equipoId].push({
         id: notif.id,
         fechaFin: notif.fechaFin,
+        createdAt: notif.createdAt,
         numeroOT: notif.ordenTrabajo?.numeroOT || null,
         tipoAviso: notif.ordenTrabajo?.aviso?.tipoAviso || null,
       });

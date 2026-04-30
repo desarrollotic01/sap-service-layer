@@ -96,7 +96,7 @@ module.exports = (sequelize) => {
 
       ordenTrabajoEquipoId: {
         type: DataTypes.UUID,
-        allowNull: false,
+        allowNull: true,
         unique: true,
       },
     },

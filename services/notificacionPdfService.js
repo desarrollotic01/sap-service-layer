@@ -219,7 +219,7 @@ const renderActividadDetalle = (p, index) => {
 
 // ─── Build HTML ──────────────────────────────────────────────────────────────
 
-function buildHtml(notificacion) {
+function buildHtml(notificacion, firmas = {}, showFirmas = true) {
   const n = notificacion || {};
   const ot = n?.ordenTrabajo || {};
   const equipoOT = n?.equipoOT || {};
@@ -227,33 +227,45 @@ function buildHtml(notificacion) {
   const ubicacion = equipoOT?.ubicacionTecnica || null;
   const planOT = equipoOT?.planMantenimiento || n?.planes?.[0]?.plan || null;
   const esEquipo = !!equipo;
-
-  const trabajadoresOT = Array.isArray(n?.equipoOT?.trabajadores)
-    ? n.equipoOT.trabajadores
-    : [];
-  const encargadoOT =
-    trabajadoresOT.find((t) => t?.esEncargado)?.trabajador || null;
-  const encargadoNombre = encargadoOT ? getNombreTecnico(encargadoOT) : "—";
-
-  const trabajadoresHtml =
-    trabajadoresOT.length > 0
-      ? trabajadoresOT
-          .map(
-            (tw) => `
-            <div class="worker-chip ${tw?.esEncargado ? "encargado" : ""}">
-              ${esc(getNombreTecnico(tw?.trabajador))}
-              ${tw?.esEncargado ? `<span class="worker-tag">ENCARGADO</span>` : ""}
-            </div>
-          `
-          )
-          .join("")
-      : `<div class="empty-box">Sin trabajadores registrados</div>`;
+  const tieneEquipoOT = !!(equipoOT?.id || esEquipo || ubicacion);
 
   const aviso = ot?.aviso || null;
   const tipoAviso = aviso?.tipoAviso || ot?.tipoAviso || "";
   const esInstalacionPdf = tipoAviso === "instalacion";
   const esVentaPdf = tipoAviso === "venta";
   const esMantenimientoPdf = !esInstalacionPdf && !esVentaPdf;
+
+  const supervisorNombrePdf = ot?.supervisor
+    ? `${ot.supervisor.nombre || ""} ${ot.supervisor.apellido || ""}`.trim() || "—"
+    : ot?.supervisorNombre || (ot?.supervisorId ? `ID: ${ot.supervisorId}` : "—");
+
+  const trabajadoresOT = Array.isArray(n?.equipoOT?.trabajadores)
+    ? n.equipoOT.trabajadores
+    : [];
+  const encargadoOT =
+    trabajadoresOT.find((t) => t?.esEncargado)?.trabajador || null;
+  const encargadoNombre = esVentaPdf
+    ? supervisorNombrePdf
+    : encargadoOT ? getNombreTecnico(encargadoOT) : "—";
+
+  const tecnicosVenta = Array.isArray(n?.tecnicos) ? n.tecnicos : [];
+
+  const trabajadoresHtml = esVentaPdf
+    ? (tecnicosVenta.length > 0
+        ? tecnicosVenta.map((t) => `
+            <div class="worker-chip">
+              ${esc(getNombreTecnico(t))}
+            </div>
+          `).join("")
+        : `<div class="empty-box">Sin técnicos registrados</div>`)
+    : (trabajadoresOT.length > 0
+        ? trabajadoresOT.map((tw) => `
+            <div class="worker-chip ${tw?.esEncargado ? "encargado" : ""}">
+              ${esc(getNombreTecnico(tw?.trabajador))}
+              ${tw?.esEncargado ? `<span class="worker-tag">ENCARGADO</span>` : ""}
+            </div>
+          `).join("")
+        : `<div class="empty-box">Sin trabajadores registrados</div>`);
 
   // Etiquetas según tipo
   const tituloDoc = esInstalacionPdf
@@ -265,7 +277,7 @@ function buildHtml(notificacion) {
   const labelSeccionInfo = esInstalacionPdf
     ? "Información de la instalación"
     : esVentaPdf
-    ? "Información de la entrega"
+    ? "Información de la venta"
     : "Información del mantenimiento";
   const labelFotoSeccion = esInstalacionPdf
     ? "Evidencia fotográfica — Instalación"
@@ -283,18 +295,11 @@ function buildHtml(notificacion) {
     ? "INFORME DE ENTREGA — ALSUD"
     : "INFORME TÉCNICO — ALSUD";
 
-  const supervisorNombrePdf =
-    ot?.supervisor?.nombre ||
-    ot?.supervisorNombre ||
-    (ot?.supervisorId ? `ID: ${ot.supervisorId}` : "—");
-
   const clienteNombre =
-    ot?.cliente?.razonSocial || n?.cliente?.razonSocial || n?.clienteNombre || "—";
-  const clienteRuc = ot?.cliente?.ruc || n?.cliente?.ruc || "—";
-  const clienteCorreo =
-    aviso?.correoContacto || ot?.cliente?.correo || n?.cliente?.correo || "—";
-  const clienteTelefono =
-    aviso?.numeroContacto || ot?.cliente?.telefono || n?.cliente?.telefono || "—";
+    aviso?.clienteData?.razonSocial || ot?.cliente?.razonSocial || n?.clienteNombre || "—";
+  const clienteRuc = aviso?.clienteData?.ruc || ot?.cliente?.ruc || "—";
+  const clienteCorreo = aviso?.correoContacto || "—";
+  const clienteTelefono = aviso?.numeroContacto || "—";
   const clienteContacto = aviso?.nombreContacto || "—";
 
   const tipoMantenimiento = getTipoMantenimientoLabel(n);
@@ -684,6 +689,57 @@ function buildHtml(notificacion) {
       font-size: 10px;
       background: #fafafa;
     }
+
+    /* ── Obs / Rec full-width stack ── */
+    .obs-rec-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .obs-rec-stack .box {
+      width: 100%;
+      min-height: 50px;
+    }
+
+    /* ── Signatures ── */
+    .firmas-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .firma-box {
+      text-align: center;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 12px 10px 10px;
+      background: #fff;
+    }
+
+    .firma-espacio {
+      height: 64px;
+      border-bottom: 2px solid #333;
+      margin-bottom: 8px;
+    }
+
+    .firma-role {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #222;
+      margin-bottom: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .firma-nombre {
+      font-size: 11px;
+      color: #444;
+      min-height: 16px;
+      word-break: break-word;
+    }
   </style>
 </head>
 
@@ -715,20 +771,29 @@ function buildHtml(notificacion) {
   </div>
 
   <!-- EQUIPO -->
-  <div class="section-title">${esInstalacionPdf ? "Información del equipo instalado" : esVentaPdf ? "Información del equipo entregado" : "Información del equipo"}</div>
+  ${tieneEquipoOT || esMantenimientoPdf ? `
+  <div class="section-title">Información del equipo</div>
   <div class="box">
     <div class="grid-3">
-      ${renderSimpleInfoField(
-        esEquipo ? "Equipo" : "Ubicación técnica",
-        esEquipo ? equipo?.nombre : ubicacion?.nombre
-      )}
-      ${renderSimpleInfoField("Código", esEquipo ? equipo?.codigo : ubicacion?.codigo)}
-      ${esMantenimientoPdf ? renderSimpleInfoField("Id - Cliente", n?.numeroEquipo || "—") : ""}
-      ${esMantenimientoPdf && esEquipo ? renderSimpleInfoField("Horómetro", n?.horometro || "—") : ""}
-      ${esMantenimientoPdf && esEquipo ? renderSimpleInfoField("Número de misiones", n?.numeroMisiones || "—") : ""}
-      ${esMantenimientoPdf ? renderSimpleInfoField("Plan de mantenimiento", planOT?.nombre || planOT?.codigoPlan || "—") : ""}
+      ${esInstalacionPdf ? `
+        ${renderSimpleInfoField("Equipo 1", equipo?.nombre || "—")}
+        ${renderSimpleInfoField("Código equipo 1", equipo?.codigo || "—")}
+        ${ubicacion ? renderSimpleInfoField("Equipo 2 / Ubicación técnica", ubicacion?.nombre || "—") : ""}
+        ${ubicacion ? renderSimpleInfoField("Código ubicación", ubicacion?.codigo || "—") : ""}
+      ` : esVentaPdf ? `
+        ${renderSimpleInfoField(esEquipo ? "Equipo" : "Ubicación técnica", esEquipo ? equipo?.nombre : ubicacion?.nombre)}
+        ${renderSimpleInfoField("Código", esEquipo ? equipo?.codigo : ubicacion?.codigo)}
+      ` : `
+        ${renderSimpleInfoField(esEquipo ? "Equipo" : "Ubicación técnica", esEquipo ? equipo?.nombre : ubicacion?.nombre)}
+        ${renderSimpleInfoField("Código", esEquipo ? equipo?.codigo : ubicacion?.codigo)}
+        ${renderSimpleInfoField("Id - Cliente", n?.numeroEquipo || "—")}
+        ${esEquipo ? renderSimpleInfoField("Horómetro", n?.horometro || "—") : ""}
+        ${esEquipo ? renderSimpleInfoField("Número de misiones", n?.numeroMisiones || "—") : ""}
+        ${renderSimpleInfoField("Plan de mantenimiento", planOT?.nombre || planOT?.codigoPlan || "—")}
+      `}
     </div>
   </div>
+  ` : ""}
 
   <!-- TRABAJADORES -->
   <div class="section-title">Trabajadores</div>
@@ -838,24 +903,46 @@ function buildHtml(notificacion) {
   }
 
   <!-- CIERRE -->
-  <div class="section-title">${esInstalacionPdf ? "Cierre de instalación" : esVentaPdf ? "Cierre de entrega" : "Cierre"}</div>
-  <div class="${esMantenimientoPdf ? "footer-box" : "footer-box-simple"}">
+  <div class="section-title">Observaciones y Recomendaciones</div>
+  <div class="obs-rec-stack">
+    ${esMantenimientoPdf ? `
+    <div class="box" style="display:flex;align-items:center;gap:16px;">
+      <div style="flex:1;">
+        <h3 style="margin:0 0 4px 0;font-size:11px;color:#555;">Estado del equipo</h3>
+        <div class="${equipoOperativo === "SI" ? "operativo-si" : "operativo-no"}">${esc(equipoOperativo)}</div>
+      </div>
+    </div>` : ""}
     <div class="box">
       <h3 style="margin:0 0 8px 0;font-size:12px;">Observaciones</h3>
       <div>${esc(n.observaciones || "—")}</div>
     </div>
     <div class="box">
-      <h3 style="margin:0 0 8px 0;font-size:12px;">${esInstalacionPdf ? "Recomendaciones post-instalación" : esVentaPdf ? "Notas de entrega" : "Recomendaciones"}</h3>
+      <h3 style="margin:0 0 8px 0;font-size:12px;">Recomendaciones</h3>
       <div>${esc(n.recomendaciones || "—")}</div>
     </div>
-    ${esMantenimientoPdf ? `
-    <div class="box">
-      <h3 style="margin:0 0 8px 0;font-size:12px;">Equipo operativo</h3>
-      <div class="${equipoOperativo === "SI" ? "operativo-si" : "operativo-no"}">
-        ${esc(equipoOperativo)}
-      </div>
-    </div>` : ""}
   </div>
+
+  <!-- FIRMAS (solo en PDF individual o cuando showFirmas=true) -->
+  ${showFirmas ? `
+  <div class="section-title">Firmas</div>
+  <div class="firmas-grid">
+    <div class="firma-box">
+      <div class="firma-espacio"></div>
+      <div class="firma-role">Elaborado por</div>
+      <div class="firma-nombre">${esc(firmas?.elaboradoPor || "")}</div>
+    </div>
+    <div class="firma-box">
+      <div class="firma-espacio"></div>
+      <div class="firma-role">Revisado por</div>
+      <div class="firma-nombre">${esc(firmas?.revisadoPor || "")}</div>
+    </div>
+    <div class="firma-box">
+      <div class="firma-espacio"></div>
+      <div class="firma-role">Recibido por</div>
+      <div class="firma-nombre">${esc(firmas?.recibidoPor || "")}</div>
+    </div>
+  </div>
+  ` : ""}
 </body>
 </html>
 `;
@@ -863,7 +950,7 @@ function buildHtml(notificacion) {
 
 // ─── Puppeteer render ────────────────────────────────────────────────────────
 
-async function renderNotificacionPdfBuffer(notificacion) {
+async function renderNotificacionPdfBuffer(notificacion, firmas = {}, showFirmas = true) {
   if (!notificacion) {
     throw new Error("Notificación no encontrada para PDF");
   }
@@ -886,7 +973,7 @@ async function renderNotificacionPdfBuffer(notificacion) {
     const page = await browser.newPage();
     await page.setBypassCSP(true);
 
-    const html = buildHtml(notificacion);
+    const html = buildHtml(notificacion, firmas, showFirmas);
     await page.setContent(html, { waitUntil: ["load", "networkidle0"] });
 
     const pdf = await page.pdf({
@@ -971,7 +1058,59 @@ function buildTablaGrupo(notificaciones, columnas, valores) {
   `;
 }
 
-function buildResumenOTHtml(notificaciones, otNumero, grupos) {
+function buildFirmasHtml(firmas = {}, otNumero = "") {
+  return `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    @page { margin: 20mm 18mm; size: A4; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; margin: 0; padding: 0; }
+    .section-title { margin: 0 0 20px 0; font-size: 13px; font-weight: 700; border-bottom: 2px solid #111; padding-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 30px; }
+    .header-logo { height: 60px; width: auto; object-fit: contain; }
+    .header-logo-text { font-size: 20px; font-weight: 900; letter-spacing: 2px; color: #1a3060; }
+    .header-right { text-align: right; font-size: 11px; line-height: 1.6; }
+    .firmas-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 16px; }
+    .firma-box { text-align: center; border: 1px solid #ccc; border-radius: 8px; padding: 14px 10px 12px; background: #fff; }
+    .firma-espacio { height: 80px; border-bottom: 2px solid #333; margin-bottom: 10px; }
+    .firma-role { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #222; margin-bottom: 6px; letter-spacing: 0.5px; }
+    .firma-nombre { font-size: 12px; color: #444; min-height: 18px; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    ${LOGO_BASE64 ? `<img src="${LOGO_BASE64}" class="header-logo" alt="ALSUD" />` : `<div class="header-logo-text">ALSUD</div>`}
+    <div class="header-right">
+      <div><b>OT:</b> ${esc(otNumero || "—")}</div>
+      <div><b>Generado:</b> ${esc(new Date().toLocaleString("es-PE"))}</div>
+    </div>
+  </div>
+  <div class="section-title">Firmas</div>
+  <div class="firmas-grid">
+    <div class="firma-box">
+      <div class="firma-espacio"></div>
+      <div class="firma-role">Elaborado por</div>
+      <div class="firma-nombre">${esc(firmas?.elaboradoPor || "")}</div>
+    </div>
+    <div class="firma-box">
+      <div class="firma-espacio"></div>
+      <div class="firma-role">Revisado por</div>
+      <div class="firma-nombre">${esc(firmas?.revisadoPor || "")}</div>
+    </div>
+    <div class="firma-box">
+      <div class="firma-espacio"></div>
+      <div class="firma-role">Recibido por</div>
+      <div class="firma-nombre">${esc(firmas?.recibidoPor || "")}</div>
+    </div>
+  </div>
+</body>
+</html>
+`;
+}
+
+function buildResumenOTHtml(notificaciones, otNumero, grupos, firmas = {}) {
   // Si hay grupos custom, renderizar una tabla por grupo
   let tablasSections = "";
 
@@ -1002,7 +1141,7 @@ function buildResumenOTHtml(notificaciones, otNumero, grupos) {
 <head>
   <meta charset="utf-8" />
   <style>
-    @page { margin: 14mm 12mm; size: A4 landscape; }
+    @page { margin: 14mm 12mm; size: A4; }
 
     body {
       font-family: Arial, Helvetica, sans-serif;
@@ -1122,6 +1261,43 @@ function buildResumenOTHtml(notificaciones, otNumero, grupos) {
       vertical-align: middle;
       border-radius: 2px;
     }
+
+    .firmas-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 24px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .firma-box {
+      text-align: center;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 12px 10px 10px;
+      background: #fff;
+    }
+
+    .firma-espacio {
+      height: 56px;
+      border-bottom: 2px solid #333;
+      margin-bottom: 8px;
+    }
+
+    .firma-role {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #222;
+      margin-bottom: 4px;
+    }
+
+    .firma-nombre {
+      font-size: 10px;
+      color: #444;
+      min-height: 14px;
+    }
   </style>
 </head>
 <body>
@@ -1143,12 +1319,30 @@ function buildResumenOTHtml(notificaciones, otNumero, grupos) {
     <span class="leyenda-color"></span>
     Celdas amarillas: campos libres para registrar repuestos o cambios realizados
   </div>
+
+  <div class="firmas-grid">
+    <div class="firma-box">
+      <div class="firma-espacio"></div>
+      <div class="firma-role">Elaborado por</div>
+      <div class="firma-nombre">${esc(firmas?.elaboradoPor || "")}</div>
+    </div>
+    <div class="firma-box">
+      <div class="firma-espacio"></div>
+      <div class="firma-role">Revisado por</div>
+      <div class="firma-nombre">${esc(firmas?.revisadoPor || "")}</div>
+    </div>
+    <div class="firma-box">
+      <div class="firma-espacio"></div>
+      <div class="firma-role">Recibido por</div>
+      <div class="firma-nombre">${esc(firmas?.recibidoPor || "")}</div>
+    </div>
+  </div>
 </body>
 </html>
 `;
 }
 
-async function renderResumenOTPdfBuffer(notificaciones, otNumero, grupos) {
+async function renderResumenOTPdfBuffer(notificaciones, otNumero, grupos, firmas = {}) {
   const browser = await puppeteer.launch({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -1158,12 +1352,11 @@ async function renderResumenOTPdfBuffer(notificaciones, otNumero, grupos) {
     const page = await browser.newPage();
     await page.setBypassCSP(true);
 
-    const html = buildResumenOTHtml(notificaciones, otNumero, grupos);
+    const html = buildResumenOTHtml(notificaciones, otNumero, grupos, firmas);
     await page.setContent(html, { waitUntil: ["load", "networkidle0"] });
 
     const pdf = await page.pdf({
       format: "A4",
-      landscape: true,
       printBackground: true,
       margin: { top: "14mm", right: "12mm", bottom: "14mm", left: "12mm" },
       displayHeaderFooter: true,
@@ -1212,4 +1405,5 @@ module.exports = {
   renderNotificacionPdfBuffer,
   mergePdfBuffers,
   renderResumenOTPdfBuffer,
+  buildFirmasHtml,
 };

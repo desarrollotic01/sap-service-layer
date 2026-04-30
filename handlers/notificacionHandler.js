@@ -18,9 +18,11 @@ const {
   getOTConEquiposDB,
   getNotificacionForPdfDB,
   getNotificacionesByOTDB,
+  getOTAvisoTipoDb,
+  getNotificacionByOTSinEquipoDB,
 } = require("../controllers/notificacionController");
 
-const { renderNotificacionPdfBuffer, mergePdfBuffers, renderResumenOTPdfBuffer } = require("../services/notificacionPdfService");
+const { renderNotificacionPdfBuffer, mergePdfBuffers, renderResumenOTPdfBuffer, buildFirmasHtml } = require("../services/notificacionPdfService");
 
 const parseJsonField = (value, fallback) => {
   if (value === undefined || value === null || value === "") return fallback;
@@ -120,37 +122,47 @@ const crearNotificacion = async (req, res) => {
       return res.status(400).json({ message: "Orden de trabajo requerida" });
     }
 
+    // Determinar si la OT es de tipo "venta" (no requiere equipo)
+    const otConAviso = await getOTAvisoTipoDb(ordenTrabajoId, transaction);
+    if (!otConAviso) {
+      await transaction.rollback();
+      return res.status(404).json({ message: "Orden de trabajo no encontrada" });
+    }
+    const esVentaOT = otConAviso?.aviso?.tipoAviso === "venta";
+
+    let equipoOT = null;
+
     if (!ordenTrabajoEquipoId) {
-      await transaction.rollback();
-      return res.status(400).json({
-        message: "ordenTrabajoEquipoId es requerido",
-      });
-    }
+      if (!esVentaOT) {
+        await transaction.rollback();
+        return res.status(400).json({ message: "ordenTrabajoEquipoId es requerido" });
+      }
+      // Para venta: verificar que no exista ya una notificación para esta OT
+      const existe = await getNotificacionByOTSinEquipoDB(ordenTrabajoId, transaction);
+      if (existe) {
+        await transaction.rollback();
+        return res.status(409).json({
+          message: "Ya existe una notificación para esta OT de venta",
+          notificacionId: existe.id,
+        });
+      }
+    } else {
+      equipoOT = await getEquipoOTDB({ ordenTrabajoId, ordenTrabajoEquipoId, transaction });
+      if (!equipoOT) {
+        await transaction.rollback();
+        return res.status(400).json({
+          message: "El registro de la OT no pertenece a la orden de trabajo",
+        });
+      }
 
-    const equipoOT = await getEquipoOTDB({
-      ordenTrabajoId,
-      ordenTrabajoEquipoId,
-      transaction,
-    });
-
-    if (!equipoOT) {
-      await transaction.rollback();
-      return res.status(400).json({
-        message: "El registro de la OT no pertenece a la orden de trabajo",
-      });
-    }
-
-    const existe = await getNotificacionByEquipoOTDB(
-      ordenTrabajoEquipoId,
-      transaction
-    );
-
-    if (existe) {
-      await transaction.rollback();
-      return res.status(409).json({
-        message: "Ya existe notificación para este registro de la OT",
-        notificacionId: existe.id,
-      });
+      const existe = await getNotificacionByEquipoOTDB(ordenTrabajoEquipoId, transaction);
+      if (existe) {
+        await transaction.rollback();
+        return res.status(409).json({
+          message: "Ya existe notificación para este registro de la OT",
+          notificacionId: existe.id,
+        });
+      }
     }
 
     const notificacion = await createNotificacionDB(
@@ -237,7 +249,7 @@ const crearNotificacion = async (req, res) => {
                 ordenTrabajoEquipoId,
                 planMantenimientoActividadId: planInput.planMantenimientoActividadId || null,
                 planMantenimientoId: planInput.planMantenimientoId || null,
-                equipoId: equipoOT.equipoId || null,
+                equipoId: equipoOT?.equipoId || null,
               })
             );
           }
@@ -247,7 +259,7 @@ const crearNotificacion = async (req, res) => {
           await bulkCreateAdjuntosDB(adjuntosPlanes, transaction);
         }
       }
-    } else if (usePrecargarPlanes) {
+    } else if (usePrecargarPlanes && ordenTrabajoEquipoId) {
       planesCreados = await precargarPlanesPorEquipoOTDB({
         notificacionId: notificacion.id,
         ordenTrabajoEquipoId,
@@ -280,7 +292,7 @@ const crearNotificacion = async (req, res) => {
           notificacionId: notificacion.id,
           ordenTrabajoId,
           ordenTrabajoEquipoId,
-          equipoId: equipoOT.equipoId || null,
+          equipoId: equipoOT?.equipoId || null,
         });
       });
 
@@ -305,7 +317,7 @@ const crearNotificacion = async (req, res) => {
           notificacionId: notificacion.id,
           ordenTrabajoId: adj.ordenTrabajoId || ordenTrabajoId,
           ordenTrabajoEquipoId: adj.ordenTrabajoEquipoId || ordenTrabajoEquipoId,
-          equipoId: equipoOT.equipoId || null,
+          equipoId: equipoOT?.equipoId || null,
         }));
 
       console.log("[ADJUNTOS] guardando en DB:", adjuntosDeBody.map(a => ({ cat: a.categoria, grupo: a.grupo, desc: a.descripcion })));
@@ -477,11 +489,12 @@ const generarNotificacionesPorOT = async (req, res) => {
 const generarPdfNotificacion = async (req, res) => {
   try {
     const { id } = req.params;
+    const firmas = req.body?.firmas || {};
 
     const notif = await getNotificacionForPdfDB(id);
     if (!notif) return res.status(404).json({ message: "Notificación no encontrada" });
 
-    const pdfBuffer = await renderNotificacionPdfBuffer(notif);
+    const pdfBuffer = await renderNotificacionPdfBuffer(notif, firmas);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename=notificacion_${id}.pdf`);
@@ -505,6 +518,7 @@ const listarNotificacionesPorOT = async (req, res) => {
 const combinarPdfsOT = async (req, res) => {
   try {
     const { ordenTrabajoId } = req.params;
+    const firmas = req.body?.firmas || {};
 
     const notificaciones = await getNotificacionesByOTDB(ordenTrabajoId);
     if (!notificaciones || notificaciones.length === 0) {
@@ -513,12 +527,14 @@ const combinarPdfsOT = async (req, res) => {
 
     const buffers = [];
     let otNumero = null;
+    let tipoAvisoOT = "";
 
     for (const notifResumen of notificaciones) {
       const notif = await getNotificacionForPdfDB(notifResumen.id);
       if (!notif) continue;
       if (!otNumero) otNumero = notif?.ordenTrabajo?.numeroOT || null;
-      const buf = await renderNotificacionPdfBuffer(notif);
+      if (!tipoAvisoOT) tipoAvisoOT = notif?.ordenTrabajo?.aviso?.tipoAviso || "";
+      const buf = await renderNotificacionPdfBuffer(notif, firmas, false);
       buffers.push(buf);
     }
 
@@ -526,9 +542,26 @@ const combinarPdfsOT = async (req, res) => {
       return res.status(404).json({ message: "No se pudieron generar PDFs" });
     }
 
-    // Tabla resumen al final
-    const resumenBuf = await renderResumenOTPdfBuffer(notificaciones, otNumero);
-    buffers.push(resumenBuf);
+    // Última página: tabla resumen (mantenimiento) o página de firmas (instalacion/venta)
+    if (!tipoAvisoOT || tipoAvisoOT === "mantenimiento") {
+      // Mantenimiento: resumen de cambios + firmas al final
+      const resumenBuf = await renderResumenOTPdfBuffer(notificaciones, otNumero, null, firmas);
+      buffers.push(resumenBuf);
+    } else {
+      // Instalación / venta: página de firmas sola al final
+      const puppeteer = require("puppeteer");
+      const browser = await puppeteer.launch({ headless: "new", args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+      try {
+        const page = await browser.newPage();
+        await page.setBypassCSP(true);
+        const html = buildFirmasHtml(firmas, otNumero);
+        await page.setContent(html, { waitUntil: ["load", "networkidle0"] });
+        const firmasBuf = await page.pdf({ format: "A4", printBackground: true, margin: { top: "14mm", right: "12mm", bottom: "14mm", left: "12mm" } });
+        buffers.push(firmasBuf);
+      } finally {
+        await browser.close();
+      }
+    }
 
     const merged = await mergePdfBuffers(buffers);
 
@@ -547,7 +580,7 @@ const combinarPdfsOT = async (req, res) => {
 const generarPdfResumen = async (req, res) => {
   try {
     const { ordenTrabajoId } = req.params;
-    const { grupos } = req.body || {};
+    const { grupos, firmas } = req.body || {};
 
     const notificaciones = await getNotificacionesByOTDB(ordenTrabajoId);
     if (!notificaciones || notificaciones.length === 0) {
@@ -558,7 +591,7 @@ const generarPdfResumen = async (req, res) => {
       ? (await getNotificacionForPdfDB(notificaciones[0].id))?.ordenTrabajo?.numeroOT
       : null;
 
-    const pdfBuffer = await renderResumenOTPdfBuffer(notificaciones, otNumero, grupos);
+    const pdfBuffer = await renderResumenOTPdfBuffer(notificaciones, otNumero, grupos, firmas || {});
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename=resumen_OT_${ordenTrabajoId}.pdf`);

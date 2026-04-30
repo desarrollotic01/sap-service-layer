@@ -1,6 +1,7 @@
 const {
   crearPlan,
   actualizarPlan,
+  eliminarPlan,
   obtenerPlanes,
   obtenerPlanPorId,
   obtenerPlanesPorEquipo,
@@ -186,9 +187,26 @@ const actualizarPlanesMantenimientoUbicacionTecnica = async (req, res) => {
   }
 };
 
+/* =========================================================
+   ELIMINAR PLAN
+========================================================= */
+const eliminarPlanHandler = async (req, res) => {
+  try {
+    const result = await eliminarPlan(req.params.id);
+    return res.json(result);
+  } catch (error) {
+    if (error.message?.toLowerCase().includes("no encontrado")) {
+      return res.status(404).json({ error: error.message });
+    }
+    console.error(error);
+    return res.status(400).json({ error: error.message });
+  }
+};
+
 module.exports = {
   crearPlanHandler,
   actualizarPlanHandler,
+  eliminarPlanHandler,
   obtenerPlanesHandler,
   obtenerPlanPorIdHandler,
   obtenerPlanesPorEquipoHandler,

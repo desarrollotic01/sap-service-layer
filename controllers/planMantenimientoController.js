@@ -900,9 +900,20 @@ const actualizarPlanesDeUbicacionTecnica = async (
   });
 };
 
+/* =========================================================
+   ELIMINAR PLAN
+========================================================= */
+const eliminarPlan = async (id) => {
+  const plan = await PlanMantenimiento.findByPk(id);
+  if (!plan) throw new Error("Plan no encontrado");
+  await plan.destroy();
+  return { message: "Plan eliminado correctamente" };
+};
+
 module.exports = {
   crearPlan,
   actualizarPlan,
+  eliminarPlan,
   obtenerPlanes,
   obtenerPlanPorId,
   obtenerPlanesPorEquipo,

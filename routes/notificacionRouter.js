@@ -7,8 +7,8 @@ router.post("/", roleAuth(["all_access","create_notificaciones"]), uploadAdjunto
 router.get("/", roleAuth(["all_access","read_notificaciones"]), listarNotificaciones);
 router.get("/ot/:ordenTrabajoId", roleAuth(["all_access","read_notificaciones"]), listarNotificacionesPorOT);
 router.post("/ot/:ordenTrabajoId/generar", roleAuth(["all_access","create_notificaciones"]), generarNotificacionesPorOT);
-router.get("/:id/pdf", roleAuth(["all_access","read_notificaciones"]), generarPdfNotificacion);
-router.get("/ot/:ordenTrabajoId/pdf-completo", roleAuth(["all_access","read_notificaciones"]), combinarPdfsOT);
+router.post("/:id/pdf", roleAuth(["all_access","read_notificaciones"]), generarPdfNotificacion);
+router.post("/ot/:ordenTrabajoId/pdf-completo", roleAuth(["all_access","read_notificaciones"]), combinarPdfsOT);
 router.post("/ot/:ordenTrabajoId/pdf-resumen", roleAuth(["all_access","read_notificaciones"]), generarPdfResumen);
 router.post("/:id/finalizar", roleAuth(["all_access","update_notificaciones"]), finalizarNotificacion);
 router.get("/:id", roleAuth(["all_access","read_notificaciones"]), obtenerNotificacion);
