@@ -3,11 +3,11 @@ const { crearEquipo, listarEquipos, obtenerEquipo, actualizarEquipo, eliminarEqu
 const uploadEquipoAdjuntos = require("../middlewares/uploadEquipoAdjuntos");
 const roleAuth = require("../checkers/roleAuth");
 const router = Router();
-router.post("/", roleAuth(["all_access","create_equipos"]), uploadEquipoAdjuntos.array("adjuntos"), crearEquipo);
+router.post("/", roleAuth(["all_access","create_equipos"]), uploadEquipoAdjuntos.any(), crearEquipo);
 router.get("/", roleAuth(["all_access","read_equipos"]), listarEquipos);
 router.get("/cliente/:clienteId", roleAuth(["all_access","read_equipos"]), getEquiposByClienteIdHandler);
 router.get("/:id", roleAuth(["all_access","read_equipos"]), obtenerEquipo);
-router.put("/:id", roleAuth(["all_access","update_equipos"]), uploadEquipoAdjuntos.array("adjuntos"), actualizarEquipo);
+router.put("/:id", roleAuth(["all_access","update_equipos"]), uploadEquipoAdjuntos.any(), actualizarEquipo);
 router.delete("/:id", roleAuth(["all_access","delete_equipos"]), eliminarEquipo);
 router.get("/:id/planes-mantenimiento", roleAuth(["all_access","read_equipos","read_planes"]), obtenerPlanesMantenimientoEquipo);
 router.put("/:equipoId/adjuntos-portal", roleAuth(["all_access","update_equipos"]), actualizarAdjuntosPortalEquipoHandler);

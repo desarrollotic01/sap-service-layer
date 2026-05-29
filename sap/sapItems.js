@@ -22,7 +22,7 @@ async function getItemsSAP() {
 
   let items = [];
   let nextUrl =
-    "/Items?$select=ItemCode,ItemName,ItemsGroupCode,PurchaseUnit,InventoryUOM,SalesUnit,Valid&$filter=Valid eq 'tYES'";
+    "/Items?$select=ItemCode,ItemName,ItemsGroupCode,PurchaseUnit,InventoryUOM,SalesUnit,Valid,MinInventory&$filter=Valid eq 'tYES'";
 
   while (nextUrl) {
     const response = await sapAxios.get(nextUrl, {

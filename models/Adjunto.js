@@ -33,7 +33,9 @@ module.exports = (sequelize) => {
           "ACTA_CONFORMIDAD",
           "INFORME",
           "CHECKLIST",
-          "OTRO"
+          "OTRO",
+          "IMAGEN_EQUIPO",
+          "DOCUMENTO_EQUIPO"
         ),
         allowNull: true,
       },

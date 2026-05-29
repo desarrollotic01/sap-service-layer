@@ -65,20 +65,20 @@ const crear = async (data, files = []) => {
     }
 
     if (files && files.length > 0) {
-  const adjuntosData = files.map((file) => ({
-    nombre: file.originalname,
-    url: `/uploads/equipos/${file.filename}`,
-    extension: file.mimetype,
-    categoria: "OTRO",
-    equipoId: equipo.id,
-    mostrarEnPortal: false,
-    tituloPortal: null,
-    descripcionPortal: null,
-    ordenPortal: 0,
-  }));
+      const adjuntosData = files.map((file) => ({
+        nombre: file.originalname,
+        url: `/uploads/equipos/${file.filename}`,
+        extension: file.mimetype,
+        categoria: file.fieldname === "imagenEquipo" ? "IMAGEN_EQUIPO" : "DOCUMENTO_EQUIPO",
+        equipoId: equipo.id,
+        mostrarEnPortal: false,
+        tituloPortal: null,
+        descripcionPortal: null,
+        ordenPortal: 0,
+      }));
 
-  await Adjunto.bulkCreate(adjuntosData, { transaction: t });
-}
+      await Adjunto.bulkCreate(adjuntosData, { transaction: t });
+    }
 
     return await obtenerEquipoCompleto(equipo.id, t);
   });
@@ -150,7 +150,7 @@ const actualizar = async (id, data, files = []) => {
         nombre: file.originalname,
         url: `/uploads/equipos/${file.filename}`,
         extension: file.mimetype,
-        categoria: "OTRO",
+        categoria: file.fieldname === "imagenEquipo" ? "IMAGEN_EQUIPO" : "DOCUMENTO_EQUIPO",
         equipoId: equipo.id,
       }));
 

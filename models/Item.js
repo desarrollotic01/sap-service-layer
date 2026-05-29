@@ -46,12 +46,16 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
+      stockMinimo: {
+        type: DataTypes.DECIMAL(15, 2),
+        allowNull: true,
+      },
+
       activoSAP: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
       },
 
-    
     },
     {
       tableName: "Items",

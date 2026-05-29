@@ -18,6 +18,9 @@ const ROLES_VALIDOS = [
   "tecnico_mecanico",
   "operario_de_mantenimiento",
   "supervisor",
+  "analista_de_mantenimiento",
+  "programador_de_mantenimiento",
+  "coordinador_de_mantenimiento",
 ];
 const TIPO_EQUIPO_PROPIEDAD = ["Vendido", "Propio", "Atendido"];
 const STATUS_EQUIPO = ["Almacen", "En compra", "Entregado"];
@@ -239,6 +242,8 @@ const importarEquipos = async (buffer) => {
     const operadorLogistico = f("operadorLogistico") || null;
     const idPlaca = f("idPlaca") || null;
     const id_cliente = f("id_cliente") || null;
+    const numeroOrdenCliente = f("numeroOrdenCliente") || null;
+    const fechaOrdenCliente = cellDate(fila["fechaOrdenCliente"]);
     const fechaOV = cellDate(fila["fechaOV"]);
     const fechaEntregaPrevista = cellDate(fila["fechaEntregaPrevista"]);
     const fechaEntregaReal = cellDate(fila["fechaEntregaReal"]);
@@ -314,6 +319,8 @@ const importarEquipos = async (buffer) => {
         operadorLogistico,
         idPlaca,
         id_cliente,
+        numeroOrdenCliente,
+        fechaOrdenCliente,
         fechaOV,
         fechaEntregaPrevista,
         fechaEntregaReal,
@@ -363,8 +370,6 @@ const importarUbicaciones = async (buffer) => {
 
     const codigo = f("codigo");
     const nombre = f("nombre");
-    const numeroOV = f("numeroOV");
-    const tipoEquipoPropiedad = f("tipoEquipoPropiedad");
     const paisNombre = f("pais");
     const clienteNombre = f("cliente");
     const especialidad = f("especialidad") || null;
@@ -372,19 +377,11 @@ const importarUbicaciones = async (buffer) => {
     const sede = f("sede") || null;
     const almacen = f("almacen") || null;
     const operadorLogistico = f("operadorLogistico") || null;
-    const idPlaca = f("idPlaca") || null;
-    const id_cliente = f("id_cliente") || null;
-    const fechaOV = cellDate(fila["fechaOV"]);
-    const fechaEntregaPrevista = cellDate(fila["fechaEntregaPrevista"]);
-    const fechaEntregaReal = cellDate(fila["fechaEntregaReal"]);
-    const finGarantia = cellDate(fila["finGarantia"]);
+    const numeroOrdenCliente = f("numeroOrdenCliente") || null;
+    const fechaOrdenCliente = cellDate(fila["fechaOrdenCliente"]);
 
     if (!codigo) errs.push("codigo es obligatorio");
     if (!nombre) errs.push("nombre es obligatorio");
-    if (!numeroOV) errs.push("numeroOV es obligatorio");
-    if (!tipoEquipoPropiedad) errs.push("tipoEquipoPropiedad es obligatorio");
-    else if (!TIPO_EQUIPO_PROPIEDAD.includes(tipoEquipoPropiedad))
-      errs.push(`tipoEquipoPropiedad inválido: "${tipoEquipoPropiedad}". Valores: ${TIPO_EQUIPO_PROPIEDAD.join(", ")}`);
 
     if (errs.length) {
       errores.push({ fila: fila.__fila, errores: errs });
@@ -411,8 +408,8 @@ const importarUbicaciones = async (buffer) => {
       const nuevo = await UbicacionTecnica.create({
         codigo,
         nombre,
-        numeroOV,
-        tipoEquipoPropiedad,
+        numeroOV: "N/A",
+        tipoEquipoPropiedad: "Propio",
         paisId: pais ? pais.id : null,
         clienteId: cliente ? cliente.id : null,
         especialidad,
@@ -420,12 +417,8 @@ const importarUbicaciones = async (buffer) => {
         sede,
         almacen,
         operadorLogistico,
-        idPlaca,
-        id_cliente,
-        fechaOV,
-        fechaEntregaPrevista,
-        fechaEntregaReal,
-        finGarantia,
+        numeroOrdenCliente,
+        fechaOrdenCliente,
       });
       const detalle = advertencias.length
         ? `${codigo} - ${nombre} ⚠️ ${advertencias.join("; ")}`
@@ -503,7 +496,7 @@ const generarPlantilla = async (entidad) => {
       ws.getCell(r, rolColIdx).dataValidation = {
         type: "list",
         allowBlank: true,
-        formulae: ['"tecnico_electrico,tecnico_mecanico,operario_de_mantenimiento,supervisor"'],
+        formulae: ['"tecnico_electrico,tecnico_mecanico,operario_de_mantenimiento,supervisor,analista_de_mantenimiento,programador_de_mantenimiento,coordinador_de_mantenimiento"'],
         showErrorMessage: true,
         errorTitle: "Valor inválido",
         error: "Selecciona un rol de la lista",
@@ -513,7 +506,7 @@ const generarPlantilla = async (entidad) => {
     // Hoja valores válidos
     validSheet.addRow(["Campo", "Valores válidos"]);
     validSheet.getRow(1).font = { bold: true };
-    validSheet.addRow(["rol", ROLES_VALIDOS.join(", ")]);
+    validSheet.addRow(["rol", ROLES_VALIDOS.join(", "), "Obligatorio"]);
     validSheet.addRow(["activo", "true, false"]);
     validSheet.addRow(["fechaNacimiento", "Formato: YYYY-MM-DD (ej: 1990-05-15)"]);
     validSheet.columns = [{ width: 20 }, { width: 70 }];
@@ -545,6 +538,8 @@ const generarPlantilla = async (entidad) => {
       { key: "operadorLogistico",    req: false, width: 20, ejemplo: "" },
       { key: "idPlaca",              req: false, width: 12, ejemplo: "ABC-123" },
       { key: "id_cliente",           req: false, width: 15, ejemplo: "CLI-001" },
+      { key: "numeroOrdenCliente",   req: false, width: 20, ejemplo: "OC-001" },
+      { key: "fechaOrdenCliente",    req: false, width: 18, ejemplo: "2024-01-20" },
       { key: "fechaOV",              req: false, width: 14, ejemplo: "2024-01-15" },
       { key: "fechaEntregaPrevista", req: false, width: 20, ejemplo: "2024-03-01" },
       { key: "fechaEntregaReal",     req: false, width: 18, ejemplo: "" },
@@ -592,6 +587,7 @@ const generarPlantilla = async (entidad) => {
     validSheet.addRow(["pais", "Nombre completo del país o código de 3 letras (ej: Perú o PER)", "Obligatorio"]);
     validSheet.addRow(["cliente", "Razón social exacta o código SAP del cliente", "Obligatorio"]);
     validSheet.addRow(["familia", "Nombre exacto de la familia de equipos", "Opcional"]);
+    validSheet.addRow(["numeroOrdenCliente", "Número de orden del cliente", "Opcional"]);
     validSheet.addRow(["Fechas", "Formato YYYY-MM-DD", "Ej: 2024-01-15"]);
     validSheet.columns = [{ width: 22 }, { width: 60 }, { width: 40 }];
 
@@ -600,23 +596,17 @@ const generarPlantilla = async (entidad) => {
     workbook.views = [{ activeTab: 1 }];
 
     const cols = [
-      { key: "codigo",               req: true,  width: 15, ejemplo: "UT-001" },
-      { key: "nombre",               req: true,  width: 30, ejemplo: "Ubicación Ejemplo" },
-      { key: "numeroOV",             req: true,  width: 15, ejemplo: "OV-12345" },
-      { key: "cliente",              req: true,  width: 30, ejemplo: "Empresa ABC SAC" },
-      { key: "pais",                 req: true,  width: 15, ejemplo: "Perú" },
-      { key: "tipoEquipoPropiedad",  req: true,  width: 22, ejemplo: "Vendido" },
-      { key: "especialidad",         req: false, width: 20, ejemplo: "Eléctrica" },
-      { key: "descripcion",          req: false, width: 30, ejemplo: "Descripción" },
-      { key: "sede",                 req: false, width: 20, ejemplo: "Lima" },
-      { key: "almacen",              req: false, width: 15, ejemplo: "" },
-      { key: "operadorLogistico",    req: false, width: 20, ejemplo: "" },
-      { key: "idPlaca",              req: false, width: 12, ejemplo: "" },
-      { key: "id_cliente",           req: false, width: 15, ejemplo: "" },
-      { key: "fechaOV",              req: false, width: 14, ejemplo: "2024-01-15" },
-      { key: "fechaEntregaPrevista", req: false, width: 20, ejemplo: "" },
-      { key: "fechaEntregaReal",     req: false, width: 18, ejemplo: "" },
-      { key: "finGarantia",          req: false, width: 14, ejemplo: "" },
+      { key: "codigo",              req: true,  width: 15, ejemplo: "UT-001" },
+      { key: "nombre",              req: true,  width: 30, ejemplo: "Ubicación Ejemplo" },
+      { key: "cliente",             req: true,  width: 30, ejemplo: "Empresa ABC SAC" },
+      { key: "pais",                req: true,  width: 15, ejemplo: "Perú" },
+      { key: "especialidad",        req: false, width: 20, ejemplo: "Eléctrica" },
+      { key: "descripcion",         req: false, width: 30, ejemplo: "Descripción" },
+      { key: "sede",                req: false, width: 20, ejemplo: "Lima" },
+      { key: "almacen",             req: false, width: 15, ejemplo: "" },
+      { key: "operadorLogistico",   req: false, width: 20, ejemplo: "" },
+      { key: "numeroOrdenCliente",  req: false, width: 20, ejemplo: "OC-001" },
+      { key: "fechaOrdenCliente",   req: false, width: 18, ejemplo: "2024-01-15" },
     ];
 
     ws.getRow(1).height = 30;
@@ -642,11 +632,8 @@ const generarPlantilla = async (entidad) => {
       }
     };
 
-    addDropdown("tipoEquipoPropiedad", TIPO_EQUIPO_PROPIEDAD);
-
     validSheet.addRow(["Campo", "Valores válidos", "Notas"]);
     validSheet.getRow(1).font = { bold: true };
-    validSheet.addRow(["tipoEquipoPropiedad", TIPO_EQUIPO_PROPIEDAD.join(", "), "Obligatorio"]);
     validSheet.addRow(["pais", "Nombre completo del país o código (ej: Perú o PER)", "Obligatorio"]);
     validSheet.addRow(["cliente", "Razón social exacta o código SAP del cliente", "Obligatorio"]);
     validSheet.addRow(["Fechas", "Formato YYYY-MM-DD", "Ej: 2024-01-15"]);

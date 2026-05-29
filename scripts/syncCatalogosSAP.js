@@ -115,6 +115,7 @@ async function syncItems() {
       unidadCompra: item.PurchaseUnit || null,
       unidadInventario: item.InventoryUOM || null,
       unidadVenta: item.SalesUnit || null,
+      stockMinimo: item.MinInventory ?? null,
       activoSAP: item.Valid === "tYES",
 
       // 🔥 IMPORTANTE: NO warehouse aquí
@@ -131,6 +132,7 @@ async function syncItems() {
       "unidadCompra",
       "unidadInventario",
       "unidadVenta",
+      "stockMinimo",
       "activoSAP",
     ],
   });
