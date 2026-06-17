@@ -2,10 +2,27 @@ const avisosController = require("../controllers/avisosController");
 const { validarAviso } = require("../validators/avisoValidator");
 const path = require("path");
 
+const UUID_FIELDS = ["clienteId", "paisId", "supervisorId", "guiaMantenimientoId", "guiaMantenimientoProgramacionId"];
+const ENUM_FIELDS = ["prioridad", "tipoMantenimiento", "producto", "tipoAviso"];
+
+function sanitizeFormDataBody(body) {
+  for (const key of UUID_FIELDS) {
+    if (body[key] !== undefined && !body[key]) {
+      delete body[key];
+    }
+  }
+  for (const key of ENUM_FIELDS) {
+    if (body[key] !== undefined && !body[key]) {
+      delete body[key];
+    }
+  }
+}
+
 async function crearAvisoHandler(req, res) {
   try {
     const errors = [];
 
+    sanitizeFormDataBody(req.body);
 
      if (Array.isArray(req.body.tipoAviso)) {
       req.body.tipoAviso = req.body.tipoAviso[0];
@@ -14,7 +31,7 @@ async function crearAvisoHandler(req, res) {
     if (req.body.tipoAviso) {
       req.body.tipoAviso = req.body.tipoAviso.trim().toLowerCase();
     }
-    
+
 
     if (!req.user?.id) {
       errors.push("Usuario no autenticado");
@@ -97,11 +114,15 @@ async function crearAvisoHandler(req, res) {
   } catch (error) {
     console.error("ERROR CREAR AVISO:", error);
 
-    // Número de aviso duplicado
     if (error.name === "SequelizeUniqueConstraintError") {
       return res.status(400).json({
         errors: ["El número de aviso ya existe. Por favor usa uno diferente."],
       });
+    }
+
+    if (error.name === "SequelizeValidationError" || error.name === "SequelizeDatabaseError") {
+      const msgs = error.errors?.map((e) => e.message) || [error.message];
+      return res.status(400).json({ errors: msgs });
     }
 
     return res.status(500).json({

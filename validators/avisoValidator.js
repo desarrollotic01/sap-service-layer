@@ -18,6 +18,13 @@ function validarAviso(body) {
   }
 
   /* =====================
+     PAÍS
+  ===================== */
+  if (!body.paisId) {
+    errors.push("paisId es obligatorio");
+  }
+
+  /* =====================
      CLIENTE
   ===================== */
   if (!body.clienteId) {

@@ -12,6 +12,7 @@ const cors = require("cors");
 const path = require("path");
 
 const { initCronJobs, setIo } = require("./cron/guiaMantenimientoCron");
+const { initSapSyncCron } = require("./cron/sapSyncCron");
 const { initContadores } = require("./utils/contadores");
 
 const app = express();
@@ -38,6 +39,7 @@ server.listen(PORT, "0.0.0.0",() => {
       console.log("Database is connected");
       setIo(getIo());
       initCronJobs();
+      initSapSyncCron();
       await initContadores();
     })
     .catch(err => console.error("Error connecting to the database:", err));

@@ -300,4 +300,6 @@ async function main() {
 
 
 
-main();
+module.exports = { syncRubros, syncClientes, syncContactos, syncItems, sincronizarCatalogosSAP };
+
+if (require.main === module) main();

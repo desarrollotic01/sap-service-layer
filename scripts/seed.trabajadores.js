@@ -51,9 +51,10 @@ async function seedBase() {
       { nombre: "Montacargas" },
       { nombre: "Rampas" },
       { nombre: "Puertas Seleccionales" },
-      { nombre: "Traspaletas" },
+      { nombre: "Transpaletas" },
       { nombre: "Apiladores" },
       { nombre: "Puertas Peatonales" },
+      {nombre: "Autosat" },
       { nombre: "OTROS" },
     ];
 
