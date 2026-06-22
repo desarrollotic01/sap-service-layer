@@ -4,7 +4,7 @@ const handler = require("../handlers/avisosHandler");
 const upload = require("../middlewares/upload");
 const roleAuth = require("../checkers/roleAuth");
 
-router.post("/", roleAuth(["all_access", "create_avisos"]), upload.fields([{ name: "documentos", maxCount: 10 }, { name: "documentoFinal", maxCount: 1 }]), handler.crearAvisoHandler);
+router.post("/", roleAuth(["all_access", "create_avisos"]), upload.fields([{ name: "documentos", maxCount: 15 }, { name: "documentoFinal", maxCount: 15 }]), handler.crearAvisoHandler);
 router.get("/", roleAuth(["all_access", "read_avisos"]), handler.obtenerAvisosHandler);
 router.get("/origen/manual", roleAuth(["all_access", "read_avisos"]), handler.getAvisosManualHandler);
 router.get("/origen/guia", roleAuth(["all_access", "read_avisos"]), handler.getAvisosGuiaHandler);

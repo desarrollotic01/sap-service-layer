@@ -659,7 +659,7 @@ const guardarCambiosTratamientoHandler = async (req, res) => {
 
         if (
           a.rolTecnico &&
-          !["tecnico_electrico", "operario_de_mantenimiento", "tecnico_mecanico", "supervisor"].includes(a.rolTecnico)
+          !["tecnico_electrico", "operario_de_mantenimiento", "tecnico_mecanico", "supervisor", "analista_de_mantenimiento", "programador_de_mantenimiento", "coordinador_de_mantenimiento"].includes(a.rolTecnico)
         ) {
           return res.status(400).json({ message: `Actividad ${i + 1}: rolTecnico inválido` });
         }

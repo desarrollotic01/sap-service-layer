@@ -1,18 +1,29 @@
 const avisosController = require("../controllers/avisosController");
+const {
+  ESTADOS_AVISO_VALIDOS,
+  TIPOS_AVISO_VALIDOS,
+  PRIORIDADES_VALIDAS,
+  TIPOS_MANTENIMIENTO_VALIDOS,
+  PRODUCTOS_VALIDOS,
+} = avisosController;
 const { validarAviso } = require("../validators/avisoValidator");
 const path = require("path");
 
 const UUID_FIELDS = ["clienteId", "paisId", "supervisorId", "guiaMantenimientoId", "guiaMantenimientoProgramacionId"];
 const ENUM_FIELDS = ["prioridad", "tipoMantenimiento", "producto", "tipoAviso"];
 
+function isEmpty(v) {
+  return !v || v === "null" || v === "undefined";
+}
+
 function sanitizeFormDataBody(body) {
   for (const key of UUID_FIELDS) {
-    if (body[key] !== undefined && !body[key]) {
+    if (body[key] !== undefined && isEmpty(body[key])) {
       delete body[key];
     }
   }
   for (const key of ENUM_FIELDS) {
-    if (body[key] !== undefined && !body[key]) {
+    if (body[key] !== undefined && isEmpty(body[key])) {
       delete body[key];
     }
   }
@@ -75,9 +86,8 @@ async function crearAvisoHandler(req, res) {
     ========================= */
 
     let documentos = [];
-    let documentoFinal = null;
+    let documentoFinal = [];
 
-    // 🔹 múltiples documentos
     if (req.files?.documentos) {
       documentos = req.files.documentos.map(file => ({
         nombre: file.originalname,
@@ -86,10 +96,12 @@ async function crearAvisoHandler(req, res) {
       }));
     }
 
-    // 🔹 documento final
     if (req.files?.documentoFinal) {
-      const file = req.files.documentoFinal[0];
-      documentoFinal = `/uploads/final/${file.filename}`;
+      documentoFinal = req.files.documentoFinal.map(file => ({
+        nombre: file.originalname,
+        url: `/uploads/final/${file.filename}`,
+        tipo: path.extname(file.originalname).replace(".", "")
+      }));
     }
 
     /* =========================

@@ -178,7 +178,8 @@ module.exports = (sequelize) => {
       },
 
       documentoFinal: {
-        type: DataTypes.STRING,
+        type: DataTypes.JSON,
+        defaultValue: [],
       },
 
 
