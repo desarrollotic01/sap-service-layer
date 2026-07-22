@@ -10,35 +10,15 @@ module.exports = (sequelize) => {
         primaryKey: true,
       },
 
-      sapDocEntry: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        unique: true,
-      },
-
-      docNum: {
+      // Código de Proyecto de SAP (módulo Project Management) — Alsud lo usa como Orden de Venta
+      codigoProyecto: {
         type: DataTypes.STRING,
         allowNull: false,
         unique: true,
       },
 
-      cardCode: {
+      nombreProyecto: {
         type: DataTypes.STRING,
-        allowNull: true,
-      },
-
-      cardName: {
-        type: DataTypes.STRING,
-        allowNull: true,
-      },
-
-      docDate: {
-        type: DataTypes.DATEONLY,
-        allowNull: true,
-      },
-
-      docTotal: {
-        type: DataTypes.DECIMAL(15, 2),
         allowNull: true,
       },
 

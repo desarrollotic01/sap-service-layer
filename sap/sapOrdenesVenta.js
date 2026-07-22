@@ -15,16 +15,14 @@ function normalizarNextLink(nextLink) {
 }
 
 /**
- * 🔥 Obtener las Órdenes de Venta abiertas desde SAP (entidad "Orders" del Service Layer)
- * ⚠️ Verificar contra la instancia real de SAP: nombre de entidad y de campos
- * (DocEntry, DocNum, CardCode, CardName, DocDate, DocTotal, DocumentStatus) según versión de SAP B1.
+ * 🔥 Obtener los Proyectos SAP (módulo Project Management, tabla OPRJ)
+ * Alsud usa el Código de Proyecto de SAP como "Orden de Venta" del aviso.
  */
 async function getOrdenesVentaSAP() {
   const cookie = await loginSAP();
 
-  let ordenes = [];
-  let nextUrl =
-    "/Orders?$select=DocEntry,DocNum,CardCode,CardName,DocDate,DocTotal,DocumentStatus&$filter=DocumentStatus eq 'bost_Open'";
+  let proyectos = [];
+  let nextUrl = "/Projects?$select=Code,Name";
 
   while (nextUrl) {
     const response = await sapAxios.get(nextUrl, {
@@ -34,16 +32,16 @@ async function getOrdenesVentaSAP() {
     const data = response.data || {};
     const batch = Array.isArray(data.value) ? data.value : [];
 
-    ordenes = ordenes.concat(batch);
+    proyectos = proyectos.concat(batch);
 
-    console.log(`🧾 Órdenes de Venta acumuladas: ${ordenes.length}`);
+    console.log(`🧾 Proyectos SAP (Orden de Venta) acumulados: ${proyectos.length}`);
 
     nextUrl = normalizarNextLink(
       data["@odata.nextLink"] || data["odata.nextLink"] || null
     );
   }
 
-  return ordenes;
+  return proyectos;
 }
 
 module.exports = {

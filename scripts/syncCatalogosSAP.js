@@ -249,35 +249,30 @@ async function syncContactos() {
 }
 
 async function syncOrdenesVenta() {
-  const ordenesSAP = await getOrdenesVentaSAP();
+  const proyectosSAP = await getOrdenesVentaSAP();
 
-  const ordenesToUpsert = [];
+  const proyectosToUpsert = [];
 
-  for (const orden of ordenesSAP) {
-    const sapDocEntry = orden.DocEntry;
-    const docNum = String(orden.DocNum || "").trim();
+  for (const proyecto of proyectosSAP) {
+    const codigoProyecto = String(proyecto.Code || "").trim();
 
-    if (sapDocEntry === null || sapDocEntry === undefined || !docNum) {
-      console.warn("⚠️ Orden de Venta omitida:", orden);
+    if (!codigoProyecto) {
+      console.warn("⚠️ Proyecto SAP omitido (sin código):", proyecto);
       continue;
     }
 
-    ordenesToUpsert.push({
-      sapDocEntry: Number(sapDocEntry),
-      docNum,
-      cardCode: orden.CardCode || null,
-      cardName: orden.CardName || null,
-      docDate: orden.DocDate ? String(orden.DocDate).slice(0, 10) : null,
-      docTotal: orden.DocTotal ?? null,
-      activoSAP: orden.DocumentStatus === "bost_Open",
+    proyectosToUpsert.push({
+      codigoProyecto,
+      nombreProyecto: String(proyecto.Name || "").trim() || codigoProyecto,
+      activoSAP: true,
     });
   }
 
-  await OrdenVenta.bulkCreate(ordenesToUpsert, {
-    updateOnDuplicate: ["docNum", "cardCode", "cardName", "docDate", "docTotal", "activoSAP"],
+  await OrdenVenta.bulkCreate(proyectosToUpsert, {
+    updateOnDuplicate: ["nombreProyecto", "activoSAP"],
   });
 
-  console.log(`✅ Órdenes de Venta sincronizadas: ${ordenesSAP.length}`);
+  console.log(`✅ Órdenes de Venta (proyectos SAP) sincronizadas: ${proyectosSAP.length}`);
 }
 
 async function sincronizarCatalogosSAP() {
