@@ -27,6 +27,25 @@ async function seedBase() {
       { codigo: "002", nombre: "COLOMBIA" },
       { codigo: "003", nombre: "MEXICO" },
       { codigo: "004", nombre: "GUATEMALA" },
+      // Sudamérica
+      { codigo: "005", nombre: "ARGENTINA" },
+      { codigo: "006", nombre: "BOLIVIA" },
+      { codigo: "007", nombre: "BRASIL" },
+      { codigo: "008", nombre: "CHILE" },
+      { codigo: "009", nombre: "ECUADOR" },
+      { codigo: "010", nombre: "PARAGUAY" },
+      { codigo: "011", nombre: "URUGUAY" },
+      { codigo: "012", nombre: "VENEZUELA" },
+      // Centroamérica
+      { codigo: "013", nombre: "BELICE" },
+      { codigo: "014", nombre: "COSTA RICA" },
+      { codigo: "015", nombre: "EL SALVADOR" },
+      { codigo: "016", nombre: "HONDURAS" },
+      { codigo: "017", nombre: "NICARAGUA" },
+      { codigo: "018", nombre: "PANAMA" },
+      // Norteamérica
+      { codigo: "019", nombre: "ESTADOS UNIDOS" },
+      { codigo: "020", nombre: "CANADA" },
     ];
 
     const paises = [];
@@ -199,6 +218,8 @@ async function seedBase() {
     console.error("❌ Error en seed:", error);
     process.exit(1);
   }
+  
+
 }
 
 seedBase();

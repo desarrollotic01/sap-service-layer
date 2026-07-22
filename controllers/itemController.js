@@ -3,7 +3,6 @@ const { getItemWarehouses } = require("../sap/sapItems");
 
 const getAllItemsController = async () => {
   const items = await Item.findAll({
-    where: { activoSAP: true },
     include: [
       {
         model: Rubro,

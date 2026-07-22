@@ -11,10 +11,14 @@ function validarAviso(body) {
   }
 
   /* =====================
-     IDENTIFICACIÓN (OR)  [todos los tipos]
+     IDENTIFICACIÓN (XOR)  [todos los tipos — uno de los dos, nunca ambos]
   ===================== */
-  if (!body.ordenVenta && !body.centroCosto) {
-    errors.push("Debe ingresar ordenVenta o centroCosto");
+  if (Boolean(body.ordenVenta) === Boolean(body.centroCosto)) {
+    errors.push(
+      body.ordenVenta
+        ? "Debe ingresar ordenVenta o centroCosto, pero no ambos"
+        : "Debe ingresar ordenVenta o centroCosto"
+    );
   }
 
   /* =====================

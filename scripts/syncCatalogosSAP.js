@@ -1,11 +1,12 @@
 require("dotenv").config();
 
-const { Cliente, Contacto, Item, Rubro,SapPaqueteTrabajo,SapRubro } = require("../db_connection");
+const { Cliente, Contacto, Item, Rubro,SapPaqueteTrabajo,SapRubro, OrdenVenta } = require("../db_connection");
 const { getClientesSAP } = require("../sap/sapClientes");
 const { getItemsSAP  } = require("../sap/sapItems");
 const { getRubrosSAP } = require("../sap/sapRubros");
 const { getContactosSAP } = require("../sap/sapContactos");
 const {obtenerPaquetesTrabajo , obtenerRubros} = require("../sap/sapCatalogos");
+const { getOrdenesVentaSAP } = require("../sap/sapOrdenesVenta");
 
 
 async function syncRubros() {
@@ -247,6 +248,38 @@ async function syncContactos() {
   console.log(`✅ Contactos sincronizados procesados: ${contactosSAP.length}`);
 }
 
+async function syncOrdenesVenta() {
+  const ordenesSAP = await getOrdenesVentaSAP();
+
+  const ordenesToUpsert = [];
+
+  for (const orden of ordenesSAP) {
+    const sapDocEntry = orden.DocEntry;
+    const docNum = String(orden.DocNum || "").trim();
+
+    if (sapDocEntry === null || sapDocEntry === undefined || !docNum) {
+      console.warn("⚠️ Orden de Venta omitida:", orden);
+      continue;
+    }
+
+    ordenesToUpsert.push({
+      sapDocEntry: Number(sapDocEntry),
+      docNum,
+      cardCode: orden.CardCode || null,
+      cardName: orden.CardName || null,
+      docDate: orden.DocDate ? String(orden.DocDate).slice(0, 10) : null,
+      docTotal: orden.DocTotal ?? null,
+      activoSAP: orden.DocumentStatus === "bost_Open",
+    });
+  }
+
+  await OrdenVenta.bulkCreate(ordenesToUpsert, {
+    updateOnDuplicate: ["docNum", "cardCode", "cardName", "docDate", "docTotal", "activoSAP"],
+  });
+
+  console.log(`✅ Órdenes de Venta sincronizadas: ${ordenesSAP.length}`);
+}
+
 async function sincronizarCatalogosSAP() {
   try {
     const [paquetes, rubros] = await Promise.all([
@@ -286,6 +319,7 @@ async function main() {
     await syncClientes();
     await syncContactos();
     await syncItems();
+    await syncOrdenesVenta();
     console.log("🎉 Sincronización SAP completada");
     process.exit(0);
   } catch (error) {
@@ -300,6 +334,6 @@ async function main() {
 
 
 
-module.exports = { syncRubros, syncClientes, syncContactos, syncItems, sincronizarCatalogosSAP };
+module.exports = { syncRubros, syncClientes, syncContactos, syncItems, syncOrdenesVenta, sincronizarCatalogosSAP };
 
 if (require.main === module) main();

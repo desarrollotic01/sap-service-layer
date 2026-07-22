@@ -14,11 +14,12 @@ const { Op } = require("sequelize");
    CONSTANTES — valores válidos para ENUMs
 ═══════════════════════════════════════════════ */
 const ROLES_VALIDOS = [
+  "operario_de_mantenimiento",
   "tecnico_electrico",
   "tecnico_mecanico",
-  "operario_de_mantenimiento",
+  "tecnico_mantenimiento",
+  "supervisor_senior_mantenimiento",
   "supervisor",
-  "analista_de_mantenimiento",
   "programador_de_mantenimiento",
   "coordinador_de_mantenimiento",
 ];
@@ -469,7 +470,7 @@ const generarPlantilla = async (entidad) => {
       { key: "nombre",          req: true,  width: 20, ejemplo: "Juan" },
       { key: "apellido",        req: true,  width: 20, ejemplo: "Pérez" },
       { key: "dni",             req: true,  width: 15, ejemplo: "12345678" },
-      { key: "rol",             req: true,  width: 28, ejemplo: "tecnico_electrico" },
+      { key: "rol",             req: true,  width: 28, ejemplo: "operario_de_mantenimiento" },
       { key: "empresa",         req: false, width: 20, ejemplo: "Interno" },
       { key: "zona",            req: false, width: 15, ejemplo: "Lima Norte" },
       { key: "direccion",       req: false, width: 30, ejemplo: "Av. Ejemplo 123" },
@@ -496,7 +497,7 @@ const generarPlantilla = async (entidad) => {
       ws.getCell(r, rolColIdx).dataValidation = {
         type: "list",
         allowBlank: true,
-        formulae: ['"tecnico_electrico,tecnico_mecanico,operario_de_mantenimiento,supervisor,analista_de_mantenimiento,programador_de_mantenimiento,coordinador_de_mantenimiento"'],
+        formulae: ['"operario_de_mantenimiento,tecnico_electrico,tecnico_mecanico,tecnico_mantenimiento,supervisor_senior_mantenimiento,supervisor,programador_de_mantenimiento,coordinador_de_mantenimiento"'],
         showErrorMessage: true,
         errorTitle: "Valor inválido",
         error: "Selecciona un rol de la lista",

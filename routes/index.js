@@ -21,6 +21,7 @@ const paisRouter = require("./paisRouter")
 const guiaMantenimientoRouter = require("./guiaMantenimientoRouter")
 const encuestaRouter = require("./encuestaRouter")
 const itemRouter = require("./itemRouter")
+const ordenVentaRouter = require("./ordenVentaRouter")
 const rubroRouter = require("./rubroRouter")
 const sedeRouter = require("./sedeRouter")
 const solicitudAlmacenRouter = require("./solicitudAlmacenRouter")
@@ -38,6 +39,7 @@ router.use("/personal-correo",personalCorreoRouter)
 router.use("/solicitudalmacen", solicitudAlmacenRouter);
 router.use("/rubros", rubroRouter);
 router.use("/items", itemRouter);
+router.use("/ordenes-venta", ordenVentaRouter);
 router.use("/encuesta", encuestaRouter);
 router.use("/guia-mantenimiento", guiaMantenimientoRouter);
 router.use("/pais",paisRouter)

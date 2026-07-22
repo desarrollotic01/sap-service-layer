@@ -1,5 +1,5 @@
 const cron = require("node-cron");
-const { syncClientes, syncContactos, syncRubros, sincronizarCatalogosSAP } = require("../scripts/syncCatalogosSAP");
+const { syncClientes, syncContactos, syncRubros, syncOrdenesVenta, sincronizarCatalogosSAP } = require("../scripts/syncCatalogosSAP");
 
 const jobSyncSAP = async () => {
   console.log(`[SAP-SYNC] Iniciando sincronización automática ${new Date().toISOString()}`);
@@ -8,6 +8,7 @@ const jobSyncSAP = async () => {
     await syncRubros();
     await syncClientes();
     await syncContactos();
+    await syncOrdenesVenta();
     console.log(`[SAP-SYNC] ✓ Sincronización completada ${new Date().toISOString()}`);
   } catch (err) {
     console.error("[SAP-SYNC] ❌ Error en sincronización:", err.message);

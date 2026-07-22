@@ -29,7 +29,7 @@ initializeSocket(server); // Inicializamos Socket.io
 app.use("/", router);
 
 app.get("/", (req, res) => {
-  res.json({ message: "El servidor esta funcionando!", data: "Bien perro!" });
+  res.json({ message: "El servidor esta funcionando!", data: "Bien perro" });
 });
 
 server.listen(PORT, "0.0.0.0",() => {
