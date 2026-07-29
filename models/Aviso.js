@@ -205,6 +205,15 @@ guiaMantenimientoProgramacionId: {
   type: DataTypes.UUID,
   allowNull: true,
 },
+
+      /* =====================
+         BORRADO LÓGICO
+      ===================== */
+      activo: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+      },
     },
     {
       tableName: "Avisos",

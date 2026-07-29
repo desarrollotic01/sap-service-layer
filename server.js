@@ -9,6 +9,7 @@ const loginMiddleware = require("./checkers/validateToken");
 const usuariosRouter = require("./routes/loginRouter");
 const portalClienteRouter = require("./routes/portalClienteRouter");
 const cors = require("cors");
+const compression = require("compression");
 const path = require("path");
 
 const { initCronJobs, setIo } = require("./cron/guiaMantenimientoCron");
@@ -17,8 +18,15 @@ const { initContadores } = require("./utils/contadores");
 
 const app = express();
 app.use(cors());
+app.use(compression());
 app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"), {
+    maxAge: "365d",
+    immutable: true,
+  })
+);
 app.use("/login", usuariosRouter); // sin auth: login
 app.use("/portal-cliente", portalClienteRouter); // sin auth: portal público (valida por token en URL)
 app.use(loginMiddleware); // auth global para el resto

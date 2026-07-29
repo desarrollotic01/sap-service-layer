@@ -54,6 +54,7 @@ const PRODUCTOS_VALIDOS = [
 const buildWhereAvisosPorOrigen = (origenAviso, filtros = {}) => {
   const where = {
     origenAviso,
+    activo: true,
   };
 
   if (filtros.estadoAviso) {
@@ -291,6 +292,7 @@ async function crearAviso(data, userId) {
 ========================= */
 async function obtenerAvisos() {
   return await Aviso.findAll({
+    where: { activo: true },
     include: [
       {
         model: Usuario,
@@ -410,24 +412,12 @@ async function eliminarAviso(id) {
   const aviso = await Aviso.findByPk(id);
   if (!aviso) return null;
 
-  const t = await sequelize.transaction();
+  // Borrado lógico: se conserva el registro y sus relaciones,
+  // solo se marca como inactivo para que deje de listarse.
+  aviso.activo = false;
+  await aviso.save();
 
-  try {
-    // borrar relaciones primero
-    await AvisoEquipo.destroy({
-      where: { avisoId: id },
-      transaction: t,
-    });
-
-    // borrar aviso
-    await aviso.destroy({ transaction: t });
-
-    await t.commit();
-    return true;
-  } catch (error) {
-    await t.rollback();
-    throw error;
-  }
+  return true;
 }
 
 
