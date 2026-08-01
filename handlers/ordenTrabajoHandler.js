@@ -414,6 +414,9 @@ async function actualizarOrdenTrabajoCompletaHandler(req, res) {
       "supervisorId", "fechaProgramadaInicio", "fechaProgramadaFin",
       "fechaInicioReal", "fechaFinReal", "fechaCierre", "observaciones",
       "avisoId", "tratamientoId", "equipos", "adjuntos",
+      // Enviados siempre por el modal de edición de OT grupal (Modalotgrupal.jsx),
+      // el controlador de actualización los ignora (no forman parte de su propia whitelist).
+      "tipoAviso", "modo", "solicitudesCompra", "solicitudesAlmacen", "encargadoId",
     ];
 
     const camposInvalidos = Object.keys(data).filter(

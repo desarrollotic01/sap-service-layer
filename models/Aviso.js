@@ -26,6 +26,11 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
 
+      tipoAtencion: {
+        type: DataTypes.ENUM("interna", "venta"),
+        allowNull: true,
+      },
+
       origenAviso: {
   type: DataTypes.ENUM("manual", "guia"),
   allowNull: false,

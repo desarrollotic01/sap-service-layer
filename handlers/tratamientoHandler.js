@@ -19,13 +19,20 @@ const esObjetoPlano = (valor) => {
   return valor !== null && typeof valor === "object" && !Array.isArray(valor);
 };
 
-const validarLineaSolicitud = (linea, index, nombreSolicitud) => {
+const validarLineaSolicitud = (linea, index, nombreSolicitud, esAlmacen = false) => {
   if (!esObjetoPlano(linea)) {
     return `${nombreSolicitud}: la línea ${index + 1} debe ser un objeto válido`;
   }
 
   if (!linea.itemCode || typeof linea.itemCode !== "string" || !linea.itemCode.trim()) {
     return `${nombreSolicitud}: itemCode es obligatorio en la línea ${index + 1}`;
+  }
+
+  // SolicitudAlmacenLinea.paqueteTrabajoId es NOT NULL en el modelo;
+  // sin esta validación el 400 explícito se convierte en un error de BD que
+  // hace rollback de todo el tratamiento (actividades incluidas).
+  if (esAlmacen && (!linea.paqueteTrabajoId || !String(linea.paqueteTrabajoId).trim())) {
+    return `${nombreSolicitud}: paqueteTrabajoId es obligatorio en la línea ${index + 1}`;
   }
 
   if (
@@ -186,7 +193,7 @@ const normalizarSolicitudesPorTarget = (obj = {}) => {
   return resultado;
 };
 
-const validarSolicitud = (solicitud, nombreSolicitud) => {
+const validarSolicitud = (solicitud, nombreSolicitud, esAlmacen = false) => {
   if (solicitud === undefined || solicitud === null) return null;
 
   if (!esObjetoPlano(solicitud)) {
@@ -213,7 +220,8 @@ const validarSolicitud = (solicitud, nombreSolicitud) => {
     const errorLinea = validarLineaSolicitud(
       solicitud.lineas[i],
       i,
-      nombreSolicitud
+      nombreSolicitud,
+      esAlmacen
     );
     if (errorLinea) return errorLinea;
   }
@@ -221,7 +229,7 @@ const validarSolicitud = (solicitud, nombreSolicitud) => {
   return null;
 };
 
-const validarSolicitudesPorTarget = (obj, nombreBase) => {
+const validarSolicitudesPorTarget = (obj, nombreBase, esAlmacen = false) => {
   if (obj === undefined || obj === null) return null;
 
   if (!esObjetoPlano(obj)) {
@@ -233,7 +241,7 @@ const validarSolicitudesPorTarget = (obj, nombreBase) => {
       return `${nombreBase}: la clave del target es inválida`;
     }
 
-    const errorSolicitud = validarSolicitud(obj[key], `${nombreBase} (${key})`);
+    const errorSolicitud = validarSolicitud(obj[key], `${nombreBase} (${key})`, esAlmacen);
     if (errorSolicitud) return errorSolicitud;
   }
 
@@ -527,7 +535,8 @@ if (esObjetoPlano(tratamiento.actividadesPlanEditadas)) {
 
     const errorSolicitudAlmacenGeneral = validarSolicitud(
       solicitudAlmacenGeneral,
-      "Solicitud de almacén general"
+      "Solicitud de almacén general",
+      true
     );
     if (errorSolicitudAlmacenGeneral) {
       return res.status(400).json({
@@ -538,7 +547,8 @@ if (esObjetoPlano(tratamiento.actividadesPlanEditadas)) {
 
     const errorSolicitudesAlmacenPorEquipo = validarSolicitudesPorTarget(
       solicitudesAlmacenPorEquipo,
-      "Solicitud de almacén por equipo/ubicación"
+      "Solicitud de almacén por equipo/ubicación",
+      true
     );
     if (errorSolicitudesAlmacenPorEquipo) {
       return res.status(400).json({

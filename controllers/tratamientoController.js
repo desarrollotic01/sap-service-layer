@@ -85,6 +85,8 @@ const obtenerOrdenVentaParaTarget = async ({
   ubicacionId = null,
   transaction,
 }) => {
+  // El aviso puede identificarse por Orden de Venta (código de proyecto SAP)
+  // o, alternativamente, por Centro de Costo (son mutuamente excluyentes, ver ModalMantenimiento.jsx).
   if (equipoId) {
     const equipo = await Equipo.findByPk(equipoId, { transaction });
 
@@ -93,12 +95,12 @@ const obtenerOrdenVentaParaTarget = async ({
     }
 
     const ov = limpiarOV(
-      equipo.numeroOV || equipo.ordenVenta || equipo.ov || aviso?.numeroOV || aviso?.ordenVenta
+      equipo.numeroOV || equipo.ordenVenta || equipo.ov || aviso?.ordenVenta || aviso?.centroCosto
     );
 
     if (!ov) {
       throw new Error(
-        `El equipo ${equipoId} no tiene número de OV asociado (tampoco el aviso)`
+        `El equipo ${equipoId} no tiene Orden de Venta ni Centro de Costo asociado (tampoco el aviso)`
       );
     }
 
@@ -116,26 +118,62 @@ const obtenerOrdenVentaParaTarget = async ({
       ubicacion.numeroOV ||
         ubicacion.ordenVenta ||
         ubicacion.ov ||
-        aviso?.numeroOV ||
-        aviso?.ordenVenta
+        aviso?.ordenVenta ||
+        aviso?.centroCosto
     );
 
     if (!ov) {
       throw new Error(
-        `La ubicación técnica ${ubicacionId} no tiene número de OV asociado (tampoco el aviso)`
+        `La ubicación técnica ${ubicacionId} no tiene Orden de Venta ni Centro de Costo asociado (tampoco el aviso)`
       );
     }
 
     return ov;
   }
 
-  const ovGeneral = limpiarOV(aviso?.numeroOV || aviso?.ordenVenta);
+  const ovGeneral = limpiarOV(aviso?.ordenVenta || aviso?.centroCosto);
 
   if (!ovGeneral) {
-    throw new Error("El aviso no tiene número de OV para generar la solicitud general");
+    throw new Error("El aviso no tiene Orden de Venta ni Centro de Costo para generar la solicitud general");
   }
 
   return ovGeneral;
+};
+
+// A diferencia de obtenerOrdenVentaParaTarget (que solo valida y arma el número de
+// solicitud), esto distingue si el valor heredado es Proyecto o Centro de Costo,
+// para poblar la línea correcta (projectCode vs costingCode) cuando el front no la envía.
+const resolverProyectoOCentroCosto = async ({
+  aviso,
+  equipoId = null,
+  ubicacionId = null,
+  transaction,
+}) => {
+  let ovEspecifico = null;
+
+  if (equipoId) {
+    const equipo = await Equipo.findByPk(equipoId, { transaction });
+    ovEspecifico = limpiarOV(equipo?.numeroOV || equipo?.ordenVenta || equipo?.ov);
+  } else if (ubicacionId) {
+    const ubicacion = await UbicacionTecnica.findByPk(ubicacionId, { transaction });
+    ovEspecifico = limpiarOV(ubicacion?.numeroOV || ubicacion?.ordenVenta || ubicacion?.ov);
+  }
+
+  if (ovEspecifico) {
+    return { projectCode: ovEspecifico, costingCode: null };
+  }
+
+  const proyectoAviso = limpiarOV(aviso?.ordenVenta);
+  if (proyectoAviso) {
+    return { projectCode: proyectoAviso, costingCode: null };
+  }
+
+  const centroCostoAviso = limpiarOV(aviso?.centroCosto);
+  if (centroCostoAviso) {
+    return { projectCode: null, costingCode: centroCostoAviso };
+  }
+
+  return { projectCode: null, costingCode: null };
 };
 
 
@@ -303,7 +341,14 @@ const crearSolicitudCompra = async ({
   ubicacionId = null,
   aviso,
 }) => {
-  const ordenVenta = await obtenerOrdenVentaParaTarget({
+  await obtenerOrdenVentaParaTarget({
+    aviso,
+    equipoId,
+    ubicacionId,
+    transaction: t,
+  });
+
+  const fallback = await resolverProyectoOCentroCosto({
     aviso,
     equipoId,
     ubicacionId,
@@ -335,8 +380,8 @@ const crearSolicitudCompra = async ({
       description: l.description || "",
       quantity: l.quantity,
       warehouseCode: l.warehouseCode || "01",
-      costingCode: l.costCenter || l.costingCode || null,
-      projectCode: l.projectCode || null,
+      costingCode: l.costCenter || l.costingCode || fallback.costingCode || null,
+      projectCode: l.projectCode || fallback.projectCode || null,
       rubroId: l.rubroId || null,
       paqueteTrabajoId: l.paqueteTrabajoId || null,
     })),
@@ -359,7 +404,14 @@ const crearSolicitudAlmacen = async ({
   ubicacionId = null,
   aviso,
 }) => {
-  const ordenVenta = await obtenerOrdenVentaParaTarget({
+  await obtenerOrdenVentaParaTarget({
+    aviso,
+    equipoId,
+    ubicacionId,
+    transaction: t,
+  });
+
+  const fallback = await resolverProyectoOCentroCosto({
     aviso,
     equipoId,
     ubicacionId,
@@ -391,8 +443,8 @@ const crearSolicitudAlmacen = async ({
       description: l.description || "",
       quantity: l.quantity,
       warehouseCode: l.warehouseCode || "01",
-      costingCode: l.costCenter || l.costingCode || null,
-      projectCode: l.projectCode || null,
+      costingCode: l.costCenter || l.costingCode || fallback.costingCode || null,
+      projectCode: l.projectCode || fallback.projectCode || null,
       rubroId: l.rubroId || null,
       paqueteTrabajoId: l.paqueteTrabajoId || null,
     })),
@@ -1021,7 +1073,7 @@ const upsertSolicitud = async ({
   };
 
   if (!solicitud) {
-    const ordenVenta = await obtenerOrdenVentaParaTarget({
+    await obtenerOrdenVentaParaTarget({
       aviso,
       equipoId,
       ubicacionId,
@@ -1043,6 +1095,13 @@ const upsertSolicitud = async ({
     });
   }
 
+  const fallback = await resolverProyectoOCentroCosto({
+    aviso,
+    equipoId,
+    ubicacionId,
+    transaction: t,
+  });
+
   await SolicitudCompraLinea.bulkCreate(
     (data.lineas || []).map((l) => ({
       solicitud_compra_id: solicitud.id,
@@ -1050,8 +1109,8 @@ const upsertSolicitud = async ({
       itemCode: l.itemCode || null,
       description: l.description || null,
       quantity: Number(l.quantity),
-      costingCode: l.costCenter || l.costingCode || null,
-      projectCode: l.projectCode || null,
+      costingCode: l.costCenter || l.costingCode || fallback.costingCode || null,
+      projectCode: l.projectCode || fallback.projectCode || null,
       warehouseCode: l.warehouseCode,
       rubroId: l.rubroId || null,
       paqueteTrabajoId: l.paqueteTrabajoId || null,

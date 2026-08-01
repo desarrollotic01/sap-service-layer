@@ -10,7 +10,7 @@ const { validarAviso } = require("../validators/avisoValidator");
 const path = require("path");
 
 const UUID_FIELDS = ["clienteId", "paisId", "supervisorId", "guiaMantenimientoId", "guiaMantenimientoProgramacionId"];
-const ENUM_FIELDS = ["prioridad", "tipoMantenimiento", "producto", "tipoAviso"];
+const ENUM_FIELDS = ["prioridad", "tipoMantenimiento", "producto", "tipoAviso", "tipoAtencion"];
 
 function isEmpty(v) {
   return !v || v === "null" || v === "undefined";
