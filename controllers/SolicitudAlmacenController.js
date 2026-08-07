@@ -321,8 +321,8 @@ const updateSolicitudAlmacen = async ({ id, data }) => {
           warehouseCode: linea.warehouseCode,
           costingCode: linea.costingCode,
           projectCode: linea.projectCode,
-          rubroSapCode: linea.rubroSapCode,
-          paqueteTrabajo: linea.paqueteTrabajo,
+          rubroId: linea.rubroId,
+          paqueteTrabajoId: linea.paqueteTrabajoId,
         },
         { transaction: t }
       );

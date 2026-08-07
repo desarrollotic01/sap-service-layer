@@ -2,6 +2,8 @@ const {
   SolicitudCompra,
   SolicitudCompraLinea,
   Item,
+  SapRubro,
+  SapPaqueteTrabajo,
 } = require("../db_connection");
 const { createPurchaseRequestSAP } = require("../sap/sapPurchaseRequest");
 
@@ -15,6 +17,16 @@ const enviarSolicitudCompraASAP = async (solicitudId) => {
           {
             model: Item,
             as: "item",
+            required: false,
+          },
+          {
+            model: SapRubro,
+            as: "rubro",
+            required: false,
+          },
+          {
+            model: SapPaqueteTrabajo,
+            as: "paqueteTrabajo",
             required: false,
           },
         ],
@@ -57,8 +69,8 @@ const enviarSolicitudCompraASAP = async (solicitudId) => {
         WarehouseCode: l.warehouseCode,
         CostingCode: l.costingCode || null,
         ProjectCode: l.projectCode || null,
-        U_ALS_RUBRO: l.rubroSapCode || l.rubro || null,
-        U_ALS_PAQTRAB: l.paqueteTrabajo || null,
+        U_ALS_RUBRO: l.rubro?.codigo || null,
+        U_ALS_PAQTRAB: l.paqueteTrabajo?.codigo || null,
       };
     }),
   };
